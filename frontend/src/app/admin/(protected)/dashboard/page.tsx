@@ -8,6 +8,7 @@ import {
   ArrowPathIcon,
   BellAlertIcon,
   ExclamationTriangleIcon,
+  ArrowUpRightIcon,
 } from '@heroicons/react/24/outline';
 import { KPICard } from '@/components/admin/dashboard/KPICard';
 import { InsightsPanelCard } from '@/components/admin/dashboard/InsightsPanelCard';
@@ -19,6 +20,14 @@ import { QuickLinksPanel } from '@/components/admin/dashboard/QuickLinksPanel';
 import { MicroTrendsGrid } from '@/components/admin/dashboard/MicroTrendsGrid';
 import { InteractiveMetricsCharts } from '@/components/admin/dashboard/InteractiveMetricsCharts';
 import { OnDutyCounselorsPanel } from '@/components/admin/dashboard/OnDutyCounselorsPanel';
+import {
+  AmbientLayer,
+  Bezel,
+  Eyebrow,
+  EASE,
+  Reveal,
+  ZoneLabel,
+} from '@/components/admin/dashboard/primitives';
 import type { GenerateReportParams } from '@/components/admin/dashboard/GenerateReportModal';
 import {
   generateInsightsReport,
@@ -61,28 +70,28 @@ function buildCriticalStatusCards(kpis: DashboardKPIs): DashboardCardModel[] {
       title: 'Critical Cases',
       value: kpis.active_critical_cases,
       subtitle: 'Requiring immediate attention',
-      icon: <ExclamationTriangleIcon className="h-6 w-6 text-red-400" />,
+      icon: <ExclamationTriangleIcon className="h-5 w-5" />,
       severity: kpis.active_critical_cases > 0 ? 'critical' : 'success',
     },
     {
       title: 'SLA Breaches',
       value: kpis.sla_breach_count,
       subtitle: 'Cases past response deadline',
-      icon: <BellAlertIcon className="h-6 w-6 text-yellow-400" />,
+      icon: <BellAlertIcon className="h-5 w-5" />,
       severity: kpis.sla_breach_count > 0 ? 'warning' : 'success',
     },
   ];
 }
 
-/** Horizontal divider with a floating zone label for scannable dashboard hierarchy. */
-function SectionLabel({ children }: { children: ReactNode }) {
+/** Ghost pill link — hairline ring, fluid hover lift. */
+function GhostPill({ href, children }: { href: string; children: ReactNode }) {
   return (
-    <div className="flex items-center gap-3 pt-2">
-      <span className="shrink-0 text-xs font-semibold uppercase tracking-widest text-white/35">
-        {children}
-      </span>
-      <div className="h-px flex-1 bg-white/8" />
-    </div>
+    <Link
+      href={href}
+      className="rounded-full px-4 py-2 text-sm font-medium text-white/65 ring-1 ring-white/10 transition-all duration-700 ease-[cubic-bezier(0.32,0.72,0,1)] hover:bg-white/[0.06] hover:text-white active:scale-[0.98]"
+    >
+      {children}
+    </Link>
   );
 }
 
@@ -209,10 +218,14 @@ export default function AdminDashboardPage() {
 
   if (loading) {
     return (
-      <div className="flex min-h-[60vh] items-center justify-center">
-        <div className="space-y-4 text-center">
-          <div className="mx-auto h-12 w-12 animate-spin rounded-full border-4 border-white/20 border-t-[#FFCA40]" />
-          <p className="text-white/60">Loading dashboard...</p>
+      <div className="relative flex min-h-[60vh] items-center justify-center">
+        <AmbientLayer />
+        <div className="relative space-y-5 text-center">
+          <div className="relative mx-auto h-14 w-14">
+            <div className="absolute inset-0 animate-spin rounded-full border border-white/10 border-t-[#FFCA40] [animation-duration:1.4s]" />
+            <div className="absolute inset-2 animate-spin rounded-full border border-white/5 border-b-[#FFCA40]/50 [animation-duration:2.2s] [animation-direction:reverse]" />
+          </div>
+          <p className="text-sm tracking-wide text-white/50">Calibrating console…</p>
         </div>
       </div>
     );
@@ -220,21 +233,31 @@ export default function AdminDashboardPage() {
 
   if (error) {
     return (
-      <div className="flex min-h-[60vh] items-center justify-center">
-        <div className="max-w-md space-y-4 text-center">
-          <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-full bg-red-500/10">
-            <ExclamationTriangleIcon className="h-8 w-8 text-red-400" />
-          </div>
-          <h3 className="text-xl font-semibold text-white">Error Loading Dashboard</h3>
-          <p className="text-white/60">{error}</p>
-          <button
-            type="button"
-            onClick={() => loadDashboard()}
-            className="rounded-xl bg-[#FFCA40] px-6 py-3 font-semibold text-[#00153a] shadow-lg shadow-[#FFCA40]/20 transition-all duration-200 hover:bg-[#FFCA40]/90"
-          >
-            Retry
-          </button>
-        </div>
+      <div className="relative flex min-h-[60vh] items-center justify-center px-4">
+        <AmbientLayer />
+        <Reveal className="relative w-full max-w-md">
+          <Bezel>
+            <div className="space-y-5 p-8 text-center">
+              <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-full bg-red-500/10 text-red-300 ring-1 ring-red-500/20">
+                <ExclamationTriangleIcon className="h-6 w-6" />
+              </div>
+              <div className="space-y-1.5">
+                <h3 className="text-lg font-semibold tracking-tight text-white">Console offline</h3>
+                <p className="text-sm leading-relaxed text-white/50">{error}</p>
+              </div>
+              <button
+                type="button"
+                onClick={() => loadDashboard()}
+                className="group mx-auto flex items-center gap-2 rounded-full bg-[#FFCA40] py-2 pl-6 pr-2 text-sm font-semibold text-[#00153a] transition-all duration-700 ease-[cubic-bezier(0.32,0.72,0,1)] hover:shadow-[0_8px_40px_-8px_rgba(255,202,64,0.45)] active:scale-[0.98]"
+              >
+                Retry connection
+                <span className="flex h-8 w-8 items-center justify-center rounded-full bg-black/10 transition-transform duration-700 ease-[cubic-bezier(0.32,0.72,0,1)] group-hover:translate-x-0.5 group-hover:-translate-y-[1px]">
+                  <ArrowPathIcon className="h-4 w-4" />
+                </span>
+              </button>
+            </div>
+          </Bezel>
+        </Reveal>
       </div>
     );
   }
@@ -246,95 +269,118 @@ export default function AdminDashboardPage() {
   const { insights, alerts } = overview;
 
   return (
-    <div className="space-y-6 p-4 md:p-6 lg:p-8">
-      {/* ── Page Header ───────────────────────────────────────── */}
-      <motion.header
-        initial={{ opacity: 0, y: -16 }}
-        animate={{ opacity: 1, y: 0 }}
-        className="flex flex-col gap-4 xl:flex-row xl:items-center xl:justify-between"
-      >
-        <div>
-          <h1 className="text-3xl font-bold text-white">Mental Health Admin Dashboard</h1>
-          <div className="mt-1 flex flex-wrap items-center gap-3 text-xs text-white/55">
-            {lastRefreshed && <span>Last refreshed: {lastRefreshed.toLocaleTimeString()}</span>}
-          </div>
-        </div>
+    <div className="relative min-h-[100dvh] space-y-10 px-4 py-8 md:px-6 md:py-10 lg:px-8 lg:py-12">
+      <AmbientLayer />
 
-        <div className="flex flex-wrap items-center gap-2">
-          <Link
-            href="/admin/agent-decisions"
-            className="rounded-xl border border-white/15 bg-white/8 px-3 py-2 text-sm font-medium text-white hover:bg-white/12"
-          >
-            Agent Decisions
-          </Link>
-          <Link
-            href="/admin/testing"
-            className="rounded-xl border border-white/15 bg-white/8 px-3 py-2 text-sm font-medium text-white hover:bg-white/12"
-          >
-            Testing Console
-          </Link>
-          <button
-            type="button"
-            onClick={() => loadDashboard(true)}
-            disabled={refreshing}
-            className="rounded-xl border border-white/10 bg-white/5 p-2 text-white/70 transition-all duration-200 hover:bg-white/10 hover:text-white disabled:opacity-60"
-            title="Refresh dashboard"
-          >
-            <ArrowPathIcon className={`h-5 w-5 ${refreshing ? 'animate-spin' : ''}`} />
-          </button>
-          {RANGE_OPTIONS.map((range) => (
+      {/* ── Page Header ───────────────────────────────────────── */}
+      <Reveal>
+        <header className="flex flex-col gap-6 xl:flex-row xl:items-end xl:justify-between">
+          <div className="space-y-3">
+            <Eyebrow>
+              <span className="h-1.5 w-1.5 rounded-full bg-emerald-400" />
+              Operations Console
+            </Eyebrow>
+            <h1 className="max-w-2xl text-4xl font-bold leading-[1.05] tracking-tight text-white md:text-5xl">
+              Mental Health
+              <span className="block text-white/40">Command Center</span>
+            </h1>
+            {lastRefreshed && (
+              <p className="text-xs tabular-nums tracking-wide text-white/40">
+                Synced {lastRefreshed.toLocaleTimeString()} · live via SSE
+              </p>
+            )}
+          </div>
+
+          <div className="flex flex-wrap items-center gap-2.5">
+            {/* Primary CTA — button-in-button trailing icon */}
             <button
-              key={range}
               type="button"
-              onClick={() => setTimeRange(range)}
-              className={`rounded-xl px-4 py-2 text-sm font-medium transition-all duration-200 ${
-                timeRange === range
-                  ? 'bg-[#FFCA40] text-[#00153a] shadow-lg shadow-[#FFCA40]/30'
-                  : 'border border-white/10 bg-white/5 text-white/65 hover:bg-white/10 hover:text-white'
-              }`}
+              onClick={() => setShowGenerateModal(true)}
+              className="group flex items-center gap-2.5 rounded-full bg-[#FFCA40] py-2 pl-5 pr-2 text-sm font-semibold text-[#00153a] transition-all duration-700 ease-[cubic-bezier(0.32,0.72,0,1)] hover:shadow-[0_8px_40px_-8px_rgba(255,202,64,0.5)] active:scale-[0.98]"
             >
-              {range}d
+              Generate IA Report
+              <span className="flex h-8 w-8 items-center justify-center rounded-full bg-black/10 transition-transform duration-700 ease-[cubic-bezier(0.32,0.72,0,1)] group-hover:translate-x-0.5 group-hover:-translate-y-[1px] group-hover:scale-105">
+                <ArrowUpRightIcon className="h-4 w-4" />
+              </span>
             </button>
-          ))}
-        </div>
-      </motion.header>
+
+            <GhostPill href="/admin/agent-decisions">Agent Decisions</GhostPill>
+            <GhostPill href="/admin/testing">Testing Console</GhostPill>
+
+            <button
+              type="button"
+              onClick={() => loadDashboard(true)}
+              disabled={refreshing}
+              aria-label="Refresh dashboard"
+              className="flex h-10 w-10 items-center justify-center rounded-full text-white/60 ring-1 ring-white/10 transition-all duration-700 ease-[cubic-bezier(0.32,0.72,0,1)] hover:bg-white/[0.06] hover:text-white active:scale-[0.94] disabled:opacity-50"
+            >
+              <ArrowPathIcon className={`h-4 w-4 ${refreshing ? 'animate-spin' : ''}`} />
+            </button>
+
+            {/* Fluid island — active pill morphs between ranges */}
+            <div className="flex items-center rounded-full bg-white/[0.05] p-1 ring-1 ring-white/10">
+              {RANGE_OPTIONS.map((range) => (
+                <button
+                  key={range}
+                  type="button"
+                  onClick={() => setTimeRange(range)}
+                  className={`relative rounded-full px-4 py-1.5 text-sm font-medium transition-colors duration-500 ${
+                    timeRange === range ? 'text-[#00153a]' : 'text-white/55 hover:text-white'
+                  }`}
+                >
+                  {timeRange === range && (
+                    <motion.span
+                      layoutId="range-pill"
+                      transition={{ duration: 0.6, ease: EASE }}
+                      className="absolute inset-0 rounded-full bg-[#FFCA40]"
+                    />
+                  )}
+                  <span className="relative tabular-nums">{range}d</span>
+                </button>
+              ))}
+            </div>
+          </div>
+        </header>
+      </Reveal>
 
       {/* ── Zone 1: Requires Immediate Attention ──────────────── */}
       {/*
        * Critical KPIs and the live alert feed are grouped together so an admin
        * can answer "what needs my attention right now?" in a single glance.
-       * The zone gains a subtle red tint whenever active issues exist.
+       * Asymmetrical bento: 5/7 split on xl, single column below.
        */}
-      <SectionLabel>Requires Immediate Attention</SectionLabel>
-      <section
-        aria-label="Critical status and live alerts"
-        className={`rounded-2xl border p-4 transition-colors duration-500 ${
-          hasCriticalIssues
-            ? 'border-red-500/20 bg-red-500/5'
-            : 'border-white/8 bg-white/3'
-        }`}
-      >
-        <div className="grid grid-cols-1 gap-4 xl:grid-cols-3">
-          {/* Left column: two critical KPI cards stacked */}
-          <div className="grid grid-cols-2 gap-4 xl:grid-cols-1 xl:gap-4">
-            {criticalCards.map((item) => (
-              <KPICard
-                key={item.title}
-                title={item.title}
-                value={item.value}
-                subtitle={item.subtitle}
-                trend={item.trend}
-                icon={item.icon}
-                severity={item.severity}
-              />
-            ))}
-          </div>
-          {/* Right column: live alerts feed */}
-          <div className="xl:col-span-2">
-            <AlertsFeed alerts={alerts} maxItems={5} />
-          </div>
-        </div>
-      </section>
+      <Reveal index={1} className="space-y-4">
+        <ZoneLabel>Requires Immediate Attention</ZoneLabel>
+        <Bezel
+          shellClassName={
+            hasCriticalIssues ? 'ring-red-500/25 bg-red-500/[0.05]' : ''
+          }
+        >
+          <section
+            aria-label="Critical status and live alerts"
+            className="grid grid-cols-1 gap-4 p-4 xl:grid-cols-12"
+          >
+            {/* Left column: two critical KPI cards stacked */}
+            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:col-span-5 xl:grid-cols-1">
+              {criticalCards.map((item) => (
+                <KPICard
+                  key={item.title}
+                  title={item.title}
+                  value={item.value}
+                  subtitle={item.subtitle}
+                  trend={item.trend}
+                  icon={item.icon}
+                  severity={item.severity}
+                />
+              ))}
+            </div>
+            {/* Right column: live alerts feed */}
+            <div className="xl:col-span-7">
+              <AlertsFeed alerts={alerts} maxItems={5} />
+            </div>
+          </section>
+        </Bezel>
+      </Reveal>
 
       {/* ── Zone 2: Platform Health ────────────────────────────── */}
       {/*
@@ -342,13 +388,15 @@ export default function AdminDashboardPage() {
        * Eliminates duplication that previously existed between the KPI grid and
        * the micro-trend strip.
        */}
-      <SectionLabel>Platform Health</SectionLabel>
-      <MicroTrendsGrid
-        trends={trends}
-        sentimentValue={kpis.overall_sentiment}
-        avgResolutionHours={kpis.avg_case_resolution_time}
-        activeUsers={activeUsers}
-      />
+      <Reveal index={2} className="space-y-4">
+        <ZoneLabel>Platform Health</ZoneLabel>
+        <MicroTrendsGrid
+          trends={trends}
+          sentimentValue={kpis.overall_sentiment}
+          avgResolutionHours={kpis.avg_case_resolution_time}
+          activeUsers={activeUsers}
+        />
+      </Reveal>
 
       {/* ── Zone 3: Trend Analysis ─────────────────────────────── */}
       {/*
@@ -356,8 +404,10 @@ export default function AdminDashboardPage() {
        * current-state metrics so the admin first knows "where we are", then
        * investigates "how we got here".
        */}
-      <SectionLabel>Trend Analysis</SectionLabel>
-      <InteractiveMetricsCharts overview={overview} trends={trends} />
+      <Reveal index={3} className="space-y-4">
+        <ZoneLabel>Trend Analysis</ZoneLabel>
+        <InteractiveMetricsCharts overview={overview} trends={trends} />
+      </Reveal>
 
       {/* ── Zone 4: Operations & Intelligence ─────────────────── */}
       {/*
@@ -366,19 +416,24 @@ export default function AdminDashboardPage() {
        *   - AI Insights         →  what patterns and interventions the system recommends
        * Pairing them reflects the "decide, then act" management workflow.
        */}
-      <SectionLabel>Operations &amp; Intelligence</SectionLabel>
-      <section className="grid grid-cols-1 gap-6 xl:grid-cols-3" aria-label="Operations and AI intelligence">
-        <div className="xl:col-span-2">
-          <OnDutyCounselorsPanel />
-        </div>
-        <div>
-          <InsightsPanelCard
-            insights={insights}
-            onGenerateReport={() => setShowGenerateModal(true)}
-            onGenerateCampaign={() => setShowInsightsCampaignModal(true)}
-          />
-        </div>
-      </section>
+      <Reveal index={4} className="space-y-4">
+        <ZoneLabel>Operations &amp; Intelligence</ZoneLabel>
+        <section
+          className="grid grid-cols-1 gap-6 xl:grid-cols-12"
+          aria-label="Operations and AI intelligence"
+        >
+          <div className="xl:col-span-7">
+            <OnDutyCounselorsPanel />
+          </div>
+          <div className="xl:col-span-5">
+            <InsightsPanelCard
+              insights={insights}
+              onGenerateReport={() => setShowGenerateModal(true)}
+              onGenerateCampaign={() => setShowInsightsCampaignModal(true)}
+            />
+          </div>
+        </section>
+      </Reveal>
 
       {/* ── Zone 5: Quick Navigation ───────────────────────────── */}
       {/*
@@ -386,8 +441,10 @@ export default function AdminDashboardPage() {
        * with operational content for visual attention. Placed last as a utility
        * tier, styled smaller to signal secondary importance.
        */}
-      <SectionLabel>Quick Navigation</SectionLabel>
-      <QuickLinksPanel />
+      <Reveal index={5} className="space-y-4">
+        <ZoneLabel>Quick Navigation</ZoneLabel>
+        <QuickLinksPanel />
+      </Reveal>
 
       <GenerateReportModal
         isOpen={showGenerateModal}
@@ -415,16 +472,12 @@ export default function AdminDashboardPage() {
         />
       )}
 
-      <motion.footer
-        initial={{ opacity: 0 }}
-        animate={{ opacity: 1 }}
-        transition={{ delay: 0.35 }}
-        className="pt-2 text-center text-xs text-white/40"
-      >
-        {lastRefreshed ? `Data as of ${lastRefreshed.toLocaleString()}` : 'Loading...'}
-        {' '}
-        &bull; Time range: Last {timeRange} days
-      </motion.footer>
+      <Reveal index={6}>
+        <footer className="flex flex-col items-center justify-between gap-2 pt-4 text-center text-xs tabular-nums tracking-wide text-white/35 sm:flex-row">
+          <span>{lastRefreshed ? `Data as of ${lastRefreshed.toLocaleString()}` : 'Loading…'}</span>
+          <span>Time range · last {timeRange} days</span>
+        </footer>
+      </Reveal>
     </div>
   );
 }

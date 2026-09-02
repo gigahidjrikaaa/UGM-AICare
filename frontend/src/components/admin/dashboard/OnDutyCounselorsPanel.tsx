@@ -5,6 +5,7 @@ import { motion } from 'framer-motion';
 import { ChartBarIcon, ClockIcon, UserGroupIcon } from '@heroicons/react/24/outline';
 import { useAdminCounselors, useAdminCounselorStats } from '@/hooks/useCounselors';
 import type { CounselorResponse } from '@/lib/appointments-api';
+import { EASE } from './primitives';
 
 const MAX_ON_DUTY_ITEMS = 8;
 
@@ -34,8 +35,8 @@ function classifyWorkload(upcomingAppointments: number): {
   if (upcomingAppointments <= 5) {
     return {
       label: 'Moderate',
-      barClass: 'bg-yellow-400',
-      textClass: 'text-yellow-300',
+      barClass: 'bg-amber-400',
+      textClass: 'text-amber-300',
       width: 65,
     };
   }
@@ -61,36 +62,39 @@ function CounselorDutyRow({ counselor, index }: { counselor: CounselorResponse; 
 
   return (
     <motion.tr
-      initial={{ opacity: 0, y: 6 }}
+      initial={{ opacity: 0, y: 8 }}
       animate={{ opacity: 1, y: 0 }}
-      transition={{ delay: index * 0.03 }}
-      className="border-b border-white/10 last:border-b-0"
+      transition={{ duration: 0.6, ease: EASE, delay: index * 0.04 }}
+      className="border-b border-white/[0.06] transition-colors duration-500 last:border-b-0 hover:bg-white/[0.02]"
     >
       <td className="px-4 py-3 text-sm text-white">
         <div className="flex flex-col">
           <span className="font-semibold">{counselor.name}</span>
-          <span className="text-xs text-white/55">{counselor.specialization || 'General Counseling'}</span>
+          <span className="text-xs text-white/45">{counselor.specialization || 'General Counseling'}</span>
         </div>
       </td>
-      <td className="px-4 py-3 text-sm text-white/80">
-        {isLoading ? 'Loading…' : totalPatients}
+      <td className="px-4 py-3 text-sm tabular-nums text-white/75">
+        {isLoading ? <span className="text-white/35">…</span> : totalPatients}
       </td>
-      <td className="px-4 py-3 text-sm text-white/80">
-        {isLoading ? 'Loading…' : `${completionRate.toFixed(0)}%`}
+      <td className="px-4 py-3 text-sm tabular-nums text-white/75">
+        {isLoading ? <span className="text-white/35">…</span> : `${completionRate.toFixed(0)}%`}
       </td>
       <td className="px-4 py-3 text-sm">
         {isLoading ? (
-          <span className="text-white/60">Loading…</span>
+          <span className="text-white/35">…</span>
         ) : (
-          <div className="space-y-1">
+          <div className="space-y-1.5">
             <div className="flex items-center justify-between text-xs">
               <span className={workload.textClass}>{workload.label}</span>
-              <span className="text-white/60">{upcomingAppointments} upcoming</span>
+              <span className="tabular-nums text-white/40">{upcomingAppointments} upcoming</span>
             </div>
-            <div className="h-1.5 w-full rounded-full bg-white/10">
-              <div
-                className={`h-1.5 rounded-full ${workload.barClass}`}
-                style={{ width: `${workload.width}%` }}
+            <div className="h-1 w-full overflow-hidden rounded-full bg-white/[0.07]">
+              <motion.div
+                initial={{ scaleX: 0 }}
+                animate={{ scaleX: workload.width / 100 }}
+                style={{ transformOrigin: 'left' }}
+                transition={{ duration: 0.8, ease: EASE, delay: 0.2 + index * 0.04 }}
+                className={`h-1 rounded-full ${workload.barClass}`}
               />
             </div>
           </div>
@@ -108,91 +112,103 @@ export function OnDutyCounselorsPanel() {
     .slice(0, MAX_ON_DUTY_ITEMS);
 
   return (
-    <section className="rounded-2xl border border-white/10 bg-white/5 p-5 backdrop-blur" aria-label="On-duty counselors">
-      <div className="mb-4 flex items-center justify-between gap-3">
-        <div>
-          <h2 className="text-lg font-semibold text-white">Counselors On-duty</h2>
-          <p className="text-xs text-white/55">Live availability, performance, and workload indicators</p>
+    <section
+      aria-label="On-duty counselors"
+      className="h-full rounded-[2rem] bg-white/[0.04] p-1.5 ring-1 ring-white/10"
+    >
+      <div className="h-full rounded-[calc(2rem-0.375rem)] bg-[#020b22]/80 p-5 shadow-[inset_0_1px_1px_rgba(255,255,255,0.08)] md:p-6">
+        <div className="mb-5 flex flex-wrap items-center justify-between gap-3">
+          <div>
+            <h2 className="text-sm font-semibold tracking-tight text-white">Counselors On-duty</h2>
+            <p className="mt-0.5 text-xs text-white/45">
+              Live availability, performance, and workload indicators
+            </p>
+          </div>
+          <Link
+            href="/admin/counselors"
+            className="rounded-full px-4 py-2 text-xs font-medium text-white/65 ring-1 ring-white/10 transition-all duration-700 ease-[cubic-bezier(0.32,0.72,0,1)] hover:bg-white/[0.06] hover:text-white active:scale-[0.97]"
+          >
+            Manage Counselors
+          </Link>
         </div>
-        <Link
-          href="/admin/counselors"
-          className="rounded-lg border border-white/15 bg-white/8 px-3 py-2 text-xs font-medium text-white hover:bg-white/12"
-        >
-          Manage Counselors
-        </Link>
+
+        {isLoading ? (
+          <div className="grid grid-cols-1 gap-3 md:grid-cols-3">
+            {[1, 2, 3].map((item) => (
+              <div key={item} className="h-20 animate-pulse rounded-2xl bg-white/[0.04]" />
+            ))}
+          </div>
+        ) : error ? (
+          <div className="rounded-2xl bg-red-500/[0.07] p-4 text-sm text-red-300 ring-1 ring-red-500/20">
+            Failed to load counselor data.
+          </div>
+        ) : onDutyCounselors.length === 0 ? (
+          <div className="rounded-2xl bg-white/[0.03] p-5 text-sm text-white/55 ring-1 ring-white/[0.06]">
+            No counselors are currently marked as available.
+          </div>
+        ) : (
+          <>
+            <div className="mb-5 grid grid-cols-1 gap-3 md:grid-cols-3">
+              {[
+                {
+                  label: 'On-duty Count',
+                  value: String(onDutyCounselors.length),
+                  icon: <UserGroupIcon className="h-3.5 w-3.5" />,
+                },
+                {
+                  label: 'Average Rating',
+                  value: (
+                    onDutyCounselors.reduce((acc, item) => acc + item.rating, 0) /
+                    onDutyCounselors.length
+                  ).toFixed(1),
+                  icon: <ChartBarIcon className="h-3.5 w-3.5" />,
+                },
+                {
+                  label: 'Avg Experience',
+                  value: `${Math.round(
+                    onDutyCounselors.reduce((acc, item) => acc + (item.years_of_experience ?? 0), 0) /
+                      onDutyCounselors.length,
+                  )}y`,
+                  icon: <ClockIcon className="h-3.5 w-3.5" />,
+                },
+              ].map((stat) => (
+                <div
+                  key={stat.label}
+                  className="rounded-2xl bg-white/[0.03] p-3.5 ring-1 ring-white/[0.06]"
+                >
+                  <div className="mb-1.5 flex items-center gap-2 text-[10px] font-semibold uppercase tracking-[0.18em] text-white/40">
+                    {stat.icon}
+                    {stat.label}
+                  </div>
+                  <p className="text-2xl font-bold tabular-nums tracking-tight text-white">{stat.value}</p>
+                </div>
+              ))}
+            </div>
+
+            <div className="overflow-x-auto">
+              <table className="min-w-full">
+                <thead>
+                  <tr className="border-b border-white/[0.08] text-left text-[10px] uppercase tracking-[0.18em] text-white/40">
+                    <th className="px-4 py-2 font-semibold">Counselor</th>
+                    <th className="px-4 py-2 font-semibold">Active Patients</th>
+                    <th className="px-4 py-2 font-semibold">Completion</th>
+                    <th className="px-4 py-2 font-semibold">Workload</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {onDutyCounselors.map((counselor, index) => (
+                    <CounselorDutyRow
+                      key={counselor.id}
+                      counselor={counselor}
+                      index={index}
+                    />
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </>
+        )}
       </div>
-
-      {isLoading ? (
-        <div className="grid grid-cols-1 gap-3 md:grid-cols-3">
-          {[1, 2, 3].map((item) => (
-            <div key={item} className="h-20 animate-pulse rounded-xl border border-white/10 bg-white/5" />
-          ))}
-        </div>
-      ) : error ? (
-        <div className="rounded-xl border border-red-500/30 bg-red-500/10 p-4 text-sm text-red-300">
-          Failed to load counselor data.
-        </div>
-      ) : onDutyCounselors.length === 0 ? (
-        <div className="rounded-xl border border-white/10 bg-white/5 p-5 text-sm text-white/65">
-          No counselors are currently marked as available.
-        </div>
-      ) : (
-        <>
-          <div className="mb-4 grid grid-cols-1 gap-3 md:grid-cols-3">
-            <div className="rounded-xl border border-white/10 bg-white/5 p-3">
-              <div className="mb-1 flex items-center gap-2 text-xs text-white/60">
-                <UserGroupIcon className="h-4 w-4" />
-                On-duty Count
-              </div>
-              <p className="text-2xl font-bold text-white">{onDutyCounselors.length}</p>
-            </div>
-            <div className="rounded-xl border border-white/10 bg-white/5 p-3">
-              <div className="mb-1 flex items-center gap-2 text-xs text-white/60">
-                <ChartBarIcon className="h-4 w-4" />
-                Average Rating
-              </div>
-              <p className="text-2xl font-bold text-white">
-                {(onDutyCounselors.reduce((acc, item) => acc + item.rating, 0) / onDutyCounselors.length).toFixed(1)}
-              </p>
-            </div>
-            <div className="rounded-xl border border-white/10 bg-white/5 p-3">
-              <div className="mb-1 flex items-center gap-2 text-xs text-white/60">
-                <ClockIcon className="h-4 w-4" />
-                Avg Experience
-              </div>
-              <p className="text-2xl font-bold text-white">
-                {Math.round(
-                  onDutyCounselors.reduce((acc, item) => acc + (item.years_of_experience ?? 0), 0) /
-                    onDutyCounselors.length,
-                )}
-                y
-              </p>
-            </div>
-          </div>
-
-          <div className="overflow-x-auto">
-            <table className="min-w-full">
-              <thead>
-                <tr className="border-b border-white/10 text-left text-xs uppercase tracking-wide text-white/60">
-                  <th className="px-4 py-2">Counselor</th>
-                  <th className="px-4 py-2">Active Patients</th>
-                  <th className="px-4 py-2">Completion Rate</th>
-                  <th className="px-4 py-2">Workload</th>
-                </tr>
-              </thead>
-              <tbody>
-                {onDutyCounselors.map((counselor, index) => (
-                  <CounselorDutyRow
-                    key={counselor.id}
-                    counselor={counselor}
-                    index={index}
-                  />
-                ))}
-              </tbody>
-            </table>
-          </div>
-        </>
-      )}
     </section>
   );
 }

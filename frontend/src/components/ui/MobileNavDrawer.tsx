@@ -46,16 +46,16 @@ export default function MobileNavDrawer({ isOpen, onClose, children }: MobileNav
     <>
       {/* Backdrop */}
       <div
-        className={`fixed inset-0 z-[60] bg-[#000c24]/80 backdrop-blur-sm transition-opacity duration-300 md:hidden ${
+        className={`fixed inset-0 z-[60] bg-black/60 backdrop-blur-md transition-opacity duration-500 ease-[cubic-bezier(0.32,0.72,0,1)] md:hidden ${
           isOpen ? 'opacity-100' : 'opacity-0 pointer-events-none'
         }`}
         onClick={onClose}
         aria-hidden="true"
       />
 
-      {/* Drawer */}
+      {/* Drawer — glass panel sliding with mass */}
       <div
-        className={`fixed inset-y-0 left-0 z-[60] w-72 bg-[#000c24] border-r border-white/10 shadow-2xl flex flex-col transition-transform duration-300 ease-in-out md:hidden ${
+        className={`fixed inset-y-0 left-0 z-[60] flex w-72 flex-col bg-[#000c24]/85 shadow-[0_0_80px_-20px_rgba(0,0,0,0.7)] ring-1 ring-white/10 backdrop-blur-2xl transition-transform duration-500 ease-[cubic-bezier(0.32,0.72,0,1)] md:hidden ${
           isOpen ? 'translate-x-0' : '-translate-x-full'
         }`}
         role="dialog"
@@ -64,10 +64,10 @@ export default function MobileNavDrawer({ isOpen, onClose, children }: MobileNav
       >
         <button
           onClick={onClose}
-          className="absolute top-4 right-4 p-2 text-white/70 hover:text-white hover:bg-white/10 rounded-lg transition-colors z-10"
+          className="absolute right-4 top-4 z-10 flex h-9 w-9 items-center justify-center rounded-full text-white/60 transition-all duration-500 ease-[cubic-bezier(0.32,0.72,0,1)] hover:bg-white/[0.08] hover:text-white active:scale-[0.92]"
           aria-label="Close menu"
         >
-          <FiX size={24} />
+          <FiX size={20} />
         </button>
         {children}
       </div>

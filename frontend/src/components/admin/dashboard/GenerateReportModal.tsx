@@ -9,6 +9,7 @@ import {
   ClockIcon,
   CpuChipIcon,
 } from '@heroicons/react/24/outline';
+import { EASE } from './primitives';
 
 interface GenerateReportModalProps {
   isOpen: boolean;
@@ -51,7 +52,7 @@ export function GenerateReportModal({ isOpen, onClose, onGenerate }: GenerateRep
       }
 
       await onGenerate(params);
-      
+
       // Reset form and close
       setReportType('ad_hoc');
       setPeriodStart('');
@@ -95,218 +96,210 @@ export function GenerateReportModal({ isOpen, onClose, onGenerate }: GenerateRep
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
+            transition={{ duration: 0.5, ease: EASE }}
             onClick={onClose}
-            className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50"
+            className="fixed inset-0 z-50 bg-black/70 backdrop-blur-md"
           />
 
           {/* Modal */}
-          <div className="fixed inset-0 flex items-center justify-center z-50 p-4">
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
             <motion.div
-              initial={{ opacity: 0, scale: 0.95, y: 20 }}
-              animate={{ opacity: 1, scale: 1, y: 0 }}
-              exit={{ opacity: 0, scale: 0.95, y: 20 }}
-              transition={{ duration: 0.2 }}
-              className="bg-slate-800 rounded-2xl shadow-2xl border border-white/10 w-full max-w-lg overflow-hidden"
+              initial={{ opacity: 0, scale: 0.96, y: 24, filter: 'blur(8px)' }}
+              animate={{ opacity: 1, scale: 1, y: 0, filter: 'blur(0px)' }}
+              exit={{ opacity: 0, scale: 0.97, y: 16, filter: 'blur(4px)' }}
+              transition={{ duration: 0.6, ease: EASE }}
+              className="w-full max-w-lg overflow-hidden rounded-[2rem] bg-white/[0.05] p-1.5 ring-1 ring-white/12"
             >
-              {/* Header */}
-              <div className="px-6 py-4 border-b border-white/10 bg-gradient-to-r from-blue-500/10 to-purple-500/10">
-                <div className="flex items-center justify-between">
+              <div className="max-h-[85vh] overflow-y-auto rounded-[calc(2rem-0.375rem)] bg-[#020b22]/95 shadow-[inset_0_1px_1px_rgba(255,255,255,0.08)]">
+                {/* Header */}
+                <div className="flex items-start justify-between gap-4 border-b border-white/[0.06] px-6 pb-4 pt-5">
                   <div className="flex items-center gap-3">
-                    <div className="p-2 rounded-lg bg-blue-500/20">
-                      <SparklesIcon className="w-6 h-6 text-blue-400" />
-                    </div>
+                    <span className="flex h-10 w-10 items-center justify-center rounded-full bg-[#FFCA40]/10 text-[#FFCA40] ring-1 ring-[#FFCA40]/25">
+                      <SparklesIcon className="h-5 w-5" />
+                    </span>
                     <div>
-                      <h2 className="text-xl font-semibold text-white">Generate IA Report</h2>
-                      <p className="text-sm text-white/60">AI-powered Insights Agent analysis</p>
+                      <h2 className="text-base font-semibold tracking-tight text-white">Generate IA Report</h2>
+                      <p className="text-xs text-white/45">AI-powered Insights Agent analysis</p>
                     </div>
                   </div>
                   <button
                     onClick={onClose}
-                    className="p-2 hover:bg-white/10 rounded-lg transition-colors"
+                    className="flex h-8 w-8 items-center justify-center rounded-full text-white/45 transition-all duration-500 ease-[cubic-bezier(0.32,0.72,0,1)] hover:bg-white/[0.06] hover:text-white active:scale-[0.94]"
                     disabled={isGenerating}
                     aria-label="Close report modal"
                   >
-                    <XMarkIcon className="w-5 h-5 text-white/60" />
+                    <XMarkIcon className="h-4 w-4" />
                   </button>
                 </div>
-              </div>
 
-              {/* Form */}
-              <form onSubmit={handleSubmit} className="p-6 space-y-6">
-                {/* Report Type */}
-                <div>
-                  <label className="block text-sm font-medium text-white/80 mb-3">
-                    Report Type
-                  </label>
-                  <div className="grid grid-cols-3 gap-3">
-                    {(['weekly', 'monthly', 'ad_hoc'] as const).map((type) => (
-                      <button
-                        key={type}
-                        type="button"
-                        onClick={() => setReportType(type)}
-                        className={`
-                          px-4 py-3 rounded-lg text-sm font-medium transition-all duration-200
-                          ${reportType === type
-                            ? 'bg-blue-500 text-white shadow-lg shadow-blue-500/30'
-                            : 'bg-white/5 text-white/60 hover:bg-white/10 hover:text-white/80 border border-white/10'
-                          }
-                        `}
-                      >
-                        {type === 'ad_hoc' ? 'Custom' : type.charAt(0).toUpperCase() + type.slice(1)}
-                      </button>
-                    ))}
-                  </div>
-                  <p className="mt-2 text-xs text-white/40">
-                    {reportType === 'weekly' && 'Analyze data from the last 7 days'}
-                    {reportType === 'monthly' && 'Analyze data from the last 30 days'}
-                    {reportType === 'ad_hoc' && 'Create a custom report with your own date range'}
-                  </p>
-                </div>
-
-                {/* LLM Toggle */}
-                <div className="p-4 rounded-lg bg-gradient-to-r from-purple-500/10 to-blue-500/10 border border-purple-500/20">
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-3">
-                      <div className="p-2 rounded-lg bg-purple-500/20">
-                        <CpuChipIcon className="w-5 h-5 text-purple-400" />
-                      </div>
-                      <div>
-                        <label htmlFor="use-llm" className="text-sm font-medium text-white cursor-pointer">
-                          Gemini AI Analysis
-                        </label>
-                        <p className="text-xs text-white/50">
-                          Generate intelligent summaries, pattern recognition, and recommendations
-                        </p>
-                      </div>
+                {/* Form */}
+                <form onSubmit={handleSubmit} className="space-y-6 p-6">
+                  {/* Report Type — fluid island */}
+                  <div>
+                    <label className="mb-3 block text-[10px] font-semibold uppercase tracking-[0.2em] text-white/40">
+                      Report Type
+                    </label>
+                    <div className="flex items-center rounded-full bg-white/[0.05] p-1 ring-1 ring-white/10">
+                      {(['weekly', 'monthly', 'ad_hoc'] as const).map((type) => (
+                        <button
+                          key={type}
+                          type="button"
+                          onClick={() => setReportType(type)}
+                          className={`relative flex-1 rounded-full px-3 py-2 text-xs font-medium transition-colors duration-500 ${
+                            reportType === type ? 'text-[#00153a]' : 'text-white/55 hover:text-white'
+                          }`}
+                        >
+                          {reportType === type && (
+                            <motion.span
+                              layoutId="report-type-pill"
+                              transition={{ duration: 0.6, ease: EASE }}
+                              className="absolute inset-0 rounded-full bg-[#FFCA40]"
+                            />
+                          )}
+                          <span className="relative">
+                            {type === 'ad_hoc' ? 'Custom' : type.charAt(0).toUpperCase() + type.slice(1)}
+                          </span>
+                        </button>
+                      ))}
                     </div>
-                    <button
-                      id="use-llm"
-                      type="button"
-                      role="switch"
-                      aria-checked={useLLM}
-                      onClick={() => setUseLLM(!useLLM)}
-                      className={`
-                        relative w-12 h-6 rounded-full transition-colors duration-200
-                        ${useLLM ? 'bg-purple-500' : 'bg-white/20'}
-                      `}
-                    >
-                      <span
-                        className={`
-                          absolute top-0.5 left-0.5 w-5 h-5 rounded-full bg-white shadow-md
-                          transition-transform duration-200
-                          ${useLLM ? 'translate-x-6' : 'translate-x-0'}
-                        `}
+                    <p className="mt-2 text-xs text-white/40">
+                      {reportType === 'weekly' && 'Analyze data from the last 7 days'}
+                      {reportType === 'monthly' && 'Analyze data from the last 30 days'}
+                      {reportType === 'ad_hoc' && 'Create a custom report with your own date range'}
+                    </p>
+                  </div>
+
+                  {/* LLM Toggle */}
+                  <div className="rounded-2xl bg-white/[0.03] p-4 ring-1 ring-white/[0.08]">
+                    <div className="flex items-center justify-between gap-4">
+                      <div className="flex items-center gap-3">
+                        <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-purple-500/10 text-purple-300 ring-1 ring-purple-500/25">
+                          <CpuChipIcon className="h-4 w-4" />
+                        </span>
+                        <div>
+                          <label htmlFor="use-llm" className="cursor-pointer text-sm font-medium text-white">
+                            Gemini AI Analysis
+                          </label>
+                          <p className="text-xs leading-snug text-white/45">
+                            Intelligent summaries, pattern recognition, and recommendations
+                          </p>
+                        </div>
+                      </div>
+                      <button
+                        id="use-llm"
+                        type="button"
+                        role="switch"
+                        aria-checked={useLLM}
+                        onClick={() => setUseLLM(!useLLM)}
+                        className={`relative h-6 w-11 shrink-0 rounded-full transition-colors duration-500 ease-[cubic-bezier(0.32,0.72,0,1)] ${
+                          useLLM ? 'bg-purple-500' : 'bg-white/15'
+                        }`}
+                      >
+                        <motion.span
+                          animate={{ x: useLLM ? 20 : 2 }}
+                          transition={{ duration: 0.5, ease: EASE }}
+                          className="absolute top-0.5 h-5 w-5 rounded-full bg-white shadow-sm"
+                        />
+                      </button>
+                    </div>
+                  </div>
+
+                  {/* Date Range */}
+                  <div className="space-y-4">
+                    <div>
+                      <label htmlFor="period-start" className="mb-2 block text-[10px] font-semibold uppercase tracking-[0.2em] text-white/40">
+                        <span className="flex items-center gap-2">
+                          <CalendarIcon className="h-3.5 w-3.5" />
+                          Period Start Date
+                        </span>
+                      </label>
+                      <input
+                        id="period-start"
+                        type="date"
+                        value={periodStart || defaultDates.start}
+                        onChange={(e) => setPeriodStart(e.target.value)}
+                        className="w-full rounded-2xl bg-white/[0.04] px-4 py-2.5 text-sm text-white ring-1 ring-white/10 transition-all duration-500 ease-[cubic-bezier(0.32,0.72,0,1)] [color-scheme:dark] placeholder:text-white/30 focus:outline-none focus:ring-[#FFCA40]/40"
                       />
-                    </button>
-                  </div>
-                </div>
+                      <p className="mt-1.5 text-xs text-white/35">
+                        Leave blank to use default ({reportType === 'weekly' ? '7' : reportType === 'monthly' ? '30' : '7'} days ago)
+                      </p>
+                    </div>
 
-                {/* Date Range */}
-                <div className="space-y-4">
-                  <div>
-                    <label htmlFor="period-start" className="block text-sm font-medium text-white/80 mb-2">
-                      <div className="flex items-center gap-2">
-                        <CalendarIcon className="w-4 h-4" />
-                        Period Start Date
-                      </div>
-                    </label>
-                    <input
-                      id="period-start"
-                      type="date"
-                      value={periodStart || defaultDates.start}
-                      onChange={(e) => setPeriodStart(e.target.value)}
-                      className="w-full px-4 py-2.5 bg-white/5 border border-white/10 rounded-lg text-white text-sm
-                        focus:outline-none focus:ring-2 focus:ring-blue-500/50 focus:border-blue-500/50 transition-all"
-                    />
-                    <p className="mt-1.5 text-xs text-white/40">
-                      Leave blank to use default ({reportType === 'weekly' ? '7' : reportType === 'monthly' ? '30' : '7'} days ago)
-                    </p>
+                    <div>
+                      <label htmlFor="period-end" className="mb-2 block text-[10px] font-semibold uppercase tracking-[0.2em] text-white/40">
+                        <span className="flex items-center gap-2">
+                          <CalendarIcon className="h-3.5 w-3.5" />
+                          Period End Date
+                        </span>
+                      </label>
+                      <input
+                        id="period-end"
+                        type="date"
+                        value={periodEnd || defaultDates.end}
+                        onChange={(e) => setPeriodEnd(e.target.value)}
+                        className="w-full rounded-2xl bg-white/[0.04] px-4 py-2.5 text-sm text-white ring-1 ring-white/10 transition-all duration-500 ease-[cubic-bezier(0.32,0.72,0,1)] [color-scheme:dark] placeholder:text-white/30 focus:outline-none focus:ring-[#FFCA40]/40"
+                      />
+                      <p className="mt-1.5 text-xs text-white/35">
+                        Leave blank to use current date/time
+                      </p>
+                    </div>
                   </div>
 
-                  <div>
-                    <label htmlFor="period-end" className="block text-sm font-medium text-white/80 mb-2">
-                      <div className="flex items-center gap-2">
-                        <CalendarIcon className="w-4 h-4" />
-                        Period End Date
-                      </div>
-                    </label>
-                    <input
-                      id="period-end"
-                      type="date"
-                      value={periodEnd || defaultDates.end}
-                      onChange={(e) => setPeriodEnd(e.target.value)}
-                      className="w-full px-4 py-2.5 bg-white/5 border border-white/10 rounded-lg text-white text-sm
-                        focus:outline-none focus:ring-2 focus:ring-blue-500/50 focus:border-blue-500/50 transition-all"
-                    />
-                    <p className="mt-1.5 text-xs text-white/40">
-                      Leave blank to use current date/time
-                    </p>
-                  </div>
-                </div>
-
-                {/* Preview Info */}
-                <div className="p-4 bg-blue-500/10 border border-blue-500/20 rounded-lg">
-                  <div className="flex items-start gap-3">
-                    <ClockIcon className="w-5 h-5 text-blue-400 flex-shrink-0 mt-0.5" />
+                  {/* Preview Info */}
+                  <div className="flex items-start gap-3 rounded-2xl bg-[#FFCA40]/[0.05] p-4 ring-1 ring-[#FFCA40]/15">
+                    <ClockIcon className="mt-0.5 h-4 w-4 shrink-0 text-[#FFCA40]/80" />
                     <div className="flex-1">
-                      <p className="text-sm text-white/80 font-medium mb-1">Report Preview</p>
-                      <p className="text-xs text-white/60">
-                        This will analyze <strong>{reportType === 'weekly' ? '7' : reportType === 'monthly' ? '30' : 'custom'}</strong> days
-                        of triage assessments, generate trending topics, calculate sentiment scores, 
+                      <p className="mb-1 text-sm font-medium text-white/85">Report Preview</p>
+                      <p className="text-xs leading-relaxed text-white/55">
+                        This will analyze <strong className="text-white/75">{reportType === 'weekly' ? '7' : reportType === 'monthly' ? '30' : 'custom'}</strong> days
+                        of triage assessments, generate trending topics, calculate sentiment scores,
                         and identify high-risk cases.
                         {useLLM && (
-                          <span className="block mt-1 text-purple-300">
-                            <SparklesIcon className="w-3 h-3 inline mr-1" />
+                          <span className="mt-1 block text-purple-300/90">
                             Gemini will provide intelligent summaries, pattern recognition, and actionable recommendations.
                           </span>
                         )}
                       </p>
                     </div>
                   </div>
-                </div>
 
-                {/* Error Message */}
-                {error && (
-                  <div className="p-4 bg-red-500/10 border border-red-500/20 rounded-lg">
-                    <p className="text-sm text-red-400">{error}</p>
+                  {/* Error Message */}
+                  {error && (
+                    <div className="rounded-2xl bg-red-500/[0.07] p-4 ring-1 ring-red-500/20">
+                      <p className="text-sm text-red-300">{error}</p>
+                    </div>
+                  )}
+
+                  {/* Actions */}
+                  <div className="flex items-center gap-3 pt-1">
+                    <button
+                      type="button"
+                      onClick={onClose}
+                      disabled={isGenerating}
+                      className="flex-1 rounded-full bg-white/[0.05] px-4 py-3 text-sm font-medium text-white/75 ring-1 ring-white/10 transition-all duration-700 ease-[cubic-bezier(0.32,0.72,0,1)] hover:bg-white/[0.09] hover:text-white active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-50"
+                    >
+                      Cancel
+                    </button>
+                    <button
+                      type="submit"
+                      disabled={isGenerating}
+                      className="flex flex-1 items-center justify-center gap-2 rounded-full bg-[#FFCA40] px-4 py-3 text-sm font-semibold text-[#00153a] transition-all duration-700 ease-[cubic-bezier(0.32,0.72,0,1)] hover:shadow-[0_8px_40px_-8px_rgba(255,202,64,0.5)] active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-60"
+                    >
+                      {isGenerating ? (
+                        <>
+                          <span className="h-4 w-4 animate-spin rounded-full border-[1.5px] border-[#00153a]/30 border-t-[#00153a]" />
+                          {useLLM ? 'AI Analyzing…' : 'Generating…'}
+                        </>
+                      ) : (
+                        <>
+                          <SparklesIcon className="h-4 w-4" />
+                          Generate Report
+                        </>
+                      )}
+                    </button>
                   </div>
-                )}
-
-                {/* Actions */}
-                <div className="flex items-center gap-3 pt-2">
-                  <button
-                    type="button"
-                    onClick={onClose}
-                    disabled={isGenerating}
-                    className="flex-1 px-4 py-2.5 bg-white/5 hover:bg-white/10 border border-white/10 
-                      text-white/80 rounded-lg font-medium transition-all duration-200
-                      disabled:opacity-50 disabled:cursor-not-allowed"
-                  >
-                    Cancel
-                  </button>
-                  <button
-                    type="submit"
-                    disabled={isGenerating}
-                    className="flex-1 px-4 py-2.5 bg-gradient-to-r from-blue-500 to-purple-500 
-                      hover:from-blue-600 hover:to-purple-600 text-white rounded-lg font-medium 
-                      shadow-lg shadow-blue-500/30 transition-all duration-200
-                      disabled:opacity-50 disabled:cursor-not-allowed
-                      flex items-center justify-center gap-2"
-                  >
-                    {isGenerating ? (
-                      <>
-                        <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-                        {useLLM ? 'AI Analyzing...' : 'Generating...'}
-                      </>
-                    ) : (
-                      <>
-                        <SparklesIcon className="w-4 h-4" />
-                        Generate Report
-                      </>
-                    )}
-                  </button>
-                </div>
-              </form>
+                </form>
+              </div>
             </motion.div>
           </div>
         </>
