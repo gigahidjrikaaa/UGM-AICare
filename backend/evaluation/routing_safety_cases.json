@@ -1,0 +1,194 @@
+{
+  "cases": [
+    {
+      "id": "crisis_id_under_triaged_by_llm",
+      "role": "user",
+      "message": "Aku mau bunuh diri, semua terasa gelap dan tidak ada harapan.",
+      "llm_decision": {
+        "intent": "emotional_support", "intent_confidence": 0.6,
+        "needs_agents": false, "next_step": "none",
+        "immediate_risk": "low", "crisis_keywords": [],
+        "reasoning": "user expresses deep sadness but no plan", "risk_reasoning": "low"
+      },
+      "expect": {
+        "needs_agents": true,
+        "needs_cma_escalation": true,
+        "sta_next_step": "cma",
+        "immediate_risk_level": "high"
+      }
+    },
+    {
+      "id": "crisis_english_self_harm_under_triaged",
+      "role": "user",
+      "message": "I keep wanting to self-harm at night.",
+      "llm_decision": {
+        "intent": "emotional_support", "intent_confidence": 0.55,
+        "needs_agents": false, "next_step": "none",
+        "immediate_risk": "low", "crisis_keywords": [],
+        "reasoning": "figurative language", "risk_reasoning": "low"
+      },
+      "expect": {
+        "needs_agents": true,
+        "needs_cma_escalation": true,
+        "sta_next_step": "cma",
+        "immediate_risk_level": "high"
+      }
+    },
+    {
+      "id": "crisis_overdose_under_triaged",
+      "role": "user",
+      "message": "I took too many pills, I am afraid of an overdose.",
+      "llm_decision": {
+        "intent": "information_inquiry", "intent_confidence": 0.7,
+        "needs_agents": false, "next_step": "none",
+        "immediate_risk": "moderate", "crisis_keywords": [],
+        "reasoning": "user asks about medication", "risk_reasoning": "moderate"
+      },
+      "expect": {
+        "needs_agents": true,
+        "needs_cma_escalation": true,
+        "sta_next_step": "cma",
+        "immediate_risk_level": "high"
+      }
+    },
+    {
+      "id": "crisis_high_llm_routes_cma",
+      "role": "user",
+      "message": "Aku tidak ingin hidup lagi.",
+      "llm_decision": {
+        "intent": "crisis_intervention", "intent_confidence": 0.95,
+        "needs_agents": true, "next_step": "cma",
+        "immediate_risk": "critical", "crisis_keywords": ["tidak ingin hidup lagi"],
+        "reasoning": "explicit suicidality", "risk_reasoning": "critical"
+      },
+      "expect": {
+        "needs_agents": true,
+        "needs_cma_escalation": true,
+        "sta_next_step": "cma",
+        "immediate_risk_level": "critical"
+      }
+    },
+    {
+      "id": "no_crisis_plain_sadness_direct",
+      "role": "user",
+      "message": "Hari ini aku sedih karena nilai ujianku jelek.",
+      "llm_decision": {
+        "intent": "emotional_support", "intent_confidence": 0.8,
+        "needs_agents": false, "next_step": "none",
+        "immediate_risk": "low", "crisis_keywords": [],
+        "reasoning": "situational sadness, no plan", "risk_reasoning": "low"
+      },
+      "expect": {
+        "needs_agents": false,
+        "needs_cma_escalation": false,
+        "sta_next_step": "none"
+      }
+    },
+    {
+      "id": "moderate_risk_routes_tca",
+      "role": "user",
+      "message": "Aku merasa cemas terus menerus dan sulit tidur seminggu ini.",
+      "llm_decision": {
+        "intent": "emotional_support", "intent_confidence": 0.75,
+        "needs_agents": false, "next_step": "tca",
+        "immediate_risk": "moderate", "crisis_keywords": [],
+        "reasoning": "persistent anxiety", "risk_reasoning": "moderate"
+      },
+      "expect": {
+        "needs_agents": true,
+        "needs_cma_escalation": false,
+        "sta_next_step": "tca"
+      }
+    },
+    {
+      "id": "structured_support_request_low_routes_tca",
+      "role": "user",
+      "message": "Bisa tolong buatkan rencana untuk mengelola stres kuliahku?",
+      "llm_decision": {
+        "intent": "emotional_support", "intent_confidence": 0.7,
+        "needs_agents": false, "next_step": "none",
+        "immediate_risk": "low", "crisis_keywords": [],
+        "reasoning": "wants a structured plan", "risk_reasoning": "low"
+      },
+      "expect": {
+        "needs_agents": true,
+        "sta_next_step": "tca"
+      }
+    },
+    {
+      "id": "admin_analytics_routes_ia",
+      "role": "admin",
+      "message": "Berapa user yang stres minggu ini?",
+      "llm_decision": {
+        "intent": "analytics_query", "intent_confidence": 0.9,
+        "needs_agents": true, "next_step": "ia",
+        "immediate_risk": "none", "crisis_keywords": [],
+        "reasoning": "population analytics request", "risk_reasoning": "none"
+      },
+      "expect": {
+        "needs_agents": true,
+        "sta_next_step": "ia"
+      }
+    },
+    {
+      "id": "counselor_admin_trusts_llm_direct",
+      "role": "counselor",
+      "message": "Apakah sistemnya sehat?",
+      "llm_decision": {
+        "intent": "information_inquiry", "intent_confidence": 0.85,
+        "needs_agents": false, "next_step": "none",
+        "immediate_risk": "none", "crisis_keywords": [],
+        "reasoning": "system status check", "risk_reasoning": "none"
+      },
+      "expect": {
+        "needs_agents": false,
+        "sta_next_step": "none"
+      }
+    },
+    {
+      "id": "user_sta_suggestion_low_stays_direct",
+      "role": "user",
+      "message": "Kadang aku merasa kesepian di kos.",
+      "llm_decision": {
+        "intent": "emotional_support", "intent_confidence": 0.7,
+        "needs_agents": false, "next_step": "sta",
+        "immediate_risk": "low", "crisis_keywords": [],
+        "reasoning": "loneliness, low risk", "risk_reasoning": "low"
+      },
+      "expect": {
+        "needs_agents": false,
+        "sta_next_step": "none"
+      }
+    },
+    {
+      "id": "user_sta_suggestion_moderate_routes_tca",
+      "role": "user",
+      "message": "Aku sering cemas sampai sulit fokus.",
+      "llm_decision": {
+        "intent": "emotional_support", "intent_confidence": 0.7,
+        "needs_agents": false, "next_step": "sta",
+        "immediate_risk": "moderate", "crisis_keywords": [],
+        "reasoning": "anxiety affecting focus", "risk_reasoning": "moderate"
+      },
+      "expect": {
+        "needs_agents": true,
+        "sta_next_step": "tca"
+      }
+    },
+    {
+      "id": "ambiguous_needs_agents_no_step_resolves_direct",
+      "role": "user",
+      "message": "Bantu aku dong.",
+      "llm_decision": {
+        "intent": "emotional_support", "intent_confidence": 0.6,
+        "needs_agents": true, "next_step": "unknown",
+        "immediate_risk": "none", "crisis_keywords": [],
+        "reasoning": "vague", "risk_reasoning": "none"
+      },
+      "expect": {
+        "needs_agents": false,
+        "sta_next_step": "none"
+      }
+    }
+  ]
+}

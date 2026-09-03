@@ -1329,6 +1329,14 @@ async def generate_response(
 
     Returns:
         The generated text response string or an error message.
+
+    TODO(token-accounting): surface true per-request token usage. This
+    function returns ``str`` only; each provider's ``usage_metadata`` is
+    dropped at the ``return response.text.strip()`` sites. To report exact
+    tokens per request, capture usage into a ``contextvars.ContextVar``
+    collector here (non-breaking side channel) and read it where the stream
+    metadata is built (aika_stream). Until then request-count per model is the
+    cost signal.
     """
     resolved_request = resolve_dispatch_request(
         model=model,

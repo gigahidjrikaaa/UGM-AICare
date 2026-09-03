@@ -2,21 +2,18 @@ from __future__ import annotations
 
 import logging
 from datetime import datetime, timedelta
-import json
 
 from langgraph.graph import StateGraph, END
 from langgraph.graph.state import CompiledStateGraph
 from langchain_core.runnables import RunnableConfig
 from sqlalchemy import func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
-from google.genai import types
 
 from app.models.user import User as AppUser
 
 from app.agents.graph_state import CMAState
 from app.agents.execution_tracker import execution_tracker
 from app.core.settings import get_settings
-from app.core.llm import get_gemini_client, GEMINI_FLASH_MODEL
 from app.domains.mental_health.models import Case, CaseSeverityEnum, CaseStatusEnum
 from app.domains.mental_health.models.appointments import Psychologist, Appointment
 from app.models.system import CaseAssignment
@@ -617,24 +614,18 @@ async def schedule_appointment_node(state: CMAState, config: RunnableConfig) -> 
         psychologist_id = state.get("cma_context", {}).get("psychologist_id")
         
         if not psychologist_id and assigned_counsellor_id:
-            # Try to find psychologist profile for assigned counselor
-            counselor_result = await db.execute(
-                select(AppUser).where(AppUser.id == assigned_counsellor_id)
+            # Assigned counselor is a User row; Psychologist.user_id references
+            # users.id, so look the psychologist profile up directly.
+            psych_result = await db.execute(
+                select(Psychologist).where(Psychologist.user_id == assigned_counsellor_id)
             )
-            counselor = counselor_result.scalar_one_or_none()
-            
-            if counselor and counselor.user_id:
-                # Check if counselor has psychologist profile
-                psych_result = await db.execute(
-                    select(Psychologist).where(Psychologist.user_id == counselor.user_id)
-                )
-                psychologist = psych_result.scalar_one_or_none()
-                if psychologist:
-                    psychologist_id = psychologist.id
-        
-        # If no psychologist found yet, use LLM to select best available
+            psychologist = psych_result.scalar_one_or_none()
+            if psychologist:
+                psychologist_id = psychologist.id
+
+        # If no psychologist found yet, deterministically select best available
         if not psychologist_id:
-            logger.info("No psychologist assigned, using LLM to select best match")
+            logger.info("No psychologist assigned, selecting best available match")
             psychologist_id = await _select_optimal_psychologist(
                 db=db,
                 severity=severity,
@@ -720,94 +711,89 @@ async def _select_optimal_psychologist(
     severity: str,
     preferences: dict
 ) -> int | None:
-    """Use LLM to select optimal psychologist based on case context.
-    
+    """Deterministically select the best available psychologist.
+
+    Replaced an LLM round-trip (Gemini Flash) that ranked psychologists with
+    rules that are trivially expressible as a scoring function. Ranking:
+    language match, specialization overlap, having a defined availability
+    schedule, then rating / experience (weighted higher for urgent cases).
+
     Args:
         db: Database session
         severity: Case severity level
         preferences: Student preferences (specialization, language, etc.)
-        
+
     Returns:
         Psychologist ID or None if not found
     """
-    try:
-        # Get available psychologists
-        result = await db.execute(
-            select(Psychologist).where(Psychologist.is_available)
-        )
-        psychologists = result.scalars().all()
-        
-        if not psychologists:
-            return None
-        
-        # If only one available, return it
-        if len(psychologists) == 1:
-            return psychologists[0].id
-        
-        # Use LLM to select best match
-        client = await get_gemini_client()
-        
-        psych_profiles = []
-        for p in psychologists:
-            psych_profiles.append({
-                "id": p.id,
-                "name": p.name,
-                "specialization": p.specialization,
-                "experience_years": p.years_of_experience,
-                "languages": p.languages,
-                "rating": p.rating,
-                "has_schedule": bool(p.availability_schedule)
-            })
-        
-        prompt = f"""Kamu adalah koordinator appointment kesehatan mental. Pilih psikolog yang PALING COCOK untuk case ini.
+    result = await db.execute(
+        select(Psychologist).where(Psychologist.is_available).order_by(Psychologist.id)
+    )
+    psychologists = result.scalars().all()
 
-Konteks Case:
-- Severity: {severity}
-- Preferensi Mahasiswa: {json.dumps(preferences)}
-
-Psikolog yang Available:
-{json.dumps(psych_profiles, indent=2)}
-
-Kriteria Pemilihan:
-1. Untuk case CRITICAL: Prioritas experience dan high ratings
-2. Match specialization kalau student punya concern spesifik
-3. Consider preferensi bahasa
-4. Prefer psikolog dengan jadwal availability yang defined
-
-Return HANYA psychologist ID (integer) dari pilihan kamu.
-"""
-        
-        response = client.models.generate_content(
-            model=GEMINI_FLASH_MODEL,
-            contents=prompt,
-            config=types.GenerateContentConfig(
-                temperature=0.2,  # Lower temp for consistent selection
-            )
-        )
-        
-        if not response or not response.text:
-            logger.warning("No response from LLM for psychologist selection")
-            return psych_profiles[0]["id"]  # Default to first available
-        
-        # Extract ID from response
-        selected_id = int(response.text.strip())
-        
-        # Validate selection
-        if any(p.id == selected_id for p in psychologists):
-            logger.info(f"LLM selected psychologist ID {selected_id}")
-            return selected_id
-        
-        # Fallback to first available
+    if not psychologists:
+        return None
+    if len(psychologists) == 1:
         return psychologists[0].id
-        
-    except Exception as e:
-        logger.error(f"Error selecting psychologist: {e}")
-        # Fallback to first available psychologist
-        result = await db.execute(
-            select(Psychologist).where(Psychologist.is_available).limit(1)
-        )
-        psych = result.scalar_one_or_none()
-        return psych.id if psych else None
+
+    urgent = severity.lower() in {"high", "critical"}
+
+    # Normalise preference keys defensively — callers pass scheduling_context
+    # with an unguaranteed shape.
+    lang_pref = (
+        preferences.get("language")
+        or preferences.get("preferred_language")
+        or preferences.get("languages")
+    )
+    if isinstance(lang_pref, list):
+        lang_pref = [str(x).lower() for x in lang_pref if str(x).strip()]
+    elif lang_pref:
+        lang_pref = str(lang_pref).lower()
+    else:
+        lang_pref = []
+
+    spec_pref = preferences.get("specialization") or preferences.get("concerns")
+    if isinstance(spec_pref, list):
+        spec_pref = [str(x).lower() for x in spec_pref if str(x).strip()]
+    elif spec_pref:
+        spec_pref = [str(spec_pref).lower()]
+    else:
+        spec_pref = []
+
+    def _langs(psychologist: Psychologist) -> list[str]:
+        raw = psychologist.languages or []
+        if isinstance(raw, str):
+            raw = [raw]
+        return [str(x).lower() for x in raw if str(x).strip()]
+
+    def _score(psychologist: Psychologist) -> tuple[float, ...]:
+        score = 0.0
+        langs = _langs(psychologist)
+
+        # 1. Language match (exact overlap).
+        if lang_pref and any(lp in langs or langs and any(l in lp for l in langs) for lp in lang_pref):
+            score += 3.0
+
+        # 2. Specialization / concern overlap.
+        spec = str(psychologist.specialization or "").lower()
+        if spec_pref and any(p in spec for p in spec_pref):
+            score += 2.0
+
+        # 3. Defined availability schedule.
+        if psychologist.availability_schedule:
+            score += 1.0
+
+        # 4. Experience & rating — weighted more for urgent cases.
+        exp = float(psychologist.years_of_experience or 0)
+        rating = float(psychologist.rating or 0)
+        exp_w = 1.5 if urgent else 0.5
+        score += exp_w * min(exp, 25.0) / 25.0
+        score += rating / 5.0
+
+        # Sort key: score desc, rating desc, experience desc, id asc.
+        return (-score, -rating, -exp, psychologist.id)
+
+    return min(psychologists, key=_score).id
 
 
 async def _find_optimal_appointment_time(
@@ -817,140 +803,66 @@ async def _find_optimal_appointment_time(
     severity: str,
     scheduling_context: dict
 ) -> datetime | None:
-    """Use LLM to find optimal appointment time.
-    
+    """Deterministically pick the earliest conflict-free appointment slot.
+
+    Replaced an LLM round-trip (Gemini Flash) that "chose" a slot from a list
+    that was already generated in urgency order (critical cases only generate
+    the next 3 days). Selecting the earliest available slot is the optimal,
+    deterministic choice for that ordering and removes a generation + the
+    parse/validation fallback path.
+
     Args:
         db: Database session
         psychologist: Psychologist model
-        preferred_time: Student's time preference
+        preferred_time: Student's time preference (unused — reserved)
         severity: Case severity
-        scheduling_context: Additional context
-        
+        scheduling_context: Additional context (unused — reserved)
+
     Returns:
-        Optimal datetime or None
+        Earliest conflict-free datetime, or None
     """
-    available_slots = []  # Initialize to avoid unbound variable
-    try:
-        # Generate available slots (simplified - implement inline)
-        # Note: Original _generate_time_slots doesn't exist in scheduling_tools
-        # Using simplified slot generation for now
-        schedule = psychologist.availability_schedule or {}
-        start_date = datetime.now()
-        end_date = start_date + timedelta(days=14)
-        
-        # For critical cases, prefer ASAP (next 3 days)
-        if severity == "critical":
-            end_date = start_date + timedelta(days=3)
-        
-        # Generate simple slots (this should be replaced with proper scheduling logic)
-        available_slots = []
-        current = start_date
-        while current < end_date:
-            # Generate slots from 9 AM to 5 PM, every hour
-            for hour in range(9, 17):
-                slot_time = current.replace(hour=hour, minute=0, second=0, microsecond=0)
-                if slot_time > datetime.now():  # Only future slots
-                    available_slots.append({
-                        "datetime": slot_time.isoformat(),
-                        "display": slot_time.strftime("%A, %d %B %Y at %I:%M %p")
-                    })
-            current += timedelta(days=1)
-        
-        if not available_slots:
-            logger.warning(f"No slots available for psychologist {psychologist.id}")
-            return None
-        
-        # Check for conflicts
-        conflicts_result = await db.execute(
-            select(Appointment.appointment_datetime).where(
-                Appointment.psychologist_id == psychologist.id,
-                Appointment.appointment_datetime >= start_date,
-                Appointment.appointment_datetime <= end_date,
-                Appointment.status.in_(["scheduled", "confirmed"])
-            )
-        )
-        booked_times = {apt.strftime("%Y-%m-%dT%H:%M:%S") for apt in conflicts_result.scalars().all()}
-        
-        # Filter out booked slots
-        available_slots = [
-            slot for slot in available_slots
-            if slot["datetime"] not in booked_times
-        ]
-        
-        if not available_slots:
-            logger.warning("All slots are booked")
-            return None
-        
-        # Use LLM to select best slot
-        client = await get_gemini_client()
-        
-        slots_text = "\n".join([
-            f"{i+1}. {slot['display']} ({slot['datetime']})"
-            for i, slot in enumerate(available_slots[:20])  # Limit to 20 for tokens
-        ])
-        
-        urgency_text = ""
-        if severity == "critical":
-            urgency_text = "\n⚠️ CASE CRITICAL: Pilih slot PALING AWAL yang available (dalam 24-48 jam ke depan kalau bisa)."
-        elif severity == "high":
-            urgency_text = "\n⚠️ HIGH PRIORITY: Prefer slots dalam 3-5 hari ke depan."
-        
-        prompt = f"""Kamu lagi schedule appointment kesehatan mental yang urgent.
+    schedule = psychologist.availability_schedule or {}
+    start_date = datetime.now()
+    end_date = start_date + timedelta(days=14)
 
-Case Severity: {severity}
-{urgency_text}
-Preferensi Mahasiswa: {preferred_time or 'Nggak ada yang specified'}
-Konteks Tambahan: {json.dumps(scheduling_context)}
+    # For critical cases, prefer ASAP (next 3 days).
+    if severity == "critical":
+        end_date = start_date + timedelta(days=3)
 
-Slot yang Available:
-{slots_text}
+    # Generate simple slots 9 AM - 5 PM hourly (naive but deterministic).
+    available_slots: list[datetime] = []
+    current = start_date
+    while current < end_date:
+        for hour in range(9, 17):
+            slot_time = current.replace(hour=hour, minute=0, second=0, microsecond=0)
+            if slot_time > datetime.now():  # Only future slots
+                available_slots.append(slot_time)
+        current += timedelta(days=1)
 
-Pilih SATU time slot yang PALING BAIK yang balance:
-1. Urgency (critical cases butuh ASAP)
-2. Preferensi student (kalau ada)
-3. Optimal timing (avoid very late evening kecuali memang perlu)
-
-Return HANYA datetime string dalam ISO format (YYYY-MM-DDTHH:MM:SS) dari list di atas.
-"""
-        
-        response = client.models.generate_content(
-            model=GEMINI_FLASH_MODEL,
-            contents=prompt,
-            config=types.GenerateContentConfig(
-                temperature=0.2,
-                max_output_tokens=50  # Just need datetime string
-            )
-        )
-        
-        if not response or not response.text:
-            logger.warning("No response from LLM for time selection")
-            return datetime.fromisoformat(available_slots[0]["datetime"])
-        
-        selected_datetime_str = response.text.strip()
-        
-        # Validate and parse
-        selected_datetime = datetime.fromisoformat(selected_datetime_str)
-        
-        # Verify it's in our available slots
-        if any(slot["datetime"] == selected_datetime_str for slot in available_slots):
-            logger.info(f"LLM selected appointment time: {selected_datetime}")
-            return selected_datetime
-        
-        # Fallback to first available slot
-        fallback = datetime.fromisoformat(available_slots[0]["datetime"])
-        logger.warning(f"LLM selection invalid, using fallback: {fallback}")
-        return fallback
-        
-    except Exception as e:
-        logger.error(f"Error finding optimal time: {e}", exc_info=True)
-        # Last resort: return earliest slot if available
-        # Note: available_slots might not be defined if error occurred early
-        try:
-            if 'available_slots' in locals() and available_slots:
-                return datetime.fromisoformat(available_slots[0]["datetime"])
-        except Exception:
-            pass
+    if not available_slots:
+        logger.warning("No slots available for psychologist %s", psychologist.id)
         return None
+
+    # Drop slots already booked for this psychologist.
+    conflicts_result = await db.execute(
+        select(Appointment.appointment_datetime).where(
+            Appointment.psychologist_id == psychologist.id,
+            Appointment.appointment_datetime >= start_date,
+            Appointment.appointment_datetime <= end_date,
+            Appointment.status.in_(["scheduled", "confirmed"])
+        )
+    )
+    booked_times = {apt.replace(minute=0, second=0, microsecond=0) for apt in conflicts_result.scalars().all()}
+    available_slots = [slot for slot in available_slots if slot not in booked_times]
+
+    if not available_slots:
+        logger.warning("All slots are booked for psychologist %s", psychologist.id)
+        return None
+
+    # Slots are generated earliest-first and the horizon already encodes
+    # severity urgency (critical => next 3 days). Earliest free slot is the
+    # optimal deterministic pick.
+    return available_slots[0]
 
 
 def _build_cma_graph() -> CompiledStateGraph:

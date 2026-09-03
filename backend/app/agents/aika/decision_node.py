@@ -138,6 +138,21 @@ _DECISION_JSON_SCHEMA: dict[str, Any] = {
 # re-validating is cheaper and removes an LLM round-trip from the failure path.
 _DECISION_MAX_PARSE_ATTEMPTS = 2
 
+# Compact system prompt for the ROUTING call only. The full Aika persona
+# (identity.py) belongs on response generation; this classifier needs only its
+# role contract. Kept deliberately short to minimise per-turn input tokens and
+# to keep the persona's conversational instructions from leaking into routing.
+_DECISION_SYSTEM_PROMPT = (
+    "You are the routing classifier for Aika, a mental-health companion for "
+    "Indonesian university students. Your only task is to classify the user's "
+    "message and emit the routing JSON defined by the decision criteria in the "
+    "user message. You are not Aika: do not respond to the user, do not "
+    "reassure them, and output no text outside the JSON object.\n"
+    "Safety overrides always win: if the message signals self-harm, suicide, "
+    "or immediate danger, set immediate_risk to 'high' or 'critical' and "
+    "route to 'cma' (needs_agents=true)."
+)
+
 
 # ===========================================================================
 # PURE HELPERS — no I/O, no side effects, fully unit-testable
@@ -353,6 +368,41 @@ def _compute_routing(
                     "needs_agents=True with no valid next_step resolved; safe direct-response."
                 )
 
+    # --- Step 3: hard crisis-keyword re-check (user role) --------------------
+    # The decision LLM may under-triage a message that nonetheless contains a
+    # hard crisis signal (keyword read as figurative, missed, or deferred).
+    # The parse-failure path already escalates on any crisis keyword; this
+    # extends the SAME guarantee to the success path so a misclassification
+    # can never silently skip escalation for a real self-harm signal.
+    if normalized_role == "user" and updates.get("immediate_risk_level") not in (
+        "high",
+        "critical",
+    ):
+        crisis_hits = _detect_crisis_keywords(message)
+        if crisis_hits:
+            logger.warning(
+                "Deterministic crisis re-check: keywords %s in message but LLM "
+                "risk was %s — escalating to CMA.",
+                crisis_hits,
+                updates.get("immediate_risk_level"),
+            )
+            updates.update({
+                "intent": "crisis_intervention",
+                "immediate_risk_level": "high",
+                "needs_agents": True,
+                "needs_cma_escalation": True,
+                "crisis_keywords_detected": crisis_hits,
+                "sta_context": {
+                    **updates.get("sta_context", {}),
+                    "next_step": "cma",
+                },
+                "agent_reasoning": (
+                    "Crisis keyword detected but LLM under-triaged risk; "
+                    "deterministic escalation to CMA."
+                ),
+                "_holding_response": _CRISIS_HOLDING_RESPONSE,
+            })
+
     return updates
 
 
@@ -510,12 +560,17 @@ class _DirectResponseResult(NamedTuple):
 
 async def _call_decision_llm(
     decision_prompt: str,
-    system_instruction: str,
     preferred_model: str,
 ) -> str:
     """Call the configured LLM for routing decision and return raw text.
 
     Token cap: 512 (decision JSON is <400 tokens).
+
+    Uses a compact routing-only system prompt rather than the full Aika
+    persona — the persona (identity.py) is several hundred tokens of
+    conversational-instruction noise for a pure JSON classification task,
+    and attaching it to every routing call both wastes tokens and distracts
+    the model from the routing contract.
     """
     # Late import — avoids circular dependency at module load time.
     from app.core.llm import generate_response
@@ -525,7 +580,7 @@ async def _call_decision_llm(
         model="gemini_google",
         temperature=0.3,
         max_tokens=512,
-        system_prompt=system_instruction,
+        system_prompt=_DECISION_SYSTEM_PROMPT,
         preferred_gemini_model=preferred_model,
         json_mode=True,
         json_schema=_DECISION_JSON_SCHEMA,
@@ -968,7 +1023,7 @@ async def aika_decision_node(
         )
 
         response_text = await _call_decision_llm(
-            decision_prompt, system_instruction, preferred_model
+            decision_prompt, preferred_model
         )
 
         # -----------------------------------------------------------------
@@ -990,7 +1045,7 @@ async def aika_decision_node(
                     _DECISION_MAX_PARSE_ATTEMPTS,
                 )
                 response_text = await _call_decision_llm(
-                    decision_prompt, system_instruction, preferred_model
+                    decision_prompt, preferred_model
                 )
             try:
                 decision = _parse_llm_decision(response_text)

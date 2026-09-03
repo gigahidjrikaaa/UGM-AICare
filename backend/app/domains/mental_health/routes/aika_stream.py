@@ -526,6 +526,10 @@ async def stream_aika_execution(
         except Exception:
             tools_used = []
 
+        # Cost/behaviour proxy surfaced to the client. Per-model request counts
+        # are the current cost signal (cost ~ request count per model); exact
+        # per-request *token* accounting is deferred until core/llm captures
+        # each provider's usage_metadata (see TODO in core/llm.py).
         metadata_dict = {
             'session_id': session_id,
             'execution_id': execution_id,  # Return execution_id for evaluation
