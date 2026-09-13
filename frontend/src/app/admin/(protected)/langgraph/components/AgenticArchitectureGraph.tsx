@@ -155,7 +155,7 @@ export function AgenticArchitectureGraph({ onNodeClick, healthData }: AgenticArc
         label,
         labelStyle: { fill: color, fontSize: 10, fontFamily: 'monospace', fontWeight: 600, letterSpacing: '0.05em' },
         labelBgStyle: { fill: '#000', stroke: color, strokeWidth: 1 },
-        labelBgPadding: [4, 2],
+        labelBgPadding: [4, 2] as [number, number],
         labelBgBorderRadius: 0,
         style: { stroke: color, strokeWidth: 1, strokeDasharray: dashed ? '4,4' : undefined },
         markerEnd: { type: MarkerType.ArrowClosed, color },

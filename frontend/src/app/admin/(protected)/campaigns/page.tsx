@@ -171,7 +171,7 @@ export default function CampaignsPage() {
 
   if (error) {
     return (
-      <div className="flex min-h-[60vh] items-center justify-center">
+      <div className="flex items-center justify-center space-y-6">
         <div className="max-w-md space-y-4 text-center">
           <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-full bg-rose-500/10">
             <TrashIcon className="h-8 w-8 text-rose-400" />

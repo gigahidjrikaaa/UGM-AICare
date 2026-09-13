@@ -43,7 +43,7 @@ export function ReportDetailClient({ reportId }: ReportDetailClientProps) {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-[#001D58] flex items-center justify-center">
+      <div className="flex items-center justify-center space-y-6">
         <div className="flex flex-col items-center gap-4">
           <div className="h-12 w-12 rounded-full border-4 border-[#FFCA40]/30 border-t-[#FFCA40] animate-spin" />
           <p className="text-white/70">Loading report...</p>
@@ -54,7 +54,7 @@ export function ReportDetailClient({ reportId }: ReportDetailClientProps) {
 
   if (error || !report) {
     return (
-      <div className="min-h-screen bg-[#001D58] flex items-center justify-center">
+      <div className="flex items-center justify-center space-y-6">
         <div className="bg-white/5 backdrop-blur-sm border border-red-500/30 rounded-xl p-6 max-w-md">
           <AlertTriangle className="text-red-400 mx-auto mb-4" size={48} />
           <h2 className="text-xl font-semibold text-white text-center mb-2">
@@ -81,7 +81,7 @@ export function ReportDetailClient({ reportId }: ReportDetailClientProps) {
   const recommendations = sentimentData?.recommendations || [];
 
   return (
-    <div className="min-h-screen bg-[#001D58] p-6">
+    <div className="space-y-6">
       <div className="max-w-7xl mx-auto space-y-6">
         {/* Header */}
         <div className="bg-white/5 backdrop-blur-sm border border-white/10 rounded-xl p-6">

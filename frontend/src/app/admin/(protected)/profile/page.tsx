@@ -165,7 +165,7 @@ export default function AdminProfilePage() {
 
   if (profileLoading) {
     return (
-      <div className="flex min-h-[60vh] items-center justify-center text-white/70">
+      <div className="flex items-center justify-center space-y-6 text-white/70">
         <div className="flex items-center gap-3">
           <FiRefreshCw className="h-5 w-5 animate-spin" />
           <span>Loading profile...</span>
