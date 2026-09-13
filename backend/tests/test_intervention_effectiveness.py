@@ -8,6 +8,7 @@ from app.services.intervention_effectiveness_service import (
     AssignmentOutcome,
     _mean_delta,
     aggregate_outcomes,
+    build_user_insights,
 )
 
 
@@ -72,3 +73,18 @@ def test_intervention_effectiveness_dp_plan_releases_expected_shape() -> None:
     assert 0.0 <= row[6] <= 100.0  # improvement_rate
     assert 0.0 <= row[8] <= 100.0  # mcid_rate
     assert 0.0 <= row[9] <= 1.0    # bounded mean
+
+
+@pytest.mark.unit
+def test_build_user_insights_orders_by_improvement_rate() -> None:
+    items = [
+        AssignmentOutcome("activity:box-breathing", "improved", 0.2),
+        AssignmentOutcome("activity:box-breathing", "improved", 0.3),
+        AssignmentOutcome("activity:four-seven-eight", "worsened", -0.2),
+    ]
+    insights = build_user_insights(items)
+    assert insights[0]["intervention_key"] == "activity:box-breathing"
+    assert insights[0]["n"] == 2
+    assert insights[0]["improvement_rate"] == 100.0
+    assert insights[1]["intervention_key"] == "activity:four-seven-eight"
+    assert insights[1]["improvement_rate"] == 0.0

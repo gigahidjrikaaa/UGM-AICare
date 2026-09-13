@@ -55,6 +55,19 @@ class ConsentResponse(BaseModel):
     consent_self_report: bool
 
 
+class InsightItem(BaseModel):
+    intervention_key: str
+    label: str
+    n: int
+    improved: int
+    improvement_rate: float
+
+
+class InsightsResponse(BaseModel):
+    interventions: List[InsightItem]
+    self_report_consent: bool
+
+
 @router.get("/samples", response_model=List[DimensionSampleOut])
 async def get_my_screening_samples(
     dimension: Optional[str] = Query(None, description="Filter to a single dimension"),
@@ -138,3 +151,45 @@ async def set_self_report_consent(
     )
     await db.commit()
     return ConsentResponse(consent_self_report=payload.granted)
+
+
+@router.get("/insights", response_model=InsightsResponse)
+async def get_my_insights(
+    current_user: User = Depends(get_current_active_user),
+    db: AsyncSession = Depends(get_async_db),
+) -> InsightsResponse:
+    """"What works for you" — the user's own measured intervention outcomes."""
+    from app.agents.tca.activities_catalog import get_activity_by_id
+    from app.domains.mental_health.models import InterventionAssignment
+    from app.services.adaptive_selection_service import activity_id_from_key
+    from app.services.intervention_effectiveness_service import (
+        AssignmentOutcome,
+        build_user_insights,
+    )
+
+    rows = (
+        await db.execute(
+            select(InterventionAssignment).where(
+                InterventionAssignment.user_id == current_user.id,
+                InterventionAssignment.status == "measured",
+            )
+        )
+    ).scalars().all()
+
+    items = [
+        AssignmentOutcome(row.intervention_key or "unknown", row.outcome_label, None)
+        for row in rows
+    ]
+
+    enriched: List[InsightItem] = []
+    for item in build_user_insights(items):
+        activity_id = activity_id_from_key(item["intervention_key"])
+        activity = get_activity_by_id(activity_id) if activity_id else None
+        enriched.append(
+            InsightItem(label=activity.name if activity else item["intervention_key"], **item)
+        )
+
+    return InsightsResponse(
+        interventions=enriched,
+        self_report_consent=bool(getattr(current_user, "consent_self_report", False)),
+    )

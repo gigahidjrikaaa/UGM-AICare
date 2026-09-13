@@ -98,6 +98,27 @@ def aggregate_outcomes(items: List[AssignmentOutcome]) -> List[Dict[str, Any]]:
     return rows
 
 
+def build_user_insights(items: List[AssignmentOutcome]) -> List[Dict[str, Any]]:
+    """Per-intervention stats for a single user ("what works for you").
+
+    Ordered by improvement rate (then sample size). Small per-user datasets,
+    so no DP/k-anonymity applies — this is the user's own data.
+    """
+    insights: List[Dict[str, Any]] = []
+    for row in aggregate_outcomes(items):
+        n = row["n"]
+        insights.append(
+            {
+                "intervention_key": row["intervention_key"],
+                "n": n,
+                "improved": row["improved"],
+                "improvement_rate": round(row["improved"] / n * 100, 1) if n else 0.0,
+            }
+        )
+    insights.sort(key=lambda r: (-r["improvement_rate"], -r["n"]))
+    return insights
+
+
 async def collect_outcomes(db: AsyncSession, *, days: int) -> List[AssignmentOutcome]:
     cutoff = datetime.now(timezone.utc) - timedelta(days=days)
     rows = (
