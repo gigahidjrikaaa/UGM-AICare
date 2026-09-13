@@ -215,6 +215,6 @@ async def test_get_mental_health_resources_survives_retrieval_failure(monkeypatc
 # Embedding-task helpers (pure parts)
 # ============================================================================
 def test_vector_literal_format() -> None:
-    from app.tasks.embedding_tasks import _vector_literal
+    from app.services.embedding_service import _vector_literal
 
     assert _vector_literal([0.5, -0.25]) == "[0.5000000,-0.2500000]"
