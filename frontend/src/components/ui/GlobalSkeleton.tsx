@@ -47,8 +47,6 @@ export default function GlobalSkeleton() {
     return <ProfilePageSkeleton />;
   } else if (pathname?.startsWith("/journaling")) {
     return <JournalingPageSkeleton />;
-  } else if (pathname?.startsWith("/caretoken")) {
-    return <CaretokenPageSkeleton />;
   } else {
     return <DefaultPageSkeleton />;
   }
@@ -422,42 +420,6 @@ function JournalingPageSkeleton() {
   );
 }
 
-function CaretokenPageSkeleton() {
-  return (
-    <motion.div
-      initial={{ opacity: 0 }}
-      animate={{ opacity: 1 }}
-      className="min-h-screen bg-linear-to-b from-[#001D58] to-[#00308F] pt-20 sm:pt-24 pb-10 px-4 sm:px-6"
-    >
-      <div className="max-w-6xl mx-auto">
-        {/* Header */}
-        <div className="text-center mb-8 sm:mb-12">
-          <SkeletonText width="w-48 sm:w-64" className="h-8 sm:h-10 mx-auto mb-3" />
-          <SkeletonText width="w-64 sm:w-96" className="h-4 mx-auto" />
-        </div>
-
-        {/* Token balance card */}
-        <div className="bg-white/5 rounded-2xl sm:rounded-3xl p-6 sm:p-8 mb-8 text-center">
-          <SkeletonCircle className="h-16 w-16 sm:h-20 sm:w-20 mx-auto mb-4" />
-          <SkeletonText width="w-32" className="h-8 mx-auto mb-2" />
-          <SkeletonText width="w-24" className="h-4 mx-auto" />
-          <div className="flex justify-center gap-3 mt-6">
-            <SkeletonBox className="h-10 w-24 rounded-lg" />
-            <SkeletonBox className="h-10 w-24 rounded-lg" />
-          </div>
-        </div>
-
-        {/* Features grid */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-          {[...Array(6)].map((_, i) => (
-            <SkeletonBox key={i} className="h-32 sm:h-40 rounded-xl" />
-          ))}
-        </div>
-      </div>
-    </motion.div>
-  );
-}
-
 // Export individual skeletons for direct use
 export {
   AikaPageSkeleton,
@@ -467,7 +429,6 @@ export {
   ResourcesPageSkeleton,
   ProfilePageSkeleton,
   JournalingPageSkeleton,
-  CaretokenPageSkeleton,
   DefaultPageSkeleton,
   SkeletonBox,
   SkeletonCircle,

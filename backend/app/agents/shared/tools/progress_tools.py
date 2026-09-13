@@ -136,7 +136,7 @@ async def get_journal_entries(
 
 @register_tool(
     name="get_appointment_history",
-    description="Get user's counseling appointment history. Shows scheduled, completed, and cancelled appointments with psychologists.",
+    description="Get user's counseling appointment history. Shows scheduled, completed, and cancelled appointments with counselors.",
     parameters={
         "type": "object",
         "properties": {
@@ -187,7 +187,7 @@ async def get_appointment_history(
             "appointments": [
                 {
                     "id": apt.id,
-                    "psychologist_id": apt.psychologist_id,
+                    "counselor_id": apt.counselor_id,
                     "scheduled_at": apt.scheduled_at.isoformat() if apt.scheduled_at else None,
                     "status": apt.status,
                     "notes": apt.notes,

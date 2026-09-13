@@ -8,7 +8,7 @@ from sqlalchemy.exc import IntegrityError
 from typing import Optional
 from app.database import get_async_db
 from app.models.user import User
-from app.domains.mental_health.models import Psychologist as CounselorProfile, Appointment
+from app.domains.mental_health.models import Counselor as CounselorProfile, Appointment
 from app.schemas.counselor import (
     CounselorCreate,
     CounselorUpdate,
@@ -94,6 +94,31 @@ async def _ensure_counselor_profiles(db: AsyncSession) -> None:
                 is_available=True,
             )
             db.add(profile)
+
+        # Shadow AgentUser rows: case assignment (admin + CMA service)
+        # validates assignees against agent_users.id keyed by
+        # Counselor.id — without these rows a fresh counselor can never
+        # be assigned a case.
+        from app.models.agent_user import AgentRoleEnum, AgentUser
+
+        await db.flush()
+
+        linked_profiles = (
+            await db.execute(
+                select(CounselorProfile).where(CounselorProfile.user_id.is_not(None))
+            )
+        ).scalars().all()
+        for profile in linked_profiles:
+            agent_id = str(profile.id)
+            existing_agent = (
+                await db.execute(
+                    select(AgentUser).where(AgentUser.id == agent_id)
+                )
+            ).scalar_one_or_none()
+            if existing_agent is None:
+                db.add(
+                    AgentUser(id=agent_id, role=AgentRoleEnum.counselor)
+                )
 
         await db.commit()
     except IntegrityError:
@@ -359,31 +384,31 @@ async def get_counselor_stats(
     
     # Get appointment statistics
     total_appointments_query = select(func.count(Appointment.id)).filter(
-        Appointment.psychologist_id == counselor_id
+        Appointment.counselor_id == counselor_id
     )
     total_appointments = await db.scalar(total_appointments_query) or 0
     
     upcoming_appointments_query = select(func.count(Appointment.id)).filter(
-        Appointment.psychologist_id == counselor_id,
+        Appointment.counselor_id == counselor_id,
         Appointment.status == 'scheduled'
     )
     upcoming_appointments = await db.scalar(upcoming_appointments_query) or 0
     
     completed_appointments_query = select(func.count(Appointment.id)).filter(
-        Appointment.psychologist_id == counselor_id,
+        Appointment.counselor_id == counselor_id,
         Appointment.status == 'completed'
     )
     completed_appointments = await db.scalar(completed_appointments_query) or 0
     
     cancelled_appointments_query = select(func.count(Appointment.id)).filter(
-        Appointment.psychologist_id == counselor_id,
+        Appointment.counselor_id == counselor_id,
         Appointment.status == 'cancelled'
     )
     cancelled_appointments = await db.scalar(cancelled_appointments_query) or 0
     
     # Get unique patients count
     total_patients_query = select(func.count(func.distinct(Appointment.user_id))).filter(
-        Appointment.psychologist_id == counselor_id
+        Appointment.counselor_id == counselor_id
     )
     total_patients = await db.scalar(total_patients_query) or 0
     

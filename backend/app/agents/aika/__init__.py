@@ -21,13 +21,12 @@ Name meaning:
 """
 
 # ✅ REMOVED: Legacy AikaOrchestrator - use aika_orchestrator_graph.py instead
-from .identity import AIKA_IDENTITY, AIKA_SYSTEM_PROMPTS, AIKA_GREETINGS, AIKA_CAPABILITIES
+from .identity import AIKA_SYSTEM_PROMPTS, AIKA_GREETINGS, AIKA_CAPABILITIES
 from .state import AikaState, AikaResponseMetadata
 from .tools import get_aika_tools, execute_tool_call
 
 __all__ = [
     # ❌ DEPRECATED: "AikaOrchestrator" - Use create_aika_agent_with_checkpointing instead
-    "AIKA_IDENTITY",
     "AIKA_SYSTEM_PROMPTS",
     "AIKA_GREETINGS",
     "AIKA_CAPABILITIES",

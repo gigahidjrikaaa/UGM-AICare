@@ -1,8 +1,4 @@
 """External service integrations.
 
-This package contains integrations with external services like Twitter, email, etc.
+This package contains integrations with external services (email, etc.).
 """
-
-from .twitter import TwitterManager
-
-__all__ = ["TwitterManager"]

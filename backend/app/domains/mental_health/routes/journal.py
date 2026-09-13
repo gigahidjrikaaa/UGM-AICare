@@ -176,12 +176,18 @@ async def create_or_update_journal_entry(
     )
     existing_entry = result.scalar_one_or_none()
     normalized_tags = _normalize_tags(entry_data.tags)
-    word_count = len(entry_data.content.split())
+
+    # Redact PII before persistence: journal content is reflective and often
+    # names third parties; chats are redacted, journals must be too.
+    from app.core.redaction import sanitize_text
+
+    safe_content, _redaction_counts = sanitize_text(entry_data.content or "")
+    word_count = len(safe_content.split())
 
     saved_entry: JournalEntry
     try:
         if existing_entry:
-            existing_entry.content = entry_data.content
+            existing_entry.content = safe_content
             existing_entry.prompt_id = entry_data.prompt_id
             existing_entry.mood = entry_data.mood
             existing_entry.valence = entry_data.valence
@@ -202,7 +208,7 @@ async def create_or_update_journal_entry(
             saved_entry = JournalEntry(
                 user_id=current_user.id,
                 entry_date=entry_data.entry_date,
-                content=entry_data.content,
+                content=safe_content,
                 prompt_id=entry_data.prompt_id,
                 mood=entry_data.mood,
                 valence=entry_data.valence,
@@ -628,6 +634,36 @@ async def get_all_user_tags(
     return sorted(row[0] for row in result.all())
 
 
-#! TODO: DELETE endpoint
-# @router.delete("/{entry_date_str}", status_code=status.HTTP_204_NO_CONTENT)
-# async def delete_journal_entry ...
+@router.delete("/{entry_date_str}", status_code=status.HTTP_204_NO_CONTENT)
+async def delete_journal_entry(
+    entry_date_str: str,
+    db: AsyncSession = Depends(get_async_db),
+    current_user: User = Depends(get_current_active_user),
+):
+    """Delete the authenticated user's journal entry for a date (GDPR erasure)."""
+    try:
+        entry_date = date.fromisoformat(entry_date_str)
+    except ValueError:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="entry_date must be YYYY-MM-DD",
+        )
+
+    result = await db.execute(
+        select(JournalEntry).where(
+            JournalEntry.user_id == current_user.id,
+            JournalEntry.entry_date == entry_date,
+        )
+    )
+    entry = result.scalar_one_or_none()
+    if entry is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="Journal entry not found"
+        )
+
+    # Manual redaction count so words are gone even without a date param check
+    await db.execute(delete(JournalTag).where(JournalTag.journal_entry_id == entry.id))
+    await db.delete(entry)
+    await db.commit()
+    logger.info("Journal entry deleted: user_id=%s, entry_date=%s", current_user.id, entry_date)
+    return None

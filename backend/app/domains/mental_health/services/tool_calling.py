@@ -88,6 +88,17 @@ def _select_tool_subset_from_message(message: str) -> Optional[set[str]]:
     intervention_keywords = (
         "intervensi", "intervention", "coping", "rencana", "plan", "progress",
     )
+    knowledge_keywords = (
+        "apa itu", "penjelasan", "teknik", "cara coping", "edukasi",
+        "relaksasi", "gmc", "hpu", "layanan konseling", "hotline",
+        "nomor darurat", "bantuan darurat",
+    )
+
+    if any(keyword in text for keyword in knowledge_keywords):
+        return {
+            "get_mental_health_resources",
+            "get_crisis_resources",
+        }
 
     if any(keyword in text for keyword in profile_keywords):
         return {
@@ -298,6 +309,7 @@ async def generate_with_tools(
                         user_id=user_id,
                         stream_callback=stream_callback,
                         execution_id=execution_id,
+                        user_role=user_role,
                     )
                     # Note: Gemini's streaming mode with tools is complex
                     # For now, we return after first iteration for streaming
@@ -326,6 +338,7 @@ async def generate_with_tools(
                     user_id=user_id,
                     execution_id=execution_id,
                     previous_tool_calls=tool_calls_executed,
+                    user_role=user_role,
                 )
                 
                 if not tool_results:
@@ -428,6 +441,7 @@ async def generate_with_tools(
                     user_id=user_id,
                     execution_id=execution_id,
                     previous_tool_calls=tool_calls_executed,
+                    user_role=user_role,
                 )
                 
                 if new_tool_results:
@@ -481,6 +495,7 @@ async def _generate_streaming_with_tools(
     user_id: int,
     stream_callback: StreamCallback,
     execution_id: Optional[str] = None,
+    user_role: Optional[str] = None,
 ) -> str:
     """Generate streaming response with tool calling support.
     
@@ -524,6 +539,7 @@ async def _generate_streaming_with_tools(
             db=db,
             user_id=user_id,
             execution_id=execution_id,
+            user_role=user_role,
         )
         
         if tool_results:
@@ -650,6 +666,7 @@ async def _check_and_execute_tool_calls(
     user_id: int,
     execution_id: Optional[str] = None,
     previous_tool_calls: Optional[List[Dict[str, Any]]] = None,
+    user_role: Optional[str] = None,
 ) -> List[Dict[str, Any]]:
     """Check if response contains tool calls and execute them.
     
@@ -686,6 +703,7 @@ async def _check_and_execute_tool_calls(
                     args=tool_args,
                     db=execution_db,
                     user_id=str(user_id),
+                    requester_role=user_role,
                 ),
                 timeout=DEFAULT_TOOL_TIMEOUT,
             )

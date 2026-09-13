@@ -99,7 +99,7 @@ NATURAL_PROBES: List[NaturalProbe] = [
         probe_variations=[
             "Btw, tidurnya gimana? Cukup nggak?",
             "Akhir-akhir ini bisa tidur nyenyak nggak?",
-            "Jam tidurmu gimana belakangan? Aku kadang juga struggle sama ini.",
+            "Jam tidurmu gimana belakangan? Masih cukup reguler nggak?",
             "Kalau malam, biasanya langsung bisa tidur atau suka kebangun?",
         ],
         follow_up_if_negative="Susah tidur tuh emang ganggu banget ya. Biasanya yang bikin susah apa?",
@@ -233,7 +233,7 @@ NATURAL_PROBES: List[NaturalProbe] = [
             "exam_period", "decision_making"
         ],
         probe_variations=[
-            "Sering overthinking nggak? Aku juga kadang gitu.",
+            "Sering overthinking nggak? Biasanya pemicunya apa?",
             "Ada yang bikin khawatir belakangan ini?",
             "Kepalamu sering penuh sama 'what if' nggak?",
             "Gimana caramu handle kalau lagi cemas?",
@@ -549,7 +549,7 @@ def generate_screening_guidance(
         if gap_analysis.discordance_level == "high":
             discordance_text += "- CRITICAL: User's self-report is significantly more positive than detected sentiment. Possible crisis masking.\n- STRATEGY: Use validating, deep-probing questions to explore the 'underlying' feelings."
         elif gap_analysis.discordance_level == "medium":
-            discordance_text += "- STRATEGY: Gentle Inquiry. Acknowledge their positive report but tentatively mention the stressors they've discussed (e.g., 'You said you're doing okay, but I can feel how heavy these assignments are for you...')."
+            discordance_text += "- STRATEGY: Gentle Inquiry. Refer back to what THE USER themselves shared earlier and ask openly, without claiming to sense anything (e.g., 'Kamu bilang oke-oke aja — kemarin kamu cerita soal tumpukan tugas; sekarang masih terasa berat nggak?'). Never say you can feel/sense their burden, and never imply you see through them."
         else: # low
             discordance_text += "- STRATEGY: Silent Coaching. Be slightly more supportive/empathetic than usual, even if they claim to be fine."
             
@@ -616,9 +616,11 @@ async def enhance_response_with_probe(
     if base_response.rstrip().endswith("?"):
         return base_response, False
     
-    # Don't add probe if response is about crisis/serious topic
-    crisis_keywords = ["crisis", "darurat", "bunuh", "suicide", "hotline", "bantuan"]
-    if any(kw in base_response.lower() for kw in crisis_keywords):
+    # Don't add probe if response is about crisis/serious topic —
+    # canonical lexicon, not a hand-picked keyword list.
+    from app.agents.shared.crisis_lexicon import has_crisis_signal
+
+    if has_crisis_signal(base_response):
         return base_response, False
     
     probe = gap_analysis.suggested_probe

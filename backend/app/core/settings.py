@@ -14,31 +14,41 @@ class Settings(BaseSettings):
     # Advanced Settings (with defaults)
     debug_sql: bool = Field(False, alias="DEBUG_SQL")
     k_anon: int = Field(15, alias="K_ANON")
+
+    # Differential Privacy (IA aggregate analytics)
+    dp_enabled: bool = Field(True, alias="DP_ENABLED")
+    dp_epsilon_per_query: float = Field(2.0, alias="DP_EPSILON_PER_QUERY")
+    dp_delta: float = Field(0.0, alias="DP_DELTA")  # pure epsilon-DP (Laplace mechanism)
+    dp_budget_limit: float = Field(50.0, alias="DP_BUDGET_LIMIT")
+    dp_budget_window_hours: int = Field(24, alias="DP_BUDGET_WINDOW_HOURS")
+
+    # Retrieval-Augmented Generation (clinical knowledge grounding)
+    rag_enabled: bool = Field(True, alias="RAG_ENABLED")
+    rag_top_k: int = Field(5, alias="RAG_TOP_K")
+    rag_min_score: float = Field(0.25, alias="RAG_MIN_SCORE")
+    rag_embedding_model: str = Field("text-embedding-004", alias="RAG_EMBEDDING_MODEL")
+    rag_embedding_dim: int = Field(768, alias="RAG_EMBEDDING_DIM")
     followup_cooldown_hours: int = Field(24, alias="FOLLOWUP_COOLDOWN_HOURS")
     sda_sla_minutes: int = Field(15, alias="SDA_SLA_MINUTES")
     policy_deny_experiments_on_crisis: bool = Field(True, alias="POLICY_DENY_EXPERIMENTS_ON_CRISIS")
     
     # PII Redaction Settings
     pii_redaction_enabled: bool = Field(True, alias="PII_REDACTION_ENABLED")
-    pii_nlp_redaction_enabled: bool = Field(False, alias="PII_NLP_REDACTION_ENABLED")
-    pii_nlp_entities: str = Field("PERSON,GPE,LOC", alias="PII_REDACTION_ENTITIES")
     
     # Email Encryption
     email_encryption_key: str = Field(..., alias="EMAIL_ENCRYPTION_KEY")
     
     # API Keys
     google_genai_api_key: Optional[str] = Field(None, alias="GOOGLE_GENAI_API_KEY")
+    google_client_id: Optional[str] = Field(None, alias="GOOGLE_CLIENT_ID")
+    # When true (default), POST /auth/oauth/token REQUIRES a verified Google
+    # id_token; set false only for legacy clients during migration (the
+    # email-fallback account link stays disabled regardless).
+    oauth_require_id_token: bool = Field(True, alias="OAUTH_REQUIRE_ID_TOKEN")
     azure_openai_endpoint: Optional[str] = Field(None, alias="AZURE_OPENAI_ENDPOINT")
     azure_openai_api_key: Optional[str] = Field(None, alias="AZURE_OPENAI_API_KEY")
     azure_openai_deployment: Optional[str] = Field(None, alias="AZURE_OPENAI_DEPLOYMENT")
     together_api_key: Optional[str] = Field(None, alias="TOGETHER_API_KEY")
-    
-    # Twitter API
-    twitter_api_key: Optional[str] = Field(None, alias="TWITTER_API_KEY")
-    twitter_api_secret: Optional[str] = Field(None, alias="TWITTER_API_SECRET")
-    twitter_access_token: Optional[str] = Field(None, alias="TWITTER_ACCESS_TOKEN")
-    twitter_access_token_secret: Optional[str] = Field(None, alias="TWITTER_ACCESS_TOKEN_SECRET")
-    twitter_bearer_token: Optional[str] = Field(None, alias="TWITTER_BEARER_TOKEN")
     
     # Redis Configuration
     redis_host: Optional[str] = Field(None, alias="REDIS_HOST")
@@ -74,11 +84,6 @@ class Settings(BaseSettings):
     cache_resource_ttl: int = Field(86400, alias="CACHE_RESOURCE_TTL")  # 24 hours
     cache_cbt_module_ttl: int = Field(86400, alias="CACHE_CBT_MODULE_TTL")  # 24 hours
     cache_user_profile_ttl: int = Field(3600, alias="CACHE_USER_PROFILE_TTL")  # 1 hour
-    
-    # Celery Configuration
-    celery_broker_url: Optional[str] = Field(None, alias="CELERY_BROKER_URL")
-    celery_result_backend: Optional[str] = Field(None, alias="CELERY_RESULT_BACKEND")
-    celery_store_results: bool = Field(False, alias="CELERY_STORE_RESULTS")
     
     # Email Configuration
     email_username: Optional[str] = Field(None, alias="EMAIL_USERNAME")

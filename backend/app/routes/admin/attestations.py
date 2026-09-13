@@ -30,8 +30,6 @@ def _network_logo_url(network: str, chain_id: int) -> Optional[str]:
         return "https://cryptologos.cc/logos/bnb-bnb-logo.png?v=040"
     if "edu" in network.lower():
         return "https://assets.coingecko.com/coins/images/29973/small/EDU.png"
-    if "somnia" in network.lower():
-        return "https://img.icons8.com/fluency/48/blockchain-technology.png"
     return "https://img.icons8.com/fluency/48/blockchain-technology.png"
 
 

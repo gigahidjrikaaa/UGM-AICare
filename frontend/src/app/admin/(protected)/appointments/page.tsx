@@ -35,7 +35,7 @@ interface AppointmentTherapist {
 interface Appointment {
   id: number;
   user: User;
-  psychologist: AppointmentTherapist;
+  counselor: AppointmentTherapist;
   appointment_type: string;
   appointment_datetime: string;
   notes: string | null;
@@ -85,7 +85,7 @@ export default function AppointmentManagementPage() {
     if (q) {
       list = list.filter(a =>
         (a.user.email || '').toLowerCase().includes(q) ||
-        (a.psychologist.name || '').toLowerCase().includes(q) ||
+        (a.counselor.name || '').toLowerCase().includes(q) ||
         (a.appointment_type || '').toLowerCase().includes(q) ||
         (a.notes || '').toLowerCase().includes(q)
       );
@@ -184,7 +184,7 @@ export default function AppointmentManagementPage() {
     const lines = rows.map(a => [
       a.id,
       a.user.email || 'N/A',
-      a.psychologist.name,
+      a.counselor.name,
       a.appointment_type,
       new Date(a.appointment_datetime).toLocaleString(),
       a.status,
@@ -522,7 +522,7 @@ export default function AppointmentManagementPage() {
                       </div>
                       <div className="flex items-center gap-2 text-sm text-white/80">
                         <FiUser className="h-4 w-4 text-white/40" />
-                        <span className="truncate">{appointment.psychologist.name}</span>
+                        <span className="truncate">{appointment.counselor.name}</span>
                       </div>
                     </div>
 
@@ -599,9 +599,9 @@ export default function AppointmentManagementPage() {
                             </div>
                           </td>
                           <td className="px-6 py-4 whitespace-nowrap">
-                            <div className="text-sm text-white">{appointment.psychologist.name}</div>
+                            <div className="text-sm text-white">{appointment.counselor.name}</div>
                             <div className="text-xs text-white/60">
-                              {appointment.psychologist.specialization || 'General practice'}
+                              {appointment.counselor.specialization || 'General practice'}
                             </div>
                           </td>
                           <td className="px-6 py-4 whitespace-nowrap">
@@ -725,24 +725,24 @@ export default function AppointmentManagementPage() {
                   <div className="text-xs uppercase tracking-wide text-white/60 mb-3">Counselor</div>
                   <div className="flex items-center gap-4">
                     <div className="relative h-16 w-16 rounded-full overflow-hidden border border-white/15 bg-white/5 flex-shrink-0">
-                      {selectedAppt.psychologist.image_url ? (
+                      {selectedAppt.counselor.image_url ? (
                         <Image
-                          src={selectedAppt.psychologist.image_url}
-                          alt={`Avatar for ${selectedAppt.psychologist.name}`}
+                          src={selectedAppt.counselor.image_url}
+                          alt={`Avatar for ${selectedAppt.counselor.name}`}
                           fill
                           sizes="64px"
                           className="object-cover"
                         />
                       ) : (
                         <div className="flex h-full w-full items-center justify-center bg-white/10 text-xl font-semibold text-white/70">
-                          {(selectedAppt.psychologist.name || 'P').charAt(0).toUpperCase()}
+                          {(selectedAppt.counselor.name || 'P').charAt(0).toUpperCase()}
                         </div>
                       )}
                     </div>
                     <div>
-                      <div className="text-base font-semibold text-white">{selectedAppt.psychologist.name}</div>
+                      <div className="text-base font-semibold text-white">{selectedAppt.counselor.name}</div>
                       <div className="text-sm text-white/60">
-                        {selectedAppt.psychologist.specialization || 'General practice'}
+                        {selectedAppt.counselor.specialization || 'General practice'}
                       </div>
                     </div>
                   </div>

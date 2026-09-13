@@ -2,6 +2,7 @@
 
 import Image from "next/image";
 import Link from "next/link";
+import { useProactiveMessages } from "@/contexts/ProactiveMessagesContext";
 import { useEffect, useMemo, useState, type ReactNode } from "react";
 import { motion, useReducedMotion } from "framer-motion";
 import { toast } from "react-hot-toast";
@@ -55,7 +56,7 @@ const quickActions: QuickAction[] = [
     icon: <BsChatDots className="h-5 w-5" />,
   },
   {
-    href: "/appointment",
+    href: "/appointments",
     label: "Book counselling",
     description: "Reserve a slot with UGM support team.",
     icon: <FiCalendar className="h-5 w-5" />,
@@ -67,7 +68,7 @@ const quickActions: QuickAction[] = [
     icon: <FiActivity className="h-5 w-5" />,
   },
   {
-    href: "/help",
+    href: "/resources",
     label: "Help & safety",
     description: "Find support contacts and guidance quickly.",
     icon: <FiShield className="h-5 w-5" />,
@@ -320,6 +321,7 @@ function DashboardBentoCard({
 }
 
 export default function DashboardPage() {
+  const { unreadCount: proactiveUnreadCount } = useProactiveMessages();
   const reduceMotion = !!useReducedMotion();
   const [profile, setProfile] = useState<UserProfileOverviewResponse | null>(null);
   const [profileLoading, setProfileLoading] = useState(true);
@@ -526,6 +528,12 @@ export default function DashboardPage() {
                   <p className="mt-1 text-white/80">
                     Your AI companion is ready to listen and support you, {firstName}
                   </p>
+                  {proactiveUnreadCount > 0 && (
+                    <p className="mt-2 inline-flex items-center gap-2 rounded-full bg-white/20 px-3 py-1 text-sm font-semibold text-white">
+                      <span className="h-2 w-2 rounded-full bg-green-300 animate-pulse" />
+                      Aika punya {proactiveUnreadCount > 1 ? `${proactiveUnreadCount} pesan baru` : "pesan baru"} buat kamu
+                    </p>
+                  )}
                 </div>
 
                 <div className="flex items-center gap-2 rounded-xl bg-white px-6 py-3 font-semibold text-teal-600 shadow-lg transition-all group-hover:scale-105 group-hover:shadow-xl">
@@ -624,7 +632,7 @@ export default function DashboardPage() {
             <div className="flex items-center justify-between">
               <h2 className="text-xl font-semibold">Upcoming appointments</h2>
               <Link
-                href="/appointment"
+                href="/appointments"
                 className="inline-flex items-center gap-2 text-sm font-medium text-[#FFCA40] hover:text-[#ffd45c]"
               >
                 Book

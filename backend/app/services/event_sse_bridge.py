@@ -11,7 +11,7 @@ from uuid import UUID
 from sqlalchemy import select
 
 from app.database import AsyncSessionLocal
-from app.domains.mental_health.models import Case, Psychologist
+from app.domains.mental_health.models import Case, Counselor
 from app.models.alerts import AlertSeverity, AlertType
 from app.services.event_bus import Event, EventType, get_event_bus
 from app.services.alert_service import AlertService
@@ -39,13 +39,13 @@ async def _resolve_recipient_user_ids(
 
         if assigned_value:
             try:
-                psychologist_id = int(assigned_value)
+                counselor_id = int(assigned_value)
             except ValueError:
-                psychologist_id = None
+                counselor_id = None
 
-            if psychologist_id is not None:
+            if counselor_id is not None:
                 profile = (
-                    await db.execute(select(Psychologist).where(Psychologist.id == psychologist_id))
+                    await db.execute(select(Counselor).where(Counselor.id == counselor_id))
                 ).scalar_one_or_none()
                 if profile and profile.user_id is not None:
                     recipient_ids.add(int(profile.user_id))
@@ -72,15 +72,41 @@ async def _create_counselor_alert(
         "case_id": case_id,
     }
 
+    alert_id = None
     async with AsyncSessionLocal() as db:
         alert_service = AlertService(db)
-        await alert_service.create_alert(
+        alert = await alert_service.create_alert(
             alert_type=alert_type,
             severity=severity,
             title=title,
             message=message,
             link=link,
             alert_metadata=metadata,
+        )
+        alert_id = str(alert.id) if alert is not None else None
+
+    # Push: notify each recipient counselor's open connections instantly.
+    # (The console bell polls every 30s; this makes delivery immediate.)
+    try:
+        from app.services.sse_broadcaster import get_broadcaster
+
+        payload = {
+            "alert_id": alert_id,
+            "alert_type": alert_type.value if hasattr(alert_type, "value") else str(alert_type),
+            "severity": severity.value if hasattr(severity, "value") else str(severity),
+            "title": title,
+            "message": message,
+            "link": link,
+            "case_id": case_id,
+        }
+        for recipient_user_id in recipient_user_ids:
+            await get_broadcaster().broadcast(
+                "counselor_alert", payload, user_id=recipient_user_id
+            )
+    except Exception as broadcast_exc:
+        logger.warning(
+            "counselor_alert SSE broadcast failed (alert row persisted): %s",
+            broadcast_exc,
         )
 
 
@@ -195,7 +221,33 @@ async def handle_sla_breach_event(event: Event) -> None:
         )
         
         logger.warning(f"Broadcasted SLA breach alert for case {case_id}")
-        
+
+        # Counselor notification: the assigned counselor gets an audience-
+        # scoped Alert (bell + counselor_alert SSE push) pointing at THEIR
+        # console — previously SLA breaches only ever reached admins.
+        recipient_user_ids = await _resolve_recipient_user_ids(
+            assigned_to=assigned_to if assigned_to != "Unassigned" else None,
+            case_id=str(case_id) if case_id else None,
+        )
+        if recipient_user_ids:
+            await _create_counselor_alert(
+                title="SLA breach on your case",
+                message=(
+                    f"Case #{case_id} has breached its response SLA "
+                    f"(assigned to: {assigned_to}). Please review it now."
+                ),
+                severity=AlertSeverity.CRITICAL,
+                case_id=str(case_id) if case_id else None,
+                recipient_user_ids=recipient_user_ids,
+                alert_type=AlertType.SLA_BREACH,
+            )
+        else:
+            logger.warning(
+                "SLA breach for case %s has no counselor recipients "
+                "(unassigned or orphan profile) — admins notified only.",
+                case_id,
+            )
+
     except Exception as e:
         logger.error(f"Failed to handle sla_breach event: {e}", exc_info=True)
 

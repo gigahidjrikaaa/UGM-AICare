@@ -10,12 +10,24 @@ import { setAccessToken } from "@/services/api";
  * API request, which would trigger unnecessary network calls.
  */
 export default function SessionSync() {
-  const { data: session } = useSession();
+  const { data: session, status } = useSession();
 
   useEffect(() => {
     // Update the access token in the API client whenever the session changes
     setAccessToken(session?.accessToken);
   }, [session?.accessToken]);
+
+  useEffect(() => {
+    // Privacy: drop the persisted Aika thread id when signed out, so the next
+    // user on a shared machine cannot adopt the previous user's conversation.
+    if (status === "unauthenticated") {
+      try {
+        window.localStorage.removeItem("aika-session-id");
+      } catch {
+        // storage unavailable (private mode) — nothing to clean
+      }
+    }
+  }, [status]);
 
   return null;
 }

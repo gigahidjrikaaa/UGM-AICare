@@ -142,7 +142,7 @@ export function SessionRiskAssessmentSection({
             </svg>
             STA Risk Assessment
           </h2>
-          <p className="text-xs text-white/40 mt-0.5 ml-7">Safety Triage Agent analysis with psychologist-relevant insights</p>
+          <p className="text-xs text-white/40 mt-0.5 ml-7">Safety Triage Agent analysis with counselor-relevant insights</p>
         </div>
         <button
           onClick={onTriggerAssessment}

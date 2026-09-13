@@ -86,6 +86,7 @@ type ProfileFormState = {
   consent_emergency_contact: boolean;
   consent_marketing: boolean;
   consent_ai_memory: boolean;
+  consent_proactive_chat: boolean;
 };
 
 const timelineIcons: Record<string, React.JSX.Element> = {
@@ -216,6 +217,7 @@ function mapProfileToForm(profile: UserProfileOverviewResponse): ProfileFormStat
     consent_emergency_contact: profile.consent.consent_emergency_contact,
     consent_marketing: profile.consent.consent_marketing,
     consent_ai_memory: profile.consent.consent_ai_memory,
+    consent_proactive_chat: profile.consent.consent_proactive_chat,
   };
 }
 
@@ -258,6 +260,7 @@ const buildUpdatePayload = (state: ProfileFormState): UserProfileOverviewUpdate 
   consent_emergency_contact: state.consent_emergency_contact,
   consent_marketing: state.consent_marketing,
   consent_ai_memory: state.consent_ai_memory,
+  consent_proactive_chat: state.consent_proactive_chat,
 });
 
 
@@ -388,6 +391,27 @@ export default function ProfilePage() {
       console.error("Failed to update AI memory consent", error);
       toast.error("Failed to update AI memory consent");
       // Revert local state
+      setForm(mapProfileToForm(profile));
+    }
+  };
+
+  const handleProactiveChatConsentToggle = async (enabled: boolean) => {
+    if (!profile || !form) {
+      return;
+    }
+
+    setForm((prev) => (prev ? { ...prev, consent_proactive_chat: enabled } : prev));
+    try {
+      const updated = await updateUserProfileOverview({ consent_proactive_chat: enabled });
+      setProfile(updated);
+      toast.success(
+        enabled
+          ? "Aika boleh mengobrol duluan (proaktif)"
+          : "Aika tidak akan mengobrol duluan"
+      );
+    } catch (error) {
+      console.error("Failed to update proactive chat consent", error);
+      toast.error("Failed to update proactive chat consent");
       setForm(mapProfileToForm(profile));
     }
   };
@@ -1061,6 +1085,31 @@ export default function ProfilePage() {
                       className={clsx(
                         "inline-block h-4 w-4 transform rounded-full bg-white transition",
                         (form?.consent_ai_memory ?? profile.consent.consent_ai_memory) ? "translate-x-6" : "translate-x-1",
+                      )}
+                    />
+                  </Switch>
+                </div>
+
+                <div className="flex items-center justify-between text-xs text-white/60">
+                  <span>
+                    Izinkan Aika mengobrol duluan
+                    <span className="block text-[10px] text-white/40">
+                      Aika bisa mengirim pesan follow-up rencana intervensi kamu (opt-in)
+                    </span>
+                  </span>
+                  <Switch
+                    checked={(form?.consent_proactive_chat ?? profile.consent.consent_proactive_chat)}
+                    onChange={handleProactiveChatConsentToggle}
+                    className={clsx(
+                      "relative inline-flex h-6 w-11 items-center rounded-full transition focus:outline-none focus:ring-2 focus:ring-[#FFCA40]/80 focus:ring-offset-2 focus:ring-offset-gray-900",
+                      (form?.consent_proactive_chat ?? profile.consent.consent_proactive_chat) ? "bg-[#FFCA40]" : "bg-gray-600",
+                    )}
+                  >
+                    <span className="sr-only">Toggle proactive chat</span>
+                    <span
+                      className={clsx(
+                        "inline-block h-4 w-4 transform rounded-full bg-white transition",
+                        (form?.consent_proactive_chat ?? profile.consent.consent_proactive_chat) ? "translate-x-6" : "translate-x-1",
                       )}
                     />
                   </Switch>

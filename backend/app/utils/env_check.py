@@ -81,10 +81,6 @@ def check_env(verbose: bool | None = None):
         "REDIS_PASSWORD",
         "REDIS_SSL",
 
-        # Celery (only required if you run Celery workers)
-        "CELERY_BROKER_URL",
-        "CELERY_RESULT_BACKEND",
-
         # Object storage (MinIO / S3-compatible)
         "MINIO_ENDPOINT",
         "MINIO_ACCESS_KEY",

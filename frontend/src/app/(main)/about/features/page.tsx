@@ -389,18 +389,6 @@ export default function AboutFeaturesPage() {
               </motion.div>
             ))}
           </div>
-
-          <div className="text-center mt-8">
-            <Link href="/caretoken">
-              <motion.button
-                whileHover={{ scale: 1.05 }}
-                whileTap={{ scale: 0.98 }}
-                className="px-8 py-3 bg-linear-to-r from-[#FFCA40] to-[#FFB700] text-[#001D58] rounded-full font-bold shadow-lg"
-              >
-                Learn More About $CARE Token
-              </motion.button>
-            </Link>
-          </div>
         </motion.section>
 
         {/* CTA Section */}

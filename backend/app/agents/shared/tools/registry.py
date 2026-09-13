@@ -23,7 +23,6 @@ Usage:
 from __future__ import annotations
 
 import logging
-import difflib
 from typing import Any, Callable, Dict, Optional
 from functools import wraps
 
@@ -196,8 +195,14 @@ def _resolve_tool_name(tool_name: str) -> str:
 
     Supports:
     - exact matches
-    - common alias prefix (`get_user_*` -> `get_*`)
-    - close-match typo recovery
+    - one deterministic alias prefix (`get_user_*` -> `get_*`)
+
+    SECURITY: fuzzy "close-match typo recovery" was removed. Silently
+    executing a DIFFERENT tool because its name scored 0.86 similarity is
+    indefensible in a mental-health context (a hallucinated
+    `update_user_profile` must not mutate as `get_user_preferences` or, far
+    worse, land on an adjacent destructive tool). Unknown names now resolve
+    to themselves and fail loudly in execute_tool().
     """
     if tool_name in _TOOL_REGISTRY:
         return tool_name
@@ -206,10 +211,6 @@ def _resolve_tool_name(tool_name: str) -> str:
         candidate = "get_" + tool_name[len("get_user_"):]
         if candidate in _TOOL_REGISTRY:
             return candidate
-
-    close = difflib.get_close_matches(tool_name, _TOOL_REGISTRY.keys(), n=1, cutoff=0.86)
-    if close:
-        return close[0]
 
     return tool_name
 

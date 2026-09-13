@@ -66,7 +66,16 @@ async def list_due_actions(
     *,
     now: Optional[datetime] = None,
     limit: int = 20,
+    for_update: bool = False,
 ) -> list[AutopilotAction]:
+    """List due actions; with ``for_update`` atomically CLAIM them.
+
+    ``for_update=True`` appends ``FOR UPDATE SKIP LOCKED`` so concurrent
+    workers never claim the same action — previously a plain SELECT let two
+    workers execute the same crisis analysis / case creation twice under
+    any multi-worker deployment. SKIP LOCKED (rather than blocking) keeps
+    each worker pulling a disjoint slice of the queue.
+    """
     current = now or datetime.now(timezone.utc)
     stmt = (
         select(AutopilotAction)
@@ -82,6 +91,11 @@ async def list_due_actions(
         .order_by(AutopilotAction.created_at.asc())
         .limit(limit)
     )
+    if for_update:
+        # Postgres-only row locking; SQLite (tests) silently ignores hints
+        # via with_for_update(skip_locked=True) being emitted only on
+        # dialects that support it — SQLAlchemy no-ops elsewhere.
+        stmt = stmt.with_for_update(skip_locked=True)
     return list((await db.execute(stmt)).scalars().all())
 
 

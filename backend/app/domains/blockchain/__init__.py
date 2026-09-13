@@ -2,26 +2,19 @@
 Blockchain Domain Module
 
 Multi-Chain Architecture:
-- SOMNIA Mainnet: CARE token, revenue oracle, staking contracts
 - EDU Chain Testnet: NFT achievement badges (ERC-1155)
 - BNB Smart Chain: NFT achievement badges (ERC-1155) -- added for multi-chain
 
 This module handles all blockchain interactions for the UGM-AICare platform:
-- CARE token operations (minting, transfers, balances)
-- PlatformRevenueOracle interactions (revenue reporting)
-- CareStakingHalal interactions (staking operations)
 - Multi-chain NFT badge minting for achievements (via NFTClientFactory)
+- Onchain attestation registry (via AttestationClientFactory)
 - Web3 utilities and base client
-- Blockchain API routes
 
 Contains:
 - base_web3.py: Shared Web3 utilities and connection management
-- care_token_client.py: CareToken smart contract client (SOMNIA)
-- oracle_client.py: PlatformRevenueOracle smart contract client (SOMNIA)
-- staking_client.py: CareStakingHalal smart contract client (SOMNIA)
 - nft/: Multi-chain NFT client (chain_registry, base_nft_client, factory)
+- attestation/: Onchain attestation registry clients
 - edu_chain/: Legacy EDU Chain NFT contracts (deprecated, use nft/ instead)
-- routes.py: FastAPI routes for blockchain operations
 """
 
 import logging as _logging
@@ -30,10 +23,6 @@ _logger = _logging.getLogger(__name__)
 
 try:
     from app.domains.blockchain.base_web3 import BaseWeb3Client
-    from app.domains.blockchain.care_token_client import CareTokenClient
-    from app.domains.blockchain.oracle_client import OracleClient
-    from app.domains.blockchain.staking_client import StakingClient
-    from app.domains.blockchain.routes import router as blockchain_router
 
     # Multi-chain NFT client (preferred for new code)
     from app.domains.blockchain.nft import (
@@ -73,8 +62,6 @@ except ImportError as _blockchain_import_err:
     # developers get a clear error if they accidentally use them in a path that
     # should not reach here.
     # ---------------------------------------------------------------------------
-    from fastapi import APIRouter as _APIRouter
-
     class _BlockchainUnavailable:
         """Raised at instantiation time to make misuse explicit."""
         def __init__(self, *args, **kwargs):  # type: ignore[override]
@@ -84,10 +71,6 @@ except ImportError as _blockchain_import_err:
             )
 
     BaseWeb3Client = _BlockchainUnavailable  # type: ignore
-    CareTokenClient = _BlockchainUnavailable  # type: ignore
-    OracleClient = _BlockchainUnavailable  # type: ignore
-    StakingClient = _BlockchainUnavailable  # type: ignore
-    blockchain_router = _APIRouter()  # empty router — mounts cleanly, returns 404
 
     class _NFTClientFactoryStub:
         @classmethod
@@ -128,14 +111,6 @@ except ImportError as _blockchain_import_err:
 __all__ = [
     # Base
     "BaseWeb3Client",
-
-    # SOMNIA contracts
-    "CareTokenClient",
-    "OracleClient",
-    "StakingClient",
-
-    # API routes
-    "blockchain_router",
 
     # Multi-chain NFT (preferred)
     "NFTClientFactory",

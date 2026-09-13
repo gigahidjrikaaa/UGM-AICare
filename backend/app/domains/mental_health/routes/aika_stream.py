@@ -40,13 +40,19 @@ logger = logging.getLogger(__name__)
 router = APIRouter()
 
 
-# Agent status messages for streaming updates
+# Agent status messages for streaming updates.
+# Node names MUST match the actual compiled graph nodes
+# (aika_orchestrator_graph._build_aika_orchestrator: aika_decision,
+# parallel_crisis, execute_tca, execute_ia, synthesize). The former
+# "sta_subgraph"/"tca_subgraph"/"cma_subgraph"/"synthesize_response" names
+# belonged to a removed graph generation, so those status events never fired.
 AGENT_STATUS_MESSAGES = {
     "aika_decision": "🤔 Aika sedang menganalisis permintaanmu...",
-    "sta_subgraph": "🧠 Menilai keamanan emosional...",
-    "tca_subgraph": "🤝 Menyusun rencana dukungan...",
-    "cma_subgraph": "🚨 Mengatur jadwal dan dokumentasi...",
-    "synthesize_response": "✨ Menyusun respons akhir...",
+    "parallel_crisis": "🚨 Menangani situasi darurat dan menyusun dukungan...",
+    "execute_tca": "🤝 Menyusun rencana dukungan...",
+    "execute_cma": "🚨 Mengatur jadwal dan dokumentasi...",
+    "execute_ia": "📊 Menyusun analisis data...",
+    "synthesize": "✨ Menyusun respons akhir...",
 }
 
 AGENT_NAMES = {
@@ -68,13 +74,11 @@ def _sanitize_reasoning_text(value: Any, max_len: int = 220) -> str:
 def _build_reasoning_payload(node_name: str, node_state: Dict[str, Any]) -> Dict[str, Any] | None:
     stage_map = {
         "aika_decision": "intent_assessment",
-        "sta_subgraph": "risk_assessment",
-        "tca_subgraph": "support_planning",
-        "tca_subgraph": "support_planning",
-        "cma_subgraph": "resource_coordination",
-        "cma_subgraph": "resource_coordination",
-        "ia_subgraph": "insight_analysis",
-        "synthesize_response": "response_synthesis",
+        "parallel_crisis": "risk_assessment",
+        "execute_tca": "support_planning",
+        "execute_cma": "resource_coordination",
+        "execute_ia": "insight_analysis",
+        "synthesize": "response_synthesis",
     }
 
     stage = stage_map.get(node_name)
@@ -90,9 +94,9 @@ def _build_reasoning_payload(node_name: str, node_state: Dict[str, Any]) -> Dict
             summary = (
                 f"Menilai intent '{intent}' dan memutuskan {'perlu' if needs_agents else 'tidak perlu'} agen tambahan."
             )
-    elif node_name in {"sta_subgraph", "tca_subgraph", "tca_subgraph", "cma_subgraph", "cma_subgraph", "ia_subgraph"}:
+    elif node_name in AGENT_STATUS_MESSAGES:
         summary = AGENT_STATUS_MESSAGES.get(node_name, "Menjalankan langkah agen khusus.")
-    elif node_name == "synthesize_response":
+    elif node_name == "synthesize":
         summary = "Menggabungkan hasil analisis menjadi respons akhir yang konsisten."
 
     summary = _sanitize_reasoning_text(summary)
@@ -125,12 +129,19 @@ def _build_reasoning_payload(node_name: str, node_state: Dict[str, Any]) -> Dict
     return payload
 
 
-async def _chunk_response_text(text: str, chunk_size: int = 3) -> AsyncGenerator[str, None]:
-    """Simulate token streaming by yielding small chunks of pre-computed text.
+async def _chunk_response_text(
+    text: str,
+    chunk_size: int = 24,
+    delay_seconds: float = 0.008,
+) -> AsyncGenerator[str, None]:
+    """Yield a fully-generated response in small word-boundary chunks.
 
-    Yields ~``chunk_size`` characters per iteration with a tiny sleep so the
-    client can render progressive message bubbles.  Word boundaries are
-    respected when possible to avoid splitting mid-word.
+    This is REPLAY, not true token streaming — the model has already
+    finished generating. The old defaults (3 chars / 20ms sleep) added
+    ~6.7 seconds of artificial delay per 1000-char reply, often exceeding
+    the model time itself. 24 chars / 8ms keeps a progressive-render feel
+    at ~0.3s per 1000 chars (~95% less artificial latency). Real provider
+    streaming remains the proper fix and is tracked as follow-up work.
     """
     if not text:
         return
@@ -146,7 +157,7 @@ async def _chunk_response_text(text: str, chunk_size: int = 3) -> AsyncGenerator
                 end = next_space + 1
 
         yield text[i:end]
-        await asyncio.sleep(0.02)
+        await asyncio.sleep(delay_seconds)
         i = end
 
 
@@ -179,18 +190,46 @@ async def stream_aika_execution(
         await asyncio.sleep(0.05)
         
         # Start execution tracking
+        # Redact before tracking: execution input_data is persisted to
+        # langgraph_executions and must follow the same PII rules as chat
+        # persistence (raw messages here bypassed sanitize_text otherwise).
+        from app.core.redaction import sanitize_text
+
+        redacted_tracking_message, _ = sanitize_text(request.message or "")
         execution_id = execution_tracker.start_execution(
             graph_id="aika_unified_graph",
             agent_name="aika",
-            input_data={"message": request.message, "role": request.role}
+            input_data={"message": redacted_tracking_message, "role": request.role}
         )
 
         # Prepare initial state
         user_hash = hashlib.sha256(f"user_{current_user.id}".encode()).hexdigest()[:16]
         remembered_facts = await list_user_fact_texts_for_agent(db, current_user, limit=20)
+
+        # Security: the authenticated principal's role is authoritative. A
+        # client-supplied role must never widen routing or the tool allowlist;
+        # a mismatched claim is rejected outright.
+        from app.core.role_utils import normalize_role as _normalize_role
+
+        requested_role = (request.role or "").strip().lower()
+        server_role = _normalize_role(current_user.role)
+        if requested_role and requested_role not in {"", "auto"} and _normalize_role(requested_role) != server_role:
+            logger.warning(
+                "Role claim mismatch for user %s: claimed=%r, authenticated=%r",
+                current_user.id,
+                requested_role,
+                server_role,
+            )
+            error_data = {
+                "type": "error",
+                "message": "Peran yang dikirim tidak sesuai dengan akun kamu. Coba muat ulang halaman.",
+            }
+            yield f"data: {json.dumps(error_data)}\n\n"
+            return
+
         initial_state = {
             "user_id": current_user.id,
-            "user_role": request.role,
+            "user_role": server_role,
             "user_hash": user_hash,
             "message": request.message,
             "conversation_history": request.conversation_history or [],
@@ -429,22 +468,22 @@ async def stream_aika_execution(
                 
                 if appt_record:
                     # Load relationships for complete data
-                    await db.refresh(appt_record, ["psychologist", "appointment_type"])
+                    await db.refresh(appt_record, ["counselor", "appointment_type"])
                     
                     appt_dict = {
                         "id": appt_record.id,
                         "student_id": appt_record.user_id,
-                        "psychologist_id": appt_record.psychologist_id,
+                        "counselor_id": appt_record.counselor_id,
                         "appointment_datetime": appt_record.appointment_datetime.isoformat(),
                         "appointment_type_id": appt_record.appointment_type_id,
                         "status": appt_record.status,
                         "notes": appt_record.notes,
-                        "psychologist": {
-                            "id": appt_record.psychologist.id,
-                            "full_name": appt_record.psychologist.full_name,
-                            "specialization": appt_record.psychologist.specialization,
-                            "languages": appt_record.psychologist.languages,
-                        } if appt_record.psychologist else None,
+                        "counselor": {
+                            "id": appt_record.counselor.id,
+                            "full_name": appt_record.counselor.full_name,
+                            "specialization": appt_record.counselor.specialization,
+                            "languages": appt_record.counselor.languages,
+                        } if appt_record.counselor else None,
                         "appointment_type": {
                             "id": appt_record.appointment_type.id,
                             "name": appt_record.appointment_type.name,
@@ -530,6 +569,7 @@ async def stream_aika_execution(
         # are the current cost signal (cost ~ request count per model); exact
         # per-request *token* accounting is deferred until core/llm captures
         # each provider's usage_metadata (see TODO in core/llm.py).
+        _cma_ctx = result.get('cma_context') if isinstance(result.get('cma_context'), dict) else {}
         metadata_dict = {
             'session_id': session_id,
             'execution_id': execution_id,  # Return execution_id for evaluation
@@ -545,7 +585,10 @@ async def stream_aika_execution(
             'risk_score': (result.get('sta_risk_assessment') or {}).get('risk_score') if isinstance(result.get('sta_risk_assessment'), dict) else None,
             'risk_assessment': result.get('sta_risk_assessment'),
             'escalation_triggered': bool(result.get('escalation_triggered', False)),
-            'case_id': result.get('case_id'),
+            # CMA writes its case id at cma_context.case_id; the top-level
+            # key was contract drift (never written by any node).
+            'case_id': _cma_ctx.get('case_id') or result.get('case_id'),
+            'case_created': bool(_cma_ctx.get('case_created', False)),
             'activity_logs': result.get('activity_logs'),
             'llm_prompt_id': prompt_id,
             'llm_request_count': llm_stats.total_requests,
@@ -688,9 +731,16 @@ async def stream_aika_execution(
                     },
                 )
 
-            # 7. Flush to obtain conversation_entry.id, then link Case if CMA created one
+            # 7. Flush to obtain conversation_entry.id, then link Case if CMA created one.
+            # CMA stores its id at cma_context.case_id (cma_graph create_case_node);
+            # the top-level "case_id" key was never written by any node, which is
+            # why this back-link silently never fired.
             await db.flush()
-            case_id_from_result = result.get("case_id")
+            cma_context = (result.get("cma_context") or {}) if isinstance(result, dict) else {}
+            case_id_from_result = (
+                cma_context.get("case_id")
+                or result.get("case_id")  # legacy fallback
+            )
             if case_id_from_result and conversation_entry.id:
                 await db.execute(
                     update(Case)
@@ -800,7 +850,8 @@ async def aika_stream_endpoint(
     
     **Use this endpoint for better UX** - shows users what Aika is doing in real-time.
     """
-    logger.info(f"📡 Streaming request from user {current_user.id}: {request.message[:50]}...")
+    # No message content in logs: JSON prod logs would carry user PII.
+    logger.info("Streaming request from user %s (message length: %d)", current_user.id, len(request.message or ""))
     
     request_id = getattr(http_request.state, "request_id", None)
 

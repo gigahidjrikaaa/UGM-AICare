@@ -194,9 +194,26 @@ def select_gemini_model(
     """Select a Gemini model based on intent/role and tool usage.
 
     This is a lightweight routing policy to reduce cost/latency for low-risk tasks.
+
+    SECURITY/cost: ``preferred_model`` is allow-listed — any user could
+    previously request arbitrary (expensive) model ids and the value was
+    forwarded verbatim to the provider. Unknown values fall back to the
+    normal routing policy.
     """
     if preferred_model:
-        return preferred_model
+        allowed = {
+            DEFAULT_GEMINI_MODEL,
+            GEMINI_LITE_MODEL,
+            GEMINI_FLASH_MODEL,
+            GEMINI_AUTO_MODEL_ALIAS,
+        }
+        allowed = {m for m in allowed if m}
+        if preferred_model in allowed:
+            return preferred_model
+        logger.warning(
+            "Rejected non-allowlisted preferred_model %r; using routing policy.",
+            preferred_model,
+        )
 
     active_model = get_active_chat_model()
     if active_model != GEMINI_AUTO_MODEL_ALIAS:
@@ -759,7 +776,8 @@ async def generate_gemini_response(
             },
         )
         if system_prompt:
-            logger.info(f"🤖 System prompt applied: {system_prompt[:100]}...")
+            # Length only: prompt heads can embed user context/memory.
+            logger.info("🤖 System prompt applied (length: %d chars)", len(system_prompt))
 
         # Validate history
         if not history or history[-1]['role'] != 'user':
@@ -1404,8 +1422,11 @@ async def generate_response(
         gemini_model = effective_preferred_model or DEFAULT_GEMINI_MODEL
         logger.info(f"Direct request: Using gemini with fallback chain (Primary: {gemini_model})")
         try:
+            # json_schema MUST be forwarded: it becomes config.response_schema
+            # (native structured output) in generate_gemini_response. Dropping
+            # it silently downgrades the decision JSON to prompt-only JSON.
             return await generate_gemini_response_with_fallback(
-                history=history, model=gemini_model, max_tokens=max_tokens, temperature=temperature, system_prompt=system_prompt, json_mode=json_mode
+                history=history, model=gemini_model, max_tokens=max_tokens, temperature=temperature, system_prompt=system_prompt, json_mode=json_mode, json_schema=json_schema
             )
         except Exception as e:
             # If all fallbacks fail, return error message
@@ -1428,3 +1449,65 @@ DEFAULT_PROVIDERS = {
     "zai_direct": ZAI_DIRECT_MODEL,
     "zai_openrouter": OPENROUTER_ZAI_MODEL,
 }
+
+
+# ============================================================================
+# EMBEDDINGS (RAG knowledge grounding)
+# ============================================================================
+
+async def embed_texts(
+    texts: list[str],
+    *,
+    model: Optional[str] = None,
+    task_type: str = "RETRIEVAL_DOCUMENT",
+    output_dimensionality: int = 768,
+) -> list[list[float]]:
+    """Embed *texts* with the configured Google embedding model.
+
+    Uses the same key-rotation/rotation-lock machinery as chat completions.
+    Batched: Google's embed_content accepts multiple contents per call.
+
+    Args:
+        texts: Texts to embed (non-empty strings).
+        model: Embedding model id; defaults to settings.rag_embedding_model
+               (text-embedding-004 @ 768 dims — matches the pgvector column).
+        task_type: RETRIEVAL_DOCUMENT for ingestion, RETRIEVAL_QUERY for
+                   queries — task-aware embeddings measurably improve recall.
+        output_dimensionality: 768, matching content_resource_chunks.embedding.
+
+    Returns:
+        List of embedding vectors, order-preserving.
+    """
+    from app.core.settings import settings as _settings
+
+    if not texts:
+        return []
+    embedding_model = model or _settings.rag_embedding_model
+    client = await get_gemini_client()
+
+    last_error: Optional[Exception] = None
+    for attempt in range(3):
+        try:
+            response = await client.aio.models.embed_content(
+                model=embedding_model,
+                contents=texts,
+                config={
+                    "task_type": task_type,
+                    "output_dimensionality": output_dimensionality,
+                },
+            )
+            embeddings = [list(e.values) for e in response.embeddings]
+            if len(embeddings) != len(texts):
+                raise ValueError(
+                    f"Embedding count mismatch: sent {len(texts)}, got {len(embeddings)}"
+                )
+            return embeddings
+        except Exception as exc:  # noqa: BLE001 - rotate & retry like chat path
+            last_error = exc
+            logger.warning(
+                "embed_content attempt %d/3 failed (%s); rotating key",
+                attempt + 1,
+                exc,
+            )
+            client = await get_gemini_client(force_rotate=True)
+    raise RuntimeError(f"All embedding attempts failed: {last_error}")

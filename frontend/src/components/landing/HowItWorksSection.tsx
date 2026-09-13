@@ -68,7 +68,7 @@ export default function HowItWorksSection() {
                          icon: CompassGlyph
                      }, {
                          title: "3. Professional Handoff",
-                         desc: "Summarizes the session and securely forwards it to UGM Psychologists.",
+                         desc: "Summarizes the session and securely forwards it to UGM Counselors.",
                          icon: ArrowScribbleGlyph
                      }].map((step, idx) => (
                         <div key={idx} className="relative flex gap-4">
@@ -85,7 +85,7 @@ export default function HowItWorksSection() {
                </motion.div>
             </div>
 
-            {/* Right: The Psychologist Dashboard View */}
+            {/* Right: The Counselor Dashboard View */}
             <motion.div 
                initial={{ opacity: 0, x: 20 }}
                whileInView={{ opacity: 1, x: 0 }}
@@ -103,7 +103,7 @@ export default function HowItWorksSection() {
                         <div className="w-3 h-3 rounded-full bg-yellow-400" />
                         <div className="w-3 h-3 rounded-full bg-green-400" />
                      </div>
-                     <div className="text-xs font-bold text-slate-500 tracking-widest uppercase">Psychologist Dashboard</div>
+                     <div className="text-xs font-bold text-slate-500 tracking-widest uppercase">Counselor Dashboard</div>
                   </div>
 
                   {/* Body */}
@@ -145,7 +145,7 @@ export default function HowItWorksSection() {
                {/* Caption */}
                <div className="mt-4 text-center">
                   <p className="text-sm text-slate-500">
-                     *Psychologists receive structured summaries, allowing for faster, informed care.
+                     *Counselors receive structured summaries, allowing for faster, informed care.
                   </p>
                </div>
             </motion.div>

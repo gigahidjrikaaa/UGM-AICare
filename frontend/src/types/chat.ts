@@ -24,13 +24,13 @@ export interface InterventionPlan {
 export interface Appointment {
   id: number;
   student_id: number;
-  psychologist_id: number;
+  counselor_id: number;
   appointment_datetime: string; // ISO datetime string
   appointment_type_id: number;
   status: 'scheduled' | 'completed' | 'cancelled' | 'no_show';
   notes?: string;
   cancellation_reason?: string;
-  psychologist?: {
+  counselor?: {
     id: number;
     full_name: string;
     specialization?: string[];

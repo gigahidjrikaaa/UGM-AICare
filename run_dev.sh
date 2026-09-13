@@ -915,12 +915,18 @@ stop_servers() {
 # Docker Compose Helpers
 # ─────────────────────────────────────────────────────────────────────────────
 
+# The repository ships per-service compose files (backend/, frontend/).
+# A root .env is optional and only used for variable interpolation.
 dc() {
-  (cd "$PROJECT_DIR" && docker compose --env-file .env -f docker-compose.base.yml "$@")
+  local env_args=()
+  [ -f "$PROJECT_DIR/.env" ] && env_args=(--env-file "$PROJECT_DIR/.env")
+  (cd "$PROJECT_DIR" && docker compose "${env_args[@]+"${env_args[@]}"}" \
+    -f backend/docker-compose.yml -f frontend/docker-compose.yml "$@")
 }
 
-dc_dev()  { dc -f docker-compose.dev.yml "$@"; }
-dc_prod() { dc -f docker-compose.prod.yml "$@"; }
+# dev/prod aliases retained for CLI compatibility; the app stack is the same.
+dc_dev()  { dc "$@"; }
+dc_prod() { dc "$@"; }
 
 # ─────────────────────────────────────────────────────────────────────────────
 # Commands

@@ -3,59 +3,17 @@ from __future__ import annotations
 import re
 from typing import Any, Mapping, cast
 
+from app.agents.shared.crisis_lexicon import (
+    CRISIS_KEYWORDS as _CANONICAL_CRISIS_KEYWORDS,
+    CRISIS_PATTERNS as _CANONICAL_CRISIS_PATTERNS,
+)
 from app.agents.sta.schemas import RiskLevel, STAClassifyRequest, STAClassifyResponse
 
-
-_CRISIS_KEYWORDS: tuple[str, ...] = (
-    # Explicit suicide mentions
-    "bunuh diri",
-    "suicide",
-    "suicidal",
-    "mengakhiri hidup",
-    
-    # Direct death wishes (English) - using patterns handled by regex
-    "kill myself",
-    # "want to die",  # Removed - handled by regex pattern with word boundaries
-    # "wanna die",  # Removed - handled by regex pattern
-    "wish i was dead",  # Specific phrase unlikely to false-match
-    "wish i were dead",  # Specific phrase
-    # "want to be dead",  # Removed - handled by regex
-    # "ready to die",  # Removed - handled by regex  
-    "end my life",  # Specific phrase
-    "ending it all",  # Specific phrase
-    "don't want to live",  # Specific phrase
-    "dont want to live",  # Specific phrase
-    "can't go on",  # Specific phrase
-    "cant go on",  # Specific phrase
-    "better off dead",  # Specific phrase
-    "better off without me",  # Specific phrase
-    "world without me",  # Specific phrase
-    
-    # Direct death wishes (Indonesian)
-    "tidak mau hidup",
-    "tidak ingin hidup",
-    "ingin mati",
-    "pengen mati",
-    # "mau mati",  # Removed - handled by Indonesian regex pattern
-    "lebih baik mati",
-    "ga mau hidup",
-    "gak mau hidup",
-    
-    # Self-harm methods
-    "gantung diri",
-    "overdose",
-    "jump off",
-    "cut my wrists",
-    "slit my wrists",
-    
-    # Farewell indicators
-    "goodbye note",
-    "goodbye letter",
-    "suicide note",
-    "final message",
-    "surat perpisahan",
-    "pesan terakhir",
-)
+# Crisis vocabulary is owned by the canonical lexicon (single source of truth
+# shared with the Aika deterministic safety net and the decision prompt).
+# Aliases kept for backward compatibility (gemini_classifier imports these).
+_CRISIS_KEYWORDS: tuple[str, ...] = _CANONICAL_CRISIS_KEYWORDS
+_CRISIS_PATTERNS: tuple[re.Pattern[str], ...] = _CANONICAL_CRISIS_PATTERNS
 
 _HIGH_DISTRESS_KEYWORDS: tuple[str, ...] = (
     "panic",
@@ -73,15 +31,23 @@ _HIGH_DISTRESS_KEYWORDS: tuple[str, ...] = (
     "empty inside",
     "tidak ada artinya",
     "meaningless",
+    "nothing matters",
     "tidak berguna",
     "useless",
     "ga berguna",
     "tidak ada gunanya",
+)
+
+# Behavioral/academic decline markers: two or more of these indicate
+# MODERATE distress (risk 1, coaching) — not a forced human handoff.
+# Previously they sat in the high-distress tier, so "bolos kuliah" +
+# "burnout" auto-escalated to a human, an over-trigger inconsistent with
+# the canonical calibration (see app.agents.shared.risk_taxonomy).
+_MODERATE_DISTRESS_KEYWORDS: tuple[str, ...] = (
     "staying in bed",
     "tidur terus",
     "skipping class",
     "bolos kuliah",
-    "nothing matters",
     "burnout",
     "drop out",
     "berhenti kuliah",
@@ -181,37 +147,23 @@ _BREAK_DOWN_PROBLEM_KEYWORDS: tuple[str, ...] = (
     "need strategy",
 )
 
-# Regex patterns for crisis detection (catch variations and misspellings)
-_CRISIS_PATTERNS: tuple[str, ...] = (
-    r"\b(want|wanna|wish)(?:ed)?\s+(?:to\s+)?(die|be\s+dead)\b",  # want to die, wanna die, wish I was dead
-    r"\b(don'?t|cant|can'?t)\s+want\s+to\s+live\b",  # don't want to live
-    r"\b(can'?t|cant)\s+(take|do)\s+(it|this)\s+(anymore|any\s+more)\b",  # can't take it anymore
-    r"\b(end|ending)\s+(?:my|this|it\s+all)\s+life\b",  # end my life (more specific)
-    r"\bending\s+it\s+all\b",  # ending it all
-    r"\b(kill|killing)\s+my?self\b",  # kill myself
-    r"\b(ready|prepared)\s+to\s+die\b",  # ready to die
-    r"\bmau\s+mati\b",  # Indonesian: want to die
-    r"\btidak\s+mau\s+hidup\b",  # Indonesian: don't want to live
-    r"\bingin\s+mati\b",  # Indonesian: want to die
-)
+# Regex patterns for crisis detection come from the canonical lexicon
+# (see app.agents.shared.crisis_lexicon) — no STA-local pattern list.
 
 
 class SafetyTriageClassifier:
     """Rule-based interim triage classifier until ML models are wired."""
 
     def _check_crisis_patterns(self, text: str) -> bool:
-        """Check text against regex patterns for crisis intent.
-        
+        """Check text against the canonical lexicon's compiled regex patterns.
+
         Args:
             text: Lowercased user message
-            
+
         Returns:
             True if any crisis pattern matches
         """
-        for pattern in _CRISIS_PATTERNS:
-            if re.search(pattern, text, re.IGNORECASE):
-                return True
-        return False
+        return any(pattern.search(text) for pattern in _CRISIS_PATTERNS)
 
     async def classify(
         self,
@@ -247,7 +199,14 @@ class SafetyTriageClassifier:
             intent = "acute_distress"
             next_step = "human"
             handoff = True
-            diagnostic_notes.append("Elevated distress keywords detected")
+            diagnostic_notes.append("Strong distress markers detected")
+        elif len([kw for kw in _MODERATE_DISTRESS_KEYWORDS if kw in text]) >= 2:
+            # Behavioral/academic decline: moderate distress → coaching,
+            # not a forced human handoff (canonical calibration).
+            risk_score = 1
+            intent = "acute_distress"
+            next_step = "tca"
+            diagnostic_notes.append("Multiple behavioral-decline markers detected")
         else:
             if any(keyword in text for keyword in _ACADEMIC_KEYWORDS):
                 intent = "academic_stress"

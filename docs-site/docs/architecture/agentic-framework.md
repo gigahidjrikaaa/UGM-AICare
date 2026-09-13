@@ -165,7 +165,7 @@ A fast regex check against a predefined list of crisis keywords (`"bunuh diri"`,
 After the conversation ends, the STA performs a deep clinical analysis using Gemini:
 - PHQ-9, GAD-7, and DASS-21 indicator extraction (covert screening)
 - Longitudinal risk trend across the student's conversation history
-- Psychologist-ready summary report
+- Counselor-ready summary report
 - CMA referral recommendation
 
 The results are stored in `ConversationRiskAssessment` and `ScreeningProfile` tables, visible to counsellors via the dashboard.

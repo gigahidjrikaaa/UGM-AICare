@@ -308,7 +308,7 @@ export default function AboutResearchPage() {
                 role: "Clinical Advisors",
                 icon: <FiUsers />,
                 members: [
-                  "Licensed Clinical Psychologists",
+                  "Licensed Clinical Counselors",
                   "UGM Counseling Center Staff",
                   "Psychiatry Consultants"
                 ]

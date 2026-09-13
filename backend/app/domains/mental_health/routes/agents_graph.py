@@ -14,6 +14,7 @@ from pydantic import BaseModel, Field
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.database import get_async_db
+from app.dependencies import get_admin_user
 from app.agents.sta.sta_graph_service import STAGraphService
 from app.agents.tca.tca_graph_service import TCAGraphService
 from app.agents.cma.cma_graph_service import CMAGraphService
@@ -22,7 +23,11 @@ from app.agents.ia.ia_graph_service import IAGraphService
 
 logger = logging.getLogger(__name__)
 
-router = APIRouter(prefix="/api/v1/agents/graph", tags=["Agent Graphs (LangGraph)"])
+router = APIRouter(
+    prefix="/api/v1/agents/graph",
+    tags=["Agent Graphs (LangGraph)"],
+    dependencies=[Depends(get_admin_user)],  # executes LLM graphs; admin tooling only
+)
 
 
 # ============================================================================
@@ -603,8 +608,21 @@ async def execute_ia_graph(
             pdf_url=result.get("pdf_url"),
             privacy_metadata={
                 "k_value": 5,  # Our k-anonymity threshold
-                "epsilon_used": analytics_result.get("differential_privacy_budget_used", 0.0) if analytics_result else 0.0,
-                "delta_used": 0.0  # TODO: Implement delta tracking in Phase 3
+                "epsilon_used": (
+                    analytics_result.get("differential_privacy_budget_used", 0.0)
+                    if analytics_result else 0.0
+                ),
+                # Pure epsilon-DP (Laplace mechanism): delta is 0 by definition.
+                "delta_used": (
+                    analytics_result.get("dp_delta", 0.0) if analytics_result else 0.0
+                ),
+                "dp_enabled": bool(
+                    analytics_result.get("dp_enabled", False)
+                ) if analytics_result else False,
+                "dp_budget_remaining": (
+                    analytics_result.get("dp_budget_remaining")
+                    if analytics_result else None
+                ),
             },
             errors=result.get("errors", []),
             execution_time_ms=execution_time_ms
@@ -631,6 +649,11 @@ async def ia_graph_health() -> Dict[str, Any]:
         "name": "Insights Agent",
         "version": "1.0.0",
         "langgraph_enabled": True,
-        "privacy_features": ["k-anonymity", "allow-listed queries", "consent validation"]
+        "privacy_features": [
+            "k-anonymity",
+            "allow-listed queries",
+            "consent validation",
+            "differential-privacy (Laplace, rolling epsilon budget)",
+        ]
     }
 

@@ -62,7 +62,7 @@ async def test_execute_analytics_node_uses_service(monkeypatch: pytest.MonkeyPat
     from app.agents.ia import ia_graph as module
 
     class FakeService:
-        async def query(self, _request):
+        async def query(self, _request, requested_by=None):
             return SimpleNamespace(table=[{"x": 1}], chart={"type": "bar"}, notes=["n"])
 
     monkeypatch.setattr(module, "InsightsAgentService", lambda _db: FakeService())

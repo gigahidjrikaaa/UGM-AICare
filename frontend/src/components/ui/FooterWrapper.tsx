@@ -43,7 +43,6 @@ export default function FooterWrapper() {
     '/appointments',
     '/activities',
     '/quests',
-    '/caretoken',
     '/survey',
   ];
   const isAppPage = appPages.some(page => pathname?.startsWith(page));

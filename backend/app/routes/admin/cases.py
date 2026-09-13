@@ -571,6 +571,12 @@ async def assign_case(
             assignee_id = None
             assignee_model = None
         else:
+            # Shadow-row get-or-create: AgentUser rows are otherwise only
+            # created inside the CMA graph, so assigning to a "fresh"
+            # counselor failed with "Unknown assignee".
+            from app.models.agent_user import ensure_agent_user
+
+            await ensure_agent_user(db, raw_assignee)
             assignee_result = await db.execute(
                 select(AgentUser).where(AgentUser.id == raw_assignee)
             )

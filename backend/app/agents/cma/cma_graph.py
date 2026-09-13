@@ -15,7 +15,7 @@ from app.agents.graph_state import CMAState
 from app.agents.execution_tracker import execution_tracker
 from app.core.settings import get_settings
 from app.domains.mental_health.models import Case, CaseSeverityEnum, CaseStatusEnum
-from app.domains.mental_health.models.appointments import Psychologist, Appointment
+from app.domains.mental_health.models.appointments import Counselor, Appointment
 from app.models.system import CaseAssignment
 from app.services.event_bus import EventType, publish_event
 from app.core.langfuse_config import trace_agent
@@ -259,17 +259,17 @@ async def auto_assign_node(state: CMAState, config: RunnableConfig) -> CMAState:
         if not case_id:
             raise ValueError("No case_id found for assignment")
         
-        # Step 1: Query all available counsellors from psychologists table.
+        # Step 1: Query all available counsellors from counselors table.
         # Guard: only include profiles whose linked User account is active with
         # a counselor or admin role. Profiles without a linked user_id are kept
         # to support legacy/standalone records — they should be rare in production.
         counsellors_stmt = (
-            select(Psychologist)
-            .join(AppUser, AppUser.id == Psychologist.user_id, isouter=True)
+            select(Counselor)
+            .join(AppUser, AppUser.id == Counselor.user_id, isouter=True)
             .where(
-                Psychologist.is_available == True,  # noqa: E712
+                Counselor.is_available == True,  # noqa: E712
                 or_(
-                    Psychologist.user_id.is_(None),
+                    Counselor.user_id.is_(None),
                     AppUser.role.in_(["counselor", "admin"]),
                 ),
             )
@@ -306,7 +306,7 @@ async def auto_assign_node(state: CMAState, config: RunnableConfig) -> CMAState:
         
         counsellor_workload = {}
         for counsellor in counsellors:
-            # Convert psychologist.id to string for comparison with Case.assigned_to (String field)
+            # Convert counselor.id to string for comparison with Case.assigned_to (String field)
             counsellor_id_str = str(counsellor.id)
             workload_stmt = select(func.count(Case.id)).where(
                 Case.assigned_to == counsellor_id_str,
@@ -331,7 +331,7 @@ async def auto_assign_node(state: CMAState, config: RunnableConfig) -> CMAState:
         # This prevents a single FK issue from poisoning the whole request session.
         async with db.begin_nested():
             # Ensure corresponding agent_users row exists.
-            # Case.assigned_to references agent_users.id, but we store psychologist.id as str.
+            # Case.assigned_to references agent_users.id, but we store counselor.id as str.
             from app.models.agent_user import AgentUser, AgentRoleEnum
 
             agent_user = await db.get(AgentUser, assigned_counsellor_id_str)
@@ -609,45 +609,45 @@ async def schedule_appointment_node(state: CMAState, config: RunnableConfig) -> 
         if not user_id:
             raise ValueError("user_id required for scheduling")
         
-        # Step 1: Determine which psychologist to book with
+        # Step 1: Determine which counselor to book with
         # Priority: assigned counselor > LLM-selected based on availability
-        psychologist_id = state.get("cma_context", {}).get("psychologist_id")
+        counselor_id = state.get("cma_context", {}).get("counselor_id")
         
-        if not psychologist_id and assigned_counsellor_id:
-            # Assigned counselor is a User row; Psychologist.user_id references
-            # users.id, so look the psychologist profile up directly.
+        if not counselor_id and assigned_counsellor_id:
+            # Assigned counselor is a User row; Counselor.user_id references
+            # users.id, so look the counselor profile up directly.
             psych_result = await db.execute(
-                select(Psychologist).where(Psychologist.user_id == assigned_counsellor_id)
+                select(Counselor).where(Counselor.user_id == assigned_counsellor_id)
             )
-            psychologist = psych_result.scalar_one_or_none()
-            if psychologist:
-                psychologist_id = psychologist.id
+            counselor = psych_result.scalar_one_or_none()
+            if counselor:
+                counselor_id = counselor.id
 
-        # If no psychologist found yet, deterministically select best available
-        if not psychologist_id:
-            logger.info("No psychologist assigned, selecting best available match")
-            psychologist_id = await _select_optimal_psychologist(
+        # If no counselor found yet, deterministically select best available
+        if not counselor_id:
+            logger.info("No counselor assigned, selecting best available match")
+            counselor_id = await _select_optimal_counselor(
                 db=db,
                 severity=severity,
                 preferences=scheduling_context or {}
             )
         
-        if not psychologist_id:
-            raise ValueError("No available psychologist found for appointment")
+        if not counselor_id:
+            raise ValueError("No available counselor found for appointment")
         
-        # Step 2: Get psychologist details
+        # Step 2: Get counselor details
         psych_result = await db.execute(
-            select(Psychologist).where(Psychologist.id == psychologist_id)
+            select(Counselor).where(Counselor.id == counselor_id)
         )
-        psychologist = psych_result.scalar_one_or_none()
+        counselor = psych_result.scalar_one_or_none()
         
-        if not psychologist or not psychologist.is_available:
-            raise ValueError(f"Psychologist {psychologist_id} not available")
+        if not counselor or not counselor.is_available:
+            raise ValueError(f"Counselor {counselor_id} not available")
         
         # Step 3: Use LLM to find optimal appointment time
         appointment_datetime = await _find_optimal_appointment_time(
             db=db,
-            psychologist=psychologist,
+            counselor=counselor,
             preferred_time=preferred_time,
             severity=severity,
             scheduling_context=scheduling_context or {}
@@ -662,7 +662,7 @@ async def schedule_appointment_node(state: CMAState, config: RunnableConfig) -> 
         
         new_appointment = Appointment(
             user_id=user_id,
-            psychologist_id=psychologist_id,
+            counselor_id=counselor_id,
             appointment_type_id=appointment_type_id,
             appointment_datetime=appointment_datetime,
             notes="Auto-scheduled by CMA. Case severity: {}. Case ID: {}".format(
@@ -679,7 +679,7 @@ async def schedule_appointment_node(state: CMAState, config: RunnableConfig) -> 
         state.setdefault("cma_context", {})["appointment_id"] = new_appointment.id
         state.setdefault("cma_context", {})["appointment_datetime"] = appointment_datetime.isoformat()
         state.setdefault("cma_context", {})["appointment_confirmed"] = True
-        state.setdefault("cma_context", {})["psychologist_id"] = psychologist_id
+        state.setdefault("cma_context", {})["counselor_id"] = counselor_id
         execution_path = state.get("execution_path", [])
         execution_path.append("schedule_appointment")
         state["execution_path"] = execution_path
@@ -689,7 +689,7 @@ async def schedule_appointment_node(state: CMAState, config: RunnableConfig) -> 
         
         logger.info(
             f"CMA scheduled appointment {new_appointment.id} for user {user_id} "
-            f"with psychologist {psychologist.name} at {appointment_datetime}"
+            f"with counselor {counselor.name} at {appointment_datetime}"
         )
         
     except Exception as e:
@@ -706,14 +706,14 @@ async def schedule_appointment_node(state: CMAState, config: RunnableConfig) -> 
     return state
 
 
-async def _select_optimal_psychologist(
+async def _select_optimal_counselor(
     db: AsyncSession,
     severity: str,
     preferences: dict
 ) -> int | None:
-    """Deterministically select the best available psychologist.
+    """Deterministically select the best available counselor.
 
-    Replaced an LLM round-trip (Gemini Flash) that ranked psychologists with
+    Replaced an LLM round-trip (Gemini Flash) that ranked counselors with
     rules that are trivially expressible as a scoring function. Ranking:
     language match, specialization overlap, having a defined availability
     schedule, then rating / experience (weighted higher for urgent cases).
@@ -724,17 +724,17 @@ async def _select_optimal_psychologist(
         preferences: Student preferences (specialization, language, etc.)
 
     Returns:
-        Psychologist ID or None if not found
+        Counselor ID or None if not found
     """
     result = await db.execute(
-        select(Psychologist).where(Psychologist.is_available).order_by(Psychologist.id)
+        select(Counselor).where(Counselor.is_available).order_by(Counselor.id)
     )
-    psychologists = result.scalars().all()
+    counselors = result.scalars().all()
 
-    if not psychologists:
+    if not counselors:
         return None
-    if len(psychologists) == 1:
-        return psychologists[0].id
+    if len(counselors) == 1:
+        return counselors[0].id
 
     urgent = severity.lower() in {"high", "critical"}
 
@@ -760,45 +760,45 @@ async def _select_optimal_psychologist(
     else:
         spec_pref = []
 
-    def _langs(psychologist: Psychologist) -> list[str]:
-        raw = psychologist.languages or []
+    def _langs(counselor: Counselor) -> list[str]:
+        raw = counselor.languages or []
         if isinstance(raw, str):
             raw = [raw]
         return [str(x).lower() for x in raw if str(x).strip()]
 
-    def _score(psychologist: Psychologist) -> tuple[float, ...]:
+    def _score(counselor: Counselor) -> tuple[float, ...]:
         score = 0.0
-        langs = _langs(psychologist)
+        langs = _langs(counselor)
 
         # 1. Language match (exact overlap).
         if lang_pref and any(lp in langs or langs and any(l in lp for l in langs) for lp in lang_pref):
             score += 3.0
 
         # 2. Specialization / concern overlap.
-        spec = str(psychologist.specialization or "").lower()
+        spec = str(counselor.specialization or "").lower()
         if spec_pref and any(p in spec for p in spec_pref):
             score += 2.0
 
         # 3. Defined availability schedule.
-        if psychologist.availability_schedule:
+        if counselor.availability_schedule:
             score += 1.0
 
         # 4. Experience & rating — weighted more for urgent cases.
-        exp = float(psychologist.years_of_experience or 0)
-        rating = float(psychologist.rating or 0)
+        exp = float(counselor.years_of_experience or 0)
+        rating = float(counselor.rating or 0)
         exp_w = 1.5 if urgent else 0.5
         score += exp_w * min(exp, 25.0) / 25.0
         score += rating / 5.0
 
         # Sort key: score desc, rating desc, experience desc, id asc.
-        return (-score, -rating, -exp, psychologist.id)
+        return (-score, -rating, -exp, counselor.id)
 
-    return min(psychologists, key=_score).id
+    return min(counselors, key=_score).id
 
 
 async def _find_optimal_appointment_time(
     db: AsyncSession,
-    psychologist: Psychologist,
+    counselor: Counselor,
     preferred_time: str | None,
     severity: str,
     scheduling_context: dict
@@ -813,7 +813,7 @@ async def _find_optimal_appointment_time(
 
     Args:
         db: Database session
-        psychologist: Psychologist model
+        counselor: Counselor model
         preferred_time: Student's time preference (unused — reserved)
         severity: Case severity
         scheduling_context: Additional context (unused — reserved)
@@ -821,7 +821,7 @@ async def _find_optimal_appointment_time(
     Returns:
         Earliest conflict-free datetime, or None
     """
-    schedule = psychologist.availability_schedule or {}
+    schedule = counselor.availability_schedule or {}
     start_date = datetime.now()
     end_date = start_date + timedelta(days=14)
 
@@ -840,13 +840,13 @@ async def _find_optimal_appointment_time(
         current += timedelta(days=1)
 
     if not available_slots:
-        logger.warning("No slots available for psychologist %s", psychologist.id)
+        logger.warning("No slots available for counselor %s", counselor.id)
         return None
 
-    # Drop slots already booked for this psychologist.
+    # Drop slots already booked for this counselor.
     conflicts_result = await db.execute(
         select(Appointment.appointment_datetime).where(
-            Appointment.psychologist_id == psychologist.id,
+            Appointment.counselor_id == counselor.id,
             Appointment.appointment_datetime >= start_date,
             Appointment.appointment_datetime <= end_date,
             Appointment.status.in_(["scheduled", "confirmed"])
@@ -856,7 +856,7 @@ async def _find_optimal_appointment_time(
     available_slots = [slot for slot in available_slots if slot not in booked_times]
 
     if not available_slots:
-        logger.warning("All slots are booked for psychologist %s", psychologist.id)
+        logger.warning("All slots are booked for counselor %s", counselor.id)
         return None
 
     # Slots are generated earliest-first and the horizon already encodes

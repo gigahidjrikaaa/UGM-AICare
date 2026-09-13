@@ -8,9 +8,9 @@ import { motion } from 'framer-motion';
 import { format, addDays, startOfWeek, addWeeks } from 'date-fns';
 import { id } from 'date-fns/locale';
 import { FiCalendar, FiClock, FiUser, FiMapPin, FiChevronLeft, FiChevronRight, FiInfo, FiCheck } from 'react-icons/fi';
-import { useCreateAppointment, usePsychologists, useAppointmentTypes } from '@/hooks/useAppointments';
+import { useCreateAppointment, useCounselorOptions, useAppointmentTypes } from '@/hooks/useAppointments';
 import { toast } from 'react-hot-toast';
-import type { Psychologist, AppointmentType } from '@/lib/appointments-api';
+import type { Counselor, AppointmentType } from '@/lib/appointments-api';
 
 // Mock data for available time slots
 const generateTimeSlots = (date: string | number | Date) => {
@@ -44,7 +44,7 @@ export default function AppointmentsPage() {
   const [step, setStep] = useState(1);
   const [selectedDate, setSelectedDate] = useState<string | null>(null);
   const [selectedTime, setSelectedTime] = useState<{time: string, available: boolean} | null>(null);
-  const [selectedCounselor, setSelectedCounselor] = useState<Psychologist | null>(null);
+  const [selectedCounselor, setSelectedCounselor] = useState<Counselor | null>(null);
   const [selectedType, setSelectedType] = useState<AppointmentType | null>(null);
   const [currentWeekStart, setCurrentWeekStart] = useState(startOfWeek(new Date(), { weekStartsOn: 1 }));
   const [notes, setNotes] = useState("");
@@ -54,7 +54,7 @@ export default function AppointmentsPage() {
   
   // React Query hooks to fetch data
   const createAppointmentMutation = useCreateAppointment();
-  const { data: psychologists = [], isLoading: isLoadingPsychologists } = usePsychologists(true);
+  const { data: counselors = [], isLoading: isLoadingCounselors } = useCounselorOptions(true);
   const { data: appointmentTypes = [], isLoading: isLoadingTypes } = useAppointmentTypes();
   
   // Redirect if not authenticated
@@ -117,7 +117,7 @@ export default function AppointmentsPage() {
       
       // Call the API to create appointment
       await createAppointmentMutation.mutateAsync({
-        psychologist_id: selectedCounselor.id,
+        counselor_id: selectedCounselor.id,
         appointment_type_id: selectedType.id,
         appointment_datetime: appointmentDateTime,
         notes: notes || undefined,
@@ -381,13 +381,13 @@ export default function AppointmentsPage() {
               {/* Counselor Selection */}
               <div className="mb-8">
                 <h3 className="text-white font-medium mb-3">Select a Mental Health Professional</h3>
-                {isLoadingPsychologists ? (
-                  <div className="text-center py-8 text-gray-300">Loading psychologists...</div>
-                ) : psychologists.length === 0 ? (
-                  <div className="text-center py-8 text-gray-300">No psychologists available at the moment.</div>
+                {isLoadingCounselors ? (
+                  <div className="text-center py-8 text-gray-300">Loading counselors...</div>
+                ) : counselors.length === 0 ? (
+                  <div className="text-center py-8 text-gray-300">No counselors available at the moment.</div>
                 ) : (
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    {psychologists.map((counselor: Psychologist) => (
+                    {counselors.map((counselor: Counselor) => (
                       <button
                         key={counselor.id}
                         onClick={() => counselor.is_available && setSelectedCounselor(counselor)}
@@ -407,7 +407,7 @@ export default function AppointmentsPage() {
                         </div>
                         <div className="text-left">
                           <h4 className="font-medium text-white">{counselor.name}</h4>
-                          <p className="text-sm text-gray-300">{counselor.specialization || 'Psychologist'}</p>
+                          <p className="text-sm text-gray-300">{counselor.specialization || 'Counselor'}</p>
                           {!counselor.is_available && (
                             <span className="text-xs text-red-300 mt-1 block">
                               Currently unavailable

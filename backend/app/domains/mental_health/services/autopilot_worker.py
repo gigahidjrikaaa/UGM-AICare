@@ -371,6 +371,41 @@ async def _handle_sta_conversation_analysis(action: AutopilotAction) -> dict[str
     }
 
 
+def _count_dead_letter(action: AutopilotAction) -> None:
+    try:
+        from app.core.metrics import autopilot_dead_letter_total
+
+        autopilot_dead_letter_total.labels(action_type=action.action_type.value).inc()
+    except Exception:  # metrics must never break the worker
+        pass
+
+
+async def _alert_dead_letter(db: AsyncSession, action: AutopilotAction, error_message: str) -> None:
+    """Counter + admin-dashboard alert: a poisoned queue was invisible before."""
+    _count_dead_letter(action)
+    try:
+        from app.models.alerts import AlertSeverity, AlertType
+        from app.services.alert_service import get_alert_service
+
+        await get_alert_service(db).create_alert(
+            alert_type=AlertType.SYSTEM_NOTIFICATION,
+            severity=AlertSeverity.HIGH,
+            title="Autopilot action dead-lettered",
+            message=(
+                f"{action.action_type.value} action #{action.id} failed "
+                f"{int(action.retry_count or 0)} retries and was dead-lettered: "
+                f"{error_message[:200]}"
+            ),
+            alert_metadata={
+                "action_id": str(action.id),
+                "action_type": action.action_type.value,
+                "risk_level": action.risk_level,
+            },
+        )
+    except Exception:
+        logger.warning("Dead-letter alert creation failed (non-blocking)", exc_info=True)
+
+
 async def execute_autopilot_action(action: AutopilotAction) -> dict[str, Any]:
     if action.action_type == AutopilotActionType.create_case:
         return await _handle_create_case(action)
@@ -386,7 +421,22 @@ async def execute_autopilot_action(action: AutopilotAction) -> dict[str, Any]:
         return await _handle_publish_attestation(action)
     if action.action_type == AutopilotActionType.sta_conversation_analysis:
         return await _handle_sta_conversation_analysis(action)
+    if action.action_type == AutopilotActionType.plan_followup:
+        return await _handle_plan_followup(action)
     raise ValueError(f"Unsupported action type: {action.action_type.value}")
+
+
+async def _handle_plan_followup(action: AutopilotAction) -> dict[str, Any]:
+    """Deliver the closed-loop plan follow-up as an in-app proactive message.
+
+    Guardrail skips (consent off, plan completed, user recently active,
+    frequency cap) return ``{"skipped": <reason>}`` and are marked confirmed —
+    a skipped nudge must never retry.
+    """
+    from app.services.plan_followup_service import deliver_plan_followup
+
+    async with AsyncSessionLocal() as db:
+        return await deliver_plan_followup(db, action)
 
 
 async def process_autopilot_queue_once(batch_limit: int = 20) -> int:
@@ -394,7 +444,10 @@ async def process_autopilot_queue_once(batch_limit: int = 20) -> int:
     processed = 0
 
     async with AsyncSessionLocal() as db:
-        actions = await list_due_actions(db, limit=batch_limit)
+        # for_update=True: atomically claim this batch with FOR UPDATE SKIP
+        # LOCKED so concurrent workers never double-execute an action (e.g.
+        # duplicate CMA case creation for one crisis).
+        actions = await list_due_actions(db, limit=batch_limit, for_update=True)
 
         for action in actions:
             logger.info(
@@ -420,6 +473,7 @@ async def process_autopilot_queue_once(batch_limit: int = 20) -> int:
                     entity_id=str(action.id),
                     extra_data={"retry_count": int(action.retry_count or 0)},
                 )
+                await _alert_dead_letter(db, action, action.error_message or "Exceeded max retries")
                 processed += 1
                 continue
 
@@ -468,7 +522,7 @@ async def process_autopilot_queue_once(batch_limit: int = 20) -> int:
                         entity_id=str(action.id),
                         extra_data={"error": str(exc), "retry_count": retries},
                     )
-                else:
+                    await _alert_dead_letter(db, action, str(exc))
                     await schedule_retry(db, action, base_seconds=base_seconds, commit=False)
                     await record_audit_event(
                         db,

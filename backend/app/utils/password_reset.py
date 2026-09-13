@@ -67,6 +67,13 @@ async def _hash_password_async(password: str) -> str:
     # Fallback: use passlib's bcrypt in a thread to avoid blocking the event loop.
     return await asyncio.to_thread(_pwd_context.hash, password)
 
+def _hash_reset_token(token: str) -> str:
+    """SHA-256 of the raw reset token — the value stored in the database."""
+    import hashlib
+
+    return hashlib.sha256(token.encode("utf-8")).hexdigest()
+
+
 def generate_reset_token() -> str:
     """Generate a secure random token for password reset."""
     return secrets.token_urlsafe(32)
@@ -96,16 +103,18 @@ async def create_password_reset_token(db: AsyncSession, email: str) -> bool:
         user = result.scalar_one_or_none()
         
         if not user:
-            # Don't reveal if user exists or not
-            logger.info(f"Password reset requested for non-existent email: {email}")
+            # Don't reveal if user exists or not (and never log the email).
+            logger.info("Password reset requested for non-existent email.")
             return True  # Still return True for security
             
-        # Generate reset token and expiration (1 hour from now)
+        # Generate reset token and expiration (1 hour from now).
+        # Only a SHA-256 HASH of the token is stored: a DB leak must not
+        # yield usable reset links (the raw token goes to the email only).
         reset_token = generate_reset_token()
         expires_at = datetime.utcnow() + timedelta(hours=1)
         
-        # Update user with reset token
-        user.password_reset_token = reset_token
+        # Update user with the reset-token hash
+        user.password_reset_token = _hash_reset_token(reset_token)
         user.password_reset_expires = expires_at
         
         await db.commit()
@@ -180,9 +189,9 @@ async def create_password_reset_token(db: AsyncSession, email: str) -> bool:
         )
         
         if email_sent:
-            logger.info(f"Password reset email sent to: {email}")
+            logger.info("Password reset email sent.")
         else:
-            logger.error(f"Failed to send password reset email to: {email}")
+            logger.error("Failed to send password reset email.")
             
         return email_sent
         
@@ -208,9 +217,9 @@ async def reset_password_with_token(
         dict: Result with success status and message
     """
     try:
-        # Find user by reset token
+        # Find user by reset-token HASH (tokens are stored hashed at rest).
         result = await db.execute(
-            select(User).where(User.password_reset_token == token)
+            select(User).where(User.password_reset_token == _hash_reset_token(token))
         )
         user = result.scalar_one_or_none()
         
@@ -239,10 +248,13 @@ async def reset_password_with_token(
         # Hash the new password (tries project implementation first, falls back to passlib)
         hashed_password = await _hash_password_async(new_password)
         
-        # Update user with new password and clear reset token
+        # Update user with new password and clear reset token.
+        # Bump token_version: revokes every access token issued before this
+        # reset (previously old sessions stayed valid for up to 24h).
         user.password_hash = hashed_password
         user.password_reset_token = None
         user.password_reset_expires = None
+        user.token_version = int(user.token_version or 0) + 1
         user.updated_at = datetime.utcnow()
         
         await db.commit()

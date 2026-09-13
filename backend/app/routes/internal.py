@@ -22,7 +22,10 @@ router = APIRouter(prefix="/api/v1/internal", tags=["Internal"])
 # --- Security Setup ---
 INTERNAL_API_KEY = os.getenv("INTERNAL_API_KEY") # Set this in your .env!
 if not INTERNAL_API_KEY:
-    print("WARNING: INTERNAL_API_KEY is not set. Internal endpoints are insecure.")
+    logger.error(
+        "INTERNAL_API_KEY is not set. Internal endpoints will FAIL CLOSED "
+        "(503) until it is configured."
+    )
 
 api_key_header = APIKeyHeader(name="X-Internal-API-Key", auto_error=False)
 
@@ -54,15 +57,18 @@ def is_allowed_email_domain(email: Optional[str]) -> bool:
     return False
 
 async def get_api_key(api_key: str = Security(api_key_header)):
-    # if not INTERNAL_API_KEY: # Allow access if key is not set (for local dev maybe)
-    #     print("Allowing access to internal API without key (INTERNAL_API_KEY not set)")
-    #     return "dummy_key_allowed"
+    # Fail CLOSED: with the key unset, None == None let headerless requests
+    # through and /internal/user-by-sub leaked emails and wallet addresses.
+    if not INTERNAL_API_KEY:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="Internal API is disabled: INTERNAL_API_KEY is not configured.",
+        )
     if api_key == INTERNAL_API_KEY:
         return api_key
-    else:
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN, detail="Invalid or missing Internal API Key"
-        )
+    raise HTTPException(
+        status_code=status.HTTP_403_FORBIDDEN, detail="Invalid or missing Internal API Key"
+    )
 # --- End Security Setup ---
 
 @router.get("/user-by-sub/{google_sub}", response_model=UserInternalResponse, dependencies=[Security(get_api_key)])
@@ -79,7 +85,7 @@ async def get_user_by_google_sub(google_sub: str, db: AsyncSession = Depends(get
     )
     db_user = result.scalar_one_or_none()
     if not db_user: # type: ignore
-        print(f"Internal API: User not found for sub: {google_sub}")
+        logger.info("Internal API: user not found for given sub.")
         raise HTTPException(status_code=404, detail="User not found")
 
     #! Decrypt email IF needed only

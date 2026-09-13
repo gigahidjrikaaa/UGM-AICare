@@ -65,6 +65,15 @@ def evaluate_action_policy(
             rationale="Badge minting is allowed for all risk levels",
         )
 
+    if action_type == AutopilotActionType.plan_followup:
+        return PolicyEvaluationResult(
+            decision=AutopilotPolicyDecision.allow,
+            rationale=(
+                "Plan follow-ups are allowed at every risk level: the gate is "
+                "the user's proactive-chat consent, enforced again at delivery"
+            ),
+        )
+
     return PolicyEvaluationResult(
         decision=AutopilotPolicyDecision.deny,
         rationale="No policy rule matched",

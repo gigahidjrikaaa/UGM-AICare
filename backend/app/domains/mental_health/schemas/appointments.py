@@ -15,23 +15,23 @@ class AppointmentStatus(str, Enum):
     moved = "moved"
     no_show = "no_show"
 
-# --- Psychologist Schemas ---
-class PsychologistBase(BaseModel):
+# --- Counselor Schemas ---
+class CounselorBase(BaseModel):
     name: str = Field(..., min_length=1, max_length=200)
     specialization: Optional[str] = Field(None, max_length=200)
     image_url: Optional[str] = Field(None, max_length=500)
     is_available: bool = True
 
-class PsychologistCreate(PsychologistBase):
+class CounselorCreate(CounselorBase):
     pass
 
-class PsychologistUpdate(BaseModel):
+class CounselorUpdate(BaseModel):
     name: Optional[str] = Field(None, min_length=1, max_length=200)
     specialization: Optional[str] = Field(None, max_length=200)
     image_url: Optional[str] = Field(None, max_length=500)
     is_available: Optional[bool] = None
 
-class Psychologist(PsychologistBase):
+class Counselor(CounselorBase):
     id: int
 
     model_config = ConfigDict(from_attributes=True)
@@ -67,7 +67,7 @@ class AppointmentUser(BaseModel):
 
 # --- Appointment Schemas ---
 class AppointmentBase(BaseModel):
-    psychologist_id: int = Field(..., gt=0)
+    counselor_id: int = Field(..., gt=0)
     appointment_type_id: int = Field(..., gt=0)
     appointment_datetime: datetime = Field(..., description="ISO 8601 datetime for the appointment")
     notes: Optional[str] = Field(None, max_length=5000, description="Pre-appointment notes or additional information")
@@ -118,7 +118,7 @@ class Appointment(AppointmentBase):
     updated_at: datetime
     
     # Nested relationships
-    psychologist: Psychologist
+    counselor: Counselor
     appointment_type: AppointmentType
 
     model_config = ConfigDict(from_attributes=True)
@@ -148,10 +148,10 @@ class AppointmentStats(BaseModel):
     moved_count: int
     no_show_count: int
 
-class PsychologistAvailability(BaseModel):
-    """Psychologist availability information."""
-    psychologist_id: int
-    psychologist_name: str
+class CounselorAvailability(BaseModel):
+    """Counselor availability information."""
+    counselor_id: int
+    counselor_name: str
     is_available: bool
     total_appointments: int
     upcoming_appointments: int

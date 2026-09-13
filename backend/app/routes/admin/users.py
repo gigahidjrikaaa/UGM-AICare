@@ -438,10 +438,19 @@ async def update_user_status(
     admin_user: User = Depends(get_admin_user),
 ):
     """Activate or deactivate a user account."""
+    # Admin-only: counselors deactivating accounts (including admins') is an
+    # escalation path — this whole endpoint is now admin-gated.
+    _ensure_admin_only(admin_user)
     logger.info("Admin %s updating status for user %s", admin_user.id, user_id)
     user = await db.get(User, user_id)
     if not user:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found")
+
+    if user.id == admin_user.id and not is_active:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="You cannot deactivate your own account.",
+        )
 
     user.is_active = is_active
     await db.commit()
@@ -457,14 +466,15 @@ async def update_user_role(
     admin_user: User = Depends(get_admin_user),
 ):
     """Update a user's role."""
+    # Admin-only: previously counselors could grant the counselor role to any
+    # user (the admin gate only applied when the TARGET role was admin).
+    _ensure_admin_only(admin_user)
     logger.info("Admin %s updating role for user %s", admin_user.id, user_id)
     user = await db.get(User, user_id)
     if not user:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found")
 
     requested_role = _normalize_role(role)
-    if requested_role == "admin":
-        _ensure_admin_only(admin_user)
     user.role = requested_role
     await db.commit()
     await db.refresh(user)

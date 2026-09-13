@@ -69,7 +69,7 @@ const determineRoleFromEmail = (email?: string | null) => {
 };
 
 async function exchangeGoogleAccountToken(
-  account: { provider: string; providerAccountId: string },
+  account: { provider: string; providerAccountId: string; idToken?: string },
   user: { email?: string | null; name?: string | null; role?: string | null; image?: string | null },
 ): Promise<OAuthExchangeResponse> {
   if (!INTERNAL_API_URL) {
@@ -82,6 +82,9 @@ async function exchangeGoogleAccountToken(
     body: JSON.stringify({
       provider: account.provider,
       provider_account_id: account.providerAccountId,
+      // REQUIRED by the backend by default: identity is derived from this
+      // verified Google id_token, not from client-supplied fields.
+      id_token: account.idToken ?? undefined,
       email: user?.email ?? undefined,
       name: user?.name ?? undefined,
       picture: user?.image ?? undefined,
@@ -178,7 +181,13 @@ export const authOptions: NextAuthOptions = {
 
       if (account?.provider === "google" && account?.providerAccountId) {
         const exchange = await exchangeGoogleAccountToken(
-          { provider: account.provider, providerAccountId: account.providerAccountId },
+          {
+            provider: account.provider,
+            providerAccountId: account.providerAccountId,
+            // NextAuth normalizes Google's id_token onto the account object.
+            idToken: (account as { id_token?: string; idToken?: string }).id_token
+              ?? (account as { idToken?: string }).idToken,
+          },
           {
             email: typedUser.email,
             name: typedUser.name,

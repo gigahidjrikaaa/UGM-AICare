@@ -124,7 +124,7 @@ const ugmResources: ResourceCardProps[] = [
   {
     name: "Faculty of Psychology Counseling (PPM)",
     description:
-      "Licensed psychologists offer individual and group sessions by appointment.",
+      "Licensed counselors offer individual and group sessions by appointment.",
     targetAudience: "Students, staff, public",
     servicesOffered: ["Individual Counseling", "Group Counseling", "Psychological Assessment"],
     address: "Fakultas Psikologi UGM, Bulaksumur",

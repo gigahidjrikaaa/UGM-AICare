@@ -110,7 +110,7 @@ Intervention types:
         "description": """Execute the Case Management Agent (CMA) to create a case for human professional support.
 
 ✅ Call this tool when user wants to connect with human professionals:
-- Explicitly asks for counselor/psychologist: "mau ketemu psikolog", "konseling", "mau curhat ke orang"
+- Explicitly asks for counselor/counselor: "mau ketemu psikolog", "konseling", "mau curhat ke orang"
 - Requests referral to professional services: "perlu bantuan profesional"
 - Asks about GMC, HPU, or mental health services at UGM
 - Wants to escalate beyond AI support
@@ -274,11 +274,11 @@ Returns curated resources based on category.
     
     {
         "name": "book_appointment",
-        "description": """Book a counseling appointment with a psychologist at UGM.
+        "description": """Book a counseling appointment with a counselor at UGM.
         
         ✅ CALL WHEN USER:
         - Explicitly requests appointment: "mau booking", "jadwalin konseling", "book appointment"
-        - Wants to meet with psychologist: "mau ketemu psikolog", "pengen konseling"
+        - Wants to meet with counselor: "mau ketemu psikolog", "pengen konseling"
         - Specifies preferred time: "besok jam 2", "Selasa siang", "next week"
         
         ❌ DO NOT CALL:
@@ -299,9 +299,9 @@ Returns curated resources based on category.
         "parameters": {
             "type": "object",
             "properties": {
-                "psychologist_id": {
+                "counselor_id": {
                     "type": "integer",
-                    "description": "ID of the psychologist (get from get_available_counselors tool first). Optional if you want system to auto-assign."
+                    "description": "ID of the counselor (get from get_available_counselors tool first). Optional if you want system to auto-assign."
                 },
                 "appointment_datetime": {
                     "type": "string",
@@ -322,7 +322,7 @@ Returns curated resources based on category.
     
     {
         "name": "get_available_counselors",
-        "description": """Get list of available psychologists/counselors at UGM.
+        "description": """Get list of available counselors/counselors at UGM.
         
         ✅ CALL WHEN:
         - User asks "siapa psikolog yang ada?", "counselor available?"
@@ -365,9 +365,9 @@ Returns curated resources based on category.
         "parameters": {
             "type": "object",
             "properties": {
-                "psychologist_id": {
+                "counselor_id": {
                     "type": "integer",
-                    "description": "ID of specific psychologist. If not provided, suggests times for any available counselor."
+                    "description": "ID of specific counselor. If not provided, suggests times for any available counselor."
                 },
                 "preferred_day_of_week": {
                     "type": "array",

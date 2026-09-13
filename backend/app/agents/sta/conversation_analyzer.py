@@ -66,6 +66,10 @@ async def analyze_conversation_risk(
     duration = time.time() - conversation_start_time if conversation_start_time else 0.0
     
     # Build analysis prompt with integrated screening extraction
+    from app.agents.shared.risk_taxonomy import render_risk_calibration_for_prompt
+
+    risk_calibration = render_risk_calibration_for_prompt(include_none=False)
+
     analysis_prompt = f"""
 You are a clinical mental health analyst reviewing a complete conversation between a university student and Aika (AI mental health assistant).
 
@@ -81,10 +85,7 @@ PART 1: RISK ASSESSMENT (Clinical Safety Analysis)
 ==============================================================================
 
 1. OVERALL RISK LEVEL: Considering all messages together, what is the overall mental health risk?
-   - low: General stress, manageable challenges
-   - moderate: Significant distress, concerning patterns emerging
-   - high: Serious risk indicators, needs professional intervention soon
-   - critical: Immediate danger, crisis intervention required NOW
+{risk_calibration}
 
 2. RISK TREND: How did the user's state change throughout the conversation?
    - stable: Consistent emotional state throughout

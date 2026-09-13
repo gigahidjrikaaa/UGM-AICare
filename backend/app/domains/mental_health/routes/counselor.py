@@ -24,7 +24,7 @@ from app.domains.mental_health.models.autopilot_actions import (
     AutopilotActionType,
 )
 from app.domains.mental_health.models import (
-    Psychologist as CounselorProfile,
+    Counselor as CounselorProfile,
     Appointment,
     Case,
     CaseNote,
@@ -43,8 +43,12 @@ from app.domains.mental_health.services.autopilot_action_service import (
 from app.models import FlaggedSession
 from app.models.user import User
 from app.models.alerts import Alert
-from app.domains.mental_health.schemas.appointments import AppointmentWithUser
-from app.agents.cma.schemas import SDACase, SDAListCasesResponse
+from app.domains.mental_health.schemas.appointments import (
+    AppointmentStatusUpdate,
+    AppointmentUpdate,
+    AppointmentWithUser,
+)
+from app.agents.cma.schemas import CMACase as SDACase, CMAListCasesResponse as SDAListCasesResponse
 from app.core.redaction import prelog_redact
 from app.routes.admin.utils import decrypt_user_email, hash_user_id
 from app.schemas.admin import (
@@ -603,10 +607,11 @@ async def get_case_latest_attestation(
 
 async def get_counselor_profile(user: User, db: AsyncSession) -> CounselorProfile:
     """Fetch the counselor profile associated with the given user."""
-    query = select(CounselorProfile).filter(CounselorProfile.user_id == user.id)
-    result = await db.execute(query)
-    profile = result.scalar_one_or_none()
+    from app.domains.mental_health.services.counselor_scope import (
+        get_counselor_profile_for_user,
+    )
 
+    profile = await get_counselor_profile_for_user(db, user.id)
     if profile is None:
         raise HTTPException(
             status_code=404,
@@ -619,44 +624,16 @@ async def _get_counselor_conversation_scope(
     profile: CounselorProfile,
     db: AsyncSession,
 ) -> tuple[set[str], set[int]]:
-    """Return accessible session IDs and user IDs for counselor-assigned cases."""
-    psychologist_id_str = str(profile.id)
+    """Return accessible session IDs and user IDs for counselor-assigned cases.
 
-    case_rows = (
-        await db.execute(
-            select(Case.session_id, Case.conversation_id).where(Case.assigned_to == psychologist_id_str)
-        )
-    ).all()
+    Delegates to the shared scope service (single definition used by both the
+    console routes and the AI tool access checks).
+    """
+    from app.domains.mental_health.services.counselor_scope import (
+        get_counselor_conversation_scope as _service_scope,
+    )
 
-    session_ids: set[str] = {str(case_session_id) for case_session_id, _ in case_rows if case_session_id}
-    conversation_ids: set[int] = set()
-
-    for _, conversation_id in case_rows:
-        parsed_id = _to_int(conversation_id)
-        if parsed_id is not None:
-            conversation_ids.add(parsed_id)
-
-    if conversation_ids:
-        resolved_sessions = (
-            await db.execute(
-                select(Conversation.session_id).where(Conversation.id.in_(conversation_ids))
-            )
-        ).scalars().all()
-        for resolved_session_id in resolved_sessions:
-            if resolved_session_id:
-                session_ids.add(str(resolved_session_id))
-
-    if not session_ids:
-        return set(), set()
-
-    scoped_user_ids = (
-        await db.execute(
-            select(func.distinct(Conversation.user_id)).where(Conversation.session_id.in_(session_ids))
-        )
-    ).scalars().all()
-
-    user_ids = {int(user_id) for user_id in scoped_user_ids if user_id is not None}
-    return session_ids, user_ids
+    return await _service_scope(db, profile)
 
 
 def _resolve_user_ids_for_hash(
@@ -770,10 +747,10 @@ async def get_my_appointments(
         select(Appointment)
         .options(
             joinedload(Appointment.user),
-            joinedload(Appointment.psychologist),
+            joinedload(Appointment.counselor),
             joinedload(Appointment.appointment_type),
         )
-        .filter(Appointment.psychologist_id == profile.id)
+        .filter(Appointment.counselor_id == profile.id)
     )
 
     if status:
@@ -802,7 +779,7 @@ async def get_my_appointment_count(
     """Return the number of appointments for the counselor, optionally filtered by status."""
     profile = await get_counselor_profile(current_user, db)
 
-    query = select(func.count(Appointment.id)).filter(Appointment.psychologist_id == profile.id)
+    query = select(func.count(Appointment.id)).filter(Appointment.counselor_id == profile.id)
 
     if status:
         query = query.filter(Appointment.status == status)
@@ -824,12 +801,12 @@ async def get_single_appointment(
         select(Appointment)
         .options(
             joinedload(Appointment.user),
-            joinedload(Appointment.psychologist),
+            joinedload(Appointment.counselor),
             joinedload(Appointment.appointment_type),
         )
         .filter(
             Appointment.id == appointment_id,
-            Appointment.psychologist_id == profile.id,
+            Appointment.counselor_id == profile.id,
         )
     )
     result = await db.execute(query)
@@ -842,6 +819,158 @@ async def get_single_appointment(
         )
 
     return AppointmentWithUser.model_validate(appointment)
+
+
+@router.put("/appointments/{appointment_id}", response_model=AppointmentWithUser)
+async def update_counselor_appointment(
+    appointment_id: int,
+    update_data: AppointmentUpdate,
+    db: AsyncSession = Depends(get_async_db),
+    current_user: User = Depends(require_counselor),
+):
+    """Counselor-owned appointment lifecycle: reschedule, complete, cancel,
+    or mark no-show.
+
+    Ownership is enforced via ``counselor_id == profile.id`` — unlike the
+    student endpoints, which key on ``user_id`` and therefore 404 for every
+    counselor action (the gap this endpoint closes). Terminal states
+    (completed/cancelled) reject further changes.
+    """
+    from datetime import datetime as _dt
+
+    profile = await get_counselor_profile(current_user, db)
+
+    query = (
+        select(Appointment)
+        .filter(
+            Appointment.id == appointment_id,
+            Appointment.counselor_id == profile.id,
+        )
+    )
+    result = await db.execute(query)
+    appointment = result.scalar_one_or_none()
+    if appointment is None:
+        raise HTTPException(
+            status_code=404,
+            detail="Appointment not found or you don't have access to it",
+        )
+
+    if appointment.status in {"completed", "cancelled"}:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Appointment is already {appointment.status}; no further changes allowed.",
+        )
+
+    updates = update_data.model_dump(exclude_unset=True)
+
+    if "status" in updates and updates["status"] is not None:
+        status_value = (
+            updates["status"].value
+            if hasattr(updates["status"], "value")
+            else str(updates["status"])
+        )
+        # Counselor lifecycle transitions from a scheduled visit.
+        if appointment.status != "scheduled" and status_value not in {"cancelled"}:
+            raise HTTPException(
+                status_code=400,
+                detail=(
+                    f"Cannot move an appointment from '{appointment.status}' "
+                    f"to '{status_value}'."
+                ),
+            )
+        appointment.status = status_value
+
+    if updates.get("appointment_datetime") is not None:
+        appointment.appointment_datetime = updates["appointment_datetime"]
+        if "status" not in updates or updates["status"] is None:
+            appointment.status = "moved"
+
+    if updates.get("notes") is not None:
+        appointment.notes = updates["notes"]
+
+    appointment.updated_at = _dt.now()
+    db.add(appointment)
+    await db.commit()
+    await db.refresh(appointment)
+
+    from sqlalchemy.orm import joinedload as _joinedload
+
+    fresh = (
+        await db.execute(
+            select(Appointment)
+            .options(
+                _joinedload(Appointment.user),
+                _joinedload(Appointment.counselor),
+                _joinedload(Appointment.appointment_type),
+            )
+            .filter(Appointment.id == appointment_id)
+        )
+    ).scalar_one()
+
+    return AppointmentWithUser.model_validate(fresh)
+
+
+@router.put(
+    "/appointments/{appointment_id}/status",
+    response_model=AppointmentWithUser,
+)
+async def update_counselor_appointment_status(
+    appointment_id: int,
+    status_data: AppointmentStatusUpdate,
+    db: AsyncSession = Depends(get_async_db),
+    current_user: User = Depends(require_counselor),
+):
+    """Status-only variant (complete / cancel / no-show) for the console UI."""
+    from datetime import datetime as _dt
+
+    profile = await get_counselor_profile(current_user, db)
+    query = (
+        select(Appointment)
+        .filter(
+            Appointment.id == appointment_id,
+            Appointment.counselor_id == profile.id,
+        )
+    )
+    result = await db.execute(query)
+    appointment = result.scalar_one_or_none()
+    if appointment is None:
+        raise HTTPException(
+            status_code=404,
+            detail="Appointment not found or you don't have access to it",
+        )
+
+    if appointment.status in {"completed", "cancelled"}:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Appointment is already {appointment.status}; no further changes allowed.",
+        )
+
+    new_status = (
+        status_data.status.value
+        if hasattr(status_data.status, "value")
+        else str(status_data.status)
+    )
+    appointment.status = new_status
+    appointment.updated_at = _dt.now()
+    db.add(appointment)
+    await db.commit()
+    await db.refresh(appointment)
+
+    from sqlalchemy.orm import joinedload as _joinedload
+
+    fresh = (
+        await db.execute(
+            select(Appointment)
+            .options(
+                _joinedload(Appointment.user),
+                _joinedload(Appointment.counselor),
+                _joinedload(Appointment.appointment_type),
+            )
+            .filter(Appointment.id == appointment_id)
+        )
+    ).scalar_one()
+
+    return AppointmentWithUser.model_validate(fresh)
 
 
 # ========================================
@@ -1385,21 +1514,21 @@ async def get_my_dashboard_stats(
     week_end = week_start + timedelta(days=7)
 
     this_week_query = select(func.count(Appointment.id)).filter(
-        Appointment.psychologist_id == profile.id,
+        Appointment.counselor_id == profile.id,
         Appointment.appointment_datetime >= week_start,
         Appointment.appointment_datetime < week_end,
     )
     this_week_appointments = await db.scalar(this_week_query) or 0
 
     upcoming_query = select(func.count(Appointment.id)).filter(
-        Appointment.psychologist_id == profile.id,
+        Appointment.counselor_id == profile.id,
         Appointment.status == "scheduled",
         Appointment.appointment_datetime >= today,
     )
     upcoming_appointments = await db.scalar(upcoming_query) or 0
 
     completed_query = select(func.count(Appointment.id)).filter(
-        Appointment.psychologist_id == profile.id,
+        Appointment.counselor_id == profile.id,
         Appointment.status == "completed",
     )
     completed_appointments = await db.scalar(completed_query) or 0
@@ -1411,7 +1540,7 @@ async def get_my_dashboard_stats(
     )
 
     total_patients_query = select(func.count(func.distinct(Appointment.user_id))).filter(
-        Appointment.psychologist_id == profile.id
+        Appointment.counselor_id == profile.id
     )
     total_patients = await db.scalar(total_patients_query) or 0
 
@@ -1445,18 +1574,18 @@ async def get_my_cases(
     Cases are assigned via the CMA (Case Management Agent) auto-assignment
     algorithm based on counselor workload.
     """
-    # Find the psychologist profile for this user
+    # Find the counselor profile for this user
     profile_query = select(CounselorProfile).where(CounselorProfile.user_id == current_user.id)
     profile_result = await db.execute(profile_query)
     profile = profile_result.scalar_one_or_none()
     
     if not profile:
-        # No psychologist profile means no cases can be assigned
+        # No counselor profile means no cases can be assigned
         return SDAListCasesResponse(cases=[])
     
-    # Query cases assigned to this counselor (assigned_to stores psychologist.id as string)
-    psychologist_id_str = str(profile.id)
-    query = select(Case).where(Case.assigned_to == psychologist_id_str).order_by(Case.created_at.desc())
+    # Query cases assigned to this counselor (assigned_to stores counselor.id as string)
+    counselor_id_str = str(profile.id)
+    query = select(Case).where(Case.assigned_to == counselor_id_str).order_by(Case.created_at.desc())
     
     if status:
         try:
@@ -1553,7 +1682,7 @@ async def get_my_case_stats(
     current_user: User = Depends(require_counselor),
 ):
     """Get case statistics for the current counselor."""
-    # Find the psychologist profile for this user
+    # Find the counselor profile for this user
     profile_query = select(CounselorProfile).where(CounselorProfile.user_id == current_user.id)
     profile_result = await db.execute(profile_query)
     profile = profile_result.scalar_one_or_none()
@@ -1568,30 +1697,30 @@ async def get_my_case_stats(
             "high_priority_cases": 0,
         }
     
-    # Case.assigned_to stores psychologist.id as string
-    psychologist_id_str = str(profile.id)
+    # Case.assigned_to stores counselor.id as string
+    counselor_id_str = str(profile.id)
     
     # Total cases
-    total_query = select(func.count(Case.id)).where(Case.assigned_to == psychologist_id_str)
+    total_query = select(func.count(Case.id)).where(Case.assigned_to == counselor_id_str)
     total = await db.scalar(total_query) or 0
     
     # Open cases (new status)
     open_query = select(func.count(Case.id)).where(
-        Case.assigned_to == psychologist_id_str,
+        Case.assigned_to == counselor_id_str,
         Case.status == CaseStatusEnum.new
     )
     open_cases = await db.scalar(open_query) or 0
     
     # In progress cases
     in_progress_query = select(func.count(Case.id)).where(
-        Case.assigned_to == psychologist_id_str,
+        Case.assigned_to == counselor_id_str,
         Case.status == CaseStatusEnum.in_progress
     )
     in_progress = await db.scalar(in_progress_query) or 0
     
     # Closed cases
     closed_query = select(func.count(Case.id)).where(
-        Case.assigned_to == psychologist_id_str,
+        Case.assigned_to == counselor_id_str,
         Case.status.in_([CaseStatusEnum.closed, CaseStatusEnum.resolved])
     )
     closed = await db.scalar(closed_query) or 0
@@ -1599,7 +1728,7 @@ async def get_my_case_stats(
     # Critical severity
     from app.domains.mental_health.models import CaseSeverityEnum
     critical_query = select(func.count(Case.id)).where(
-        Case.assigned_to == psychologist_id_str,
+        Case.assigned_to == counselor_id_str,
         Case.severity == CaseSeverityEnum.critical,
         Case.status != CaseStatusEnum.closed
     )
@@ -1607,7 +1736,7 @@ async def get_my_case_stats(
     
     # High priority (high severity)
     high_query = select(func.count(Case.id)).where(
-        Case.assigned_to == psychologist_id_str,
+        Case.assigned_to == counselor_id_str,
         Case.severity == CaseSeverityEnum.high,
         Case.status != CaseStatusEnum.closed
     )
@@ -1917,10 +2046,10 @@ async def list_all_my_notes(
     if not profile:
         return {"items": []}
 
-    psychologist_id_str = str(profile.id)
+    counselor_id_str = str(profile.id)
 
     # Fetch all case IDs assigned to this counselor
-    case_ids_query = select(Case.id, Case.user_hash).where(Case.assigned_to == psychologist_id_str)
+    case_ids_query = select(Case.id, Case.user_hash).where(Case.assigned_to == counselor_id_str)
     case_rows = (await db.execute(case_ids_query)).all()
     if not case_rows:
         return {"items": []}
@@ -1971,12 +2100,12 @@ async def list_patient_treatment_plans(
     if not profile:
         return {"items": []}
 
-    psychologist_id_str = str(profile.id)
+    counselor_id_str = str(profile.id)
 
     # Get cases assigned to this counselor
     cases_result = (
         await db.execute(
-            select(Case).where(Case.assigned_to == psychologist_id_str)
+            select(Case).where(Case.assigned_to == counselor_id_str)
         )
     ).scalars().all()
 
@@ -2067,12 +2196,12 @@ async def get_patient_progress(
     if not profile:
         return {"items": []}
 
-    psychologist_id_str = str(profile.id)
+    counselor_id_str = str(profile.id)
 
     # Get all cases assigned to this counselor
     cases_result = (
         await db.execute(
-            select(Case).where(Case.assigned_to == psychologist_id_str)
+            select(Case).where(Case.assigned_to == counselor_id_str)
         )
     ).scalars().all()
 
@@ -2239,11 +2368,11 @@ async def get_today_appointments(
         select(Appointment)
         .options(
             joinedload(Appointment.user),
-            joinedload(Appointment.psychologist),
+            joinedload(Appointment.counselor),
             joinedload(Appointment.appointment_type),
         )
         .filter(
-            Appointment.psychologist_id == profile.id,
+            Appointment.counselor_id == profile.id,
             Appointment.status == "scheduled",
             Appointment.appointment_datetime >= datetime.combine(today, datetime.min.time()),
             Appointment.appointment_datetime < datetime.combine(tomorrow, datetime.min.time()),

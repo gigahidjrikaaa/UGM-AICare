@@ -5,8 +5,6 @@ import "dotenv/config";
 
 // --- Environment Variables ---
 const eduTestnetRpcUrl = process.env.EDU_TESTNET_RPC_URL;
-const somniaMainnetRpcUrl = process.env.SOMNIA_MAINNET_RPC_URL;
-const somniaTestnetRpcUrl = process.env.SOMNIA_TESTNET_RPC_URL;
 const bscTestnetRpcUrl = process.env.BSC_TESTNET_RPC_URL;
 const bscMainnetRpcUrl = process.env.BSC_MAINNET_RPC_URL;
 const opbnbTestnetRpcUrl = process.env.OPBNB_TESTNET_RPC_URL;
@@ -19,8 +17,6 @@ const warnIfMissing = (name: string, value: string | undefined) => {
 };
 
 warnIfMissing("EDU_TESTNET_RPC_URL", eduTestnetRpcUrl);
-warnIfMissing("SOMNIA_MAINNET_RPC_URL", somniaMainnetRpcUrl);
-warnIfMissing("SOMNIA_TESTNET_RPC_URL", somniaTestnetRpcUrl);
 warnIfMissing("BSC_TESTNET_RPC_URL", bscTestnetRpcUrl);
 warnIfMissing("BSC_MAINNET_RPC_URL", bscMainnetRpcUrl);
 warnIfMissing("OPBNB_TESTNET_RPC_URL", opbnbTestnetRpcUrl);
@@ -46,20 +42,6 @@ const config: HardhatUserConfig = {
       url: eduTestnetRpcUrl || "",
       chainId: 656476,
       accounts: privateKey ? [`0x${privateKey}`] : [],
-    },
-
-    // --- SOMNIA (CARE Token ecosystem) ---
-    somniaMainnet: {
-      url: somniaMainnetRpcUrl || "https://api.infra.mainnet.somnia.network/",
-      chainId: 5031,
-      accounts: mainnetPrivateKey ? [`0x${mainnetPrivateKey}`] : [],
-      gasPrice: "auto",
-    },
-    somniaTestnet: {
-      url: somniaTestnetRpcUrl || "https://dream-rpc.somnia.network/",
-      chainId: 50312,
-      accounts: privateKey ? [`0x${privateKey}`] : [],
-      gasPrice: "auto",
     },
 
     // --- BNB Smart Chain (Badge NFTs - multi-chain expansion) ---

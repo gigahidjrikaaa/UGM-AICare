@@ -34,7 +34,7 @@ from .quests import (
 )
 
 # Clinical subdomain
-from .appointments import Psychologist, AppointmentType, Appointment
+from .appointments import Counselor, AppointmentType, Appointment
 from .interventions import (
     InterventionCampaign,
     CampaignExecution,
@@ -90,7 +90,7 @@ __all__ = [
     "ComplianceAuditLog",
     "QuestAnalyticsEvent",
     # Clinical
-    "Psychologist",
+    "Counselor",
     "AppointmentType",
     "Appointment",
     "InterventionCampaign",

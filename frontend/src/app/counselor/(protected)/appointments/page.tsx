@@ -1,18 +1,7 @@
 'use client';
 
 import { useState, useEffect, useCallback } from 'react';
-import {
-  FiCalendar,
-  FiClock,
-  FiUser,
-  FiVideo,
-  FiMapPin,
-  FiCheckCircle,
-  FiXCircle,
-  FiEdit,
-  FiAlertTriangle,
-  FiX,
-} from 'react-icons/fi';
+import { FiCalendar, FiClock, FiUser, FiVideo, FiMapPin, FiCheckCircle, FiXCircle, FiEdit, FiAlertTriangle, FiX, FiUserX } from 'react-icons/fi';
 import apiClient from '@/services/api';
 import toast from 'react-hot-toast';
 
@@ -53,7 +42,7 @@ interface Appointment {
   notes?: string;
 }
 
-type ActionMode = 'complete' | 'reschedule' | 'cancel';
+type ActionMode = 'complete' | 'reschedule' | 'cancel' | 'no_show';
 
 const statusColors = {
   scheduled: 'bg-blue-500/20 text-blue-300 border-blue-500/30',
@@ -188,16 +177,29 @@ export default function CounselorAppointmentsPage() {
       setActionLoading(appointmentId);
 
       if (mode === 'complete') {
-        await apiClient.put(`/appointments/${appointmentId}`, {
+        // Counselor-owned lifecycle endpoint (the patient-scoped
+        // /appointments/{id} PUT 404s for counselors).
+        await apiClient.put(`/counselor/appointments/${appointmentId}/status`, {
           status: 'completed',
-          notes: actionNote.trim() || undefined,
         });
+        if (actionNote.trim()) {
+          await apiClient.put(`/counselor/appointments/${appointmentId}`, {
+            notes: actionNote.trim(),
+          });
+        }
         toast.success('Appointment marked as completed');
+      }
+
+      if (mode === 'no_show') {
+        await apiClient.put(`/counselor/appointments/${appointmentId}/status`, {
+          status: 'no_show',
+        });
+        toast.success('Appointment marked as no-show');
       }
 
       if (mode === 'reschedule') {
         const parsed = new Date(`${rescheduleDate}T${rescheduleTime}`);
-        await apiClient.put(`/appointments/${appointmentId}`, {
+        await apiClient.put(`/counselor/appointments/${appointmentId}`, {
           appointment_datetime: parsed.toISOString(),
           status: 'scheduled',
           notes: actionNote.trim() || undefined,
@@ -206,7 +208,15 @@ export default function CounselorAppointmentsPage() {
       }
 
       if (mode === 'cancel') {
-        await apiClient.delete(`/appointments/${appointmentId}`);
+        // Soft-cancel via the counselor endpoint (patient DELETE 404s here).
+        await apiClient.put(`/counselor/appointments/${appointmentId}/status`, {
+          status: 'cancelled',
+        });
+        if (actionNote.trim()) {
+          await apiClient.put(`/counselor/appointments/${appointmentId}`, {
+            notes: actionNote.trim(),
+          });
+        }
         toast.success('Appointment cancelled');
       }
 
@@ -431,13 +441,21 @@ export default function CounselorAppointmentsPage() {
                             <FiEdit className="w-4 h-4" />
                             Reschedule
                           </button>
-                          <button 
+                          <button
                             onClick={() => openActionModal('cancel', appointment)}
                             disabled={actionLoading === appointment.appointment_id}
                             className="px-4 py-2 bg-red-500/10 hover:bg-red-500/20 border border-red-500/30 rounded-lg text-sm text-red-300 transition-all flex items-center gap-2 whitespace-nowrap disabled:opacity-50"
                           >
                             <FiXCircle className="w-4 h-4" />
                             Cancel
+                          </button>
+                          <button
+                            onClick={() => openActionModal('no_show', appointment)}
+                            disabled={actionLoading === appointment.appointment_id}
+                            className="px-4 py-2 bg-orange-500/10 hover:bg-orange-500/20 border border-orange-500/30 rounded-lg text-sm text-orange-300 transition-all flex items-center gap-2 whitespace-nowrap disabled:opacity-50"
+                          >
+                            <FiUserX className="w-4 h-4" />
+                            No-show
                           </button>
                         </>
                       )}

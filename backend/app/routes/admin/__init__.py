@@ -15,7 +15,18 @@ from .cases import router as cases_router
 from .counselors import router as counselors_router
 from .system import router as system_router
 from .users import router as users_router
-from .testing import router as testing_router
+# Testing/demo endpoints (DB seeding, chat simulation, subprocess replays):
+# env-gated OFF by default in production — enable explicitly with
+# ENABLE_ADMIN_TESTING_ENDPOINTS=true.
+import os as _os
+
+if (
+    _os.getenv("APP_ENV", "").lower() not in {"production", "prod"}
+    or _os.getenv("ENABLE_ADMIN_TESTING_ENDPOINTS", "").lower() in {"1", "true", "yes", "on"}
+):
+    from .testing import router as testing_router
+else:
+    testing_router = None
 from .insights import router as insights_router
 from .alerts import router as alerts_router
 from .sse import router as sse_router
@@ -50,7 +61,8 @@ router.include_router(dashboard_router)
 router.include_router(interventions_router)
 router.include_router(cases_router)
 router.include_router(counselors_router)
-router.include_router(testing_router)
+if testing_router is not None:
+    router.include_router(testing_router)
 router.include_router(insights_router)
 router.include_router(alerts_router)
 router.include_router(sse_router)

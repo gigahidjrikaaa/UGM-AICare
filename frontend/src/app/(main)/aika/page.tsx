@@ -23,6 +23,7 @@ import { useRouter } from 'next/navigation';
 import Image from 'next/image';
 import { Activity, Eye, EyeOff, X } from 'lucide-react';
 import { useAikaChat, type ToolActivityLog } from '@/hooks/useAikaChat';
+import { useProactiveMessages } from "@/contexts/ProactiveMessagesContext";
 import { useProfilePicture } from '@/hooks/useProfilePicture';
 import { ChatWindow } from '@/components/features/chat/ChatWindow';
 import { ChatInput } from '@/components/features/chat/ChatInput';
@@ -123,6 +124,44 @@ export default function AikaEnhancedPage() {
     });
   }, [addActivity]);
 
+  // ---- Session continuity + proactive (Aika-initiated) messages ----
+  // The session id is persisted so an Aika-initiated thread (plan follow-up)
+  // survives page reloads and the whole conversation stays in one thread.
+  const storedSessionIdRef = useRef<string>('');
+  if (!storedSessionIdRef.current) {
+    const KEY = 'aika-session-id';
+    let id = '';
+    try {
+      id = window.localStorage.getItem(KEY) || '';
+    } catch {
+      id = '';
+    }
+    if (!id) {
+      id = 'aika-session-' + new Date().getTime() + '-' + Math.random().toString(36).slice(2, 8);
+      try {
+        window.localStorage.setItem(KEY, id);
+      } catch {
+        // private mode: fall back to per-mount sessions
+      }
+    }
+    storedSessionIdRef.current = id;
+  }
+
+  const { messages: pendingProactiveMessages, markRead: markProactiveRead } =
+    useProactiveMessages();
+
+  // Adopt the proactive thread once; keep it even after the message is
+  // consumed so the user's reply continues the SAME conversation.
+  const [adoptedSessionId, setAdoptedSessionId] = useState<string | null>(null);
+  useEffect(() => {
+    const first = pendingProactiveMessages[0];
+    if (first?.session_id) {
+      setAdoptedSessionId(first.session_id);
+    }
+  }, [pendingProactiveMessages]);
+
+  const activeSessionId = adoptedSessionId ?? storedSessionIdRef.current;
+
   // Use the Aika chat hook
   const {
     messages,
@@ -139,10 +178,12 @@ export default function AikaEnhancedPage() {
     handleInputChange,
     handleSendMessage,
   } = useAikaChat({
-    sessionId: 'aika-session-' + new Date().getTime(),
+    sessionId: activeSessionId,
     showAgentActivity: true,
     showRiskIndicators: true,
     onToolActivity: handleToolActivity,
+    proactiveMessages: pendingProactiveMessages,
+    onProactiveConsumed: (id) => void markProactiveRead(id),
   });
 
   // Track processed metadata to prevent duplicate logging
@@ -543,7 +584,7 @@ export default function AikaEnhancedPage() {
                     activities={showThinkingTrace ? activities : activities.filter((a) => a.activity_type !== 'reasoning_trace')}
                     metadata={lastMetadata ?? null}
                     embedded={true}
-                    onClose={() => setIsAikaPanelOpen(true)}
+                    onClose={() => setIsAikaPanelOpen(false)}
                   />
                 </div>
 

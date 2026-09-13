@@ -15,7 +15,6 @@ from app.schemas.admin.system import (
     SystemSettingsCategory,
     SystemSettingsResponse,
 )
-from app.utils.code_cleanup import CodeCleanupService
 from app.services.database_monitoring import get_monitoring_service
 from app.services.api_performance import get_performance_service
 
@@ -255,52 +254,9 @@ async def import_settings(
     return results
 
 
-# Code Cleanup Endpoints
-@router.get("/cleanup/scan")
-async def scan_codebase(
-    admin_user=Depends(get_admin_user),
-):
-    """Scan codebase for cleanup opportunities."""
-    project_root = os.path.abspath(os.path.join(os.path.dirname(__file__), "../../.."))
-    cleanup_service = CodeCleanupService(project_root)
-    try:
-        report = await cleanup_service.generate_cleanup_report()
-        return {"success": True, "report": report}
-    except Exception as e:
-        # Do not expose internal errors to the client; log and return generic message
-        import logging
-        logging.getLogger(__name__).exception("Codebase scan failed")
-        return {"success": False, "message": "Codebase scan failed"}
-
-
-@router.post("/cleanup/execute")
-async def execute_cleanup(
-    categories: Optional[List[str]] = None,
-    dry_run: bool = True,
-    admin_user=Depends(get_admin_user),
-):
-    """Execute automated code cleanup."""
-    project_root = os.path.abspath(os.path.join(os.path.dirname(__file__), "../../.."))
-    cleanup_service = CodeCleanupService(project_root)
-    
-    if categories is None:
-        categories = ['console_debug', 'temp_code', 'empty_blocks']
-    
-    try:
-        results = await cleanup_service.auto_cleanup(categories, dry_run)
-        return {
-            "dry_run": dry_run,
-            "categories": categories,
-            "results": results,
-            "message": "Cleanup executed successfully" if not dry_run else "Dry run completed - no files modified"
-        }
-    except ValueError as ve:
-        return {"success": False, "message": str(ve)}
-    except Exception:
-        import logging
-        logging.getLogger(__name__).exception("Code cleanup failed")
-        return {"success": False, "message": "Code cleanup failed"}
-
+# NOTE: the /cleanup/* endpoints were removed — they regex-edited live
+# source files on the running server via app.utils.code_cleanup. Code
+# cleanup belongs in dev tooling, not a production admin API.
 
 # Database Monitoring Endpoints
 @router.get("/database/health")

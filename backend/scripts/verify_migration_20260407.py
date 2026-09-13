@@ -48,16 +48,13 @@ async def main():
         for r in rows:
             print("ts:", r[0], r[1], "=", r[2])
 
-        n = (await conn.execute(text("SELECT COUNT(*) FROM care_token_mints"))).scalar()
-        print("care_token_mints exists, rows:", n)
-
         rows = await conn.execute(text("SELECT conname FROM pg_constraint WHERE contype='c' AND conname LIKE 'ck_%'"))
         print("CHECK constraints:", sorted(r[0] for r in rows))
 
         n = (await conn.execute(text(
             "SELECT COUNT(*) FROM pg_constraint WHERE contype='f' AND conname IN ("
             "'fk_consent_ledger_user_restrict','fk_audit_log_user_restrict',"
-            "'fk_alerts_seen_by_set_null','fk_revenue_reports_created_by_set_null')"
+            "'fk_alerts_seen_by_set_null')"
         ))).scalar()
         print("key new FKs present:", n)
 

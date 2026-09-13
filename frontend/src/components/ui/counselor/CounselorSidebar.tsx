@@ -3,22 +3,7 @@
 import Image from 'next/image';
 import Link from 'next/link';
 import { signOut } from 'next-auth/react';
-import {
-  FiHome,
-  FiClipboard,
-  FiCalendar,
-  FiUsers,
-  FiUser,
-  FiSettings,
-  FiLogOut,
-  FiHeart,
-  FiAlertTriangle,
-  FiMessageSquare,
-  FiFileText,
-  FiBookOpen,
-  FiEye,
-  FiActivity,
-} from 'react-icons/fi';
+import {FiHome, FiClipboard, FiCalendar, FiUsers, FiUser, FiSettings, FiLogOut, FiHeart, FiAlertTriangle, FiMessageSquare, FiFileText, FiBookOpen, FiEye, FiActivity, FiMessageCircle} from 'react-icons/fi';
 import SidebarLink from '../admin/SidebarLink';
 
 import MobileNavDrawer from '../MobileNavDrawer';
@@ -47,6 +32,7 @@ const navGroups = [
 ];
 
 const secondaryNavItems = [
+  { name: 'Ask Aika', icon: <FiMessageCircle size={18}/>, href: '/aika' },
   { name: 'My Profile', icon: <FiUser size={18}/>, href: '/counselor/profile' },
   { name: 'Settings', icon: <FiSettings size={18}/>, href: '/counselor/settings' },
 ];

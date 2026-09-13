@@ -175,6 +175,9 @@ def build_decision_prompt(
     analytics parameters.
     """
     memory_section = f"\n\n{personal_memory_block}" if personal_memory_block else ""
+    from app.agents.shared.crisis_lexicon import render_keywords_for_prompt
+
+    crisis_keywords_sample = render_keywords_for_prompt()
 
     normalized = normalize_role(user_role)
     routing_rules = ""
@@ -261,11 +264,11 @@ def build_decision_prompt(
         f'- "none": No distress signals.\n'
         f'  Examples: "Hello, how are you?", "What is CBT?", "Thanks for the help"\n\n'
         f"CRISIS KEYWORDS TO DETECT (Indonesian + English):\n"
-        f"suicide, bunuh diri, kill myself, end my life, tidak ingin hidup lagi,\n"
-        f"self-harm, cutting, mutilasi diri, menyakiti diri, overdose,\n"
-        f"jump from building, loncat dari gedung, gantung diri, hanging,\n"
-        f"want to die, mau mati, ingin mati, etc."
-        f"{memory_section}"
+        f"{crisis_keywords_sample}\n"
+        f"These keywords are enforced deterministically: any message containing "
+        f"one of them is escalated to CMA even if you classify it as low risk. "
+        f"Never down-classify a message that contains them.\n"
+        f"{memory_section}\n"
     )
 
 

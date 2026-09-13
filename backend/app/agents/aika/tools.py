@@ -48,8 +48,10 @@ _AIKA_ROLE_TOOL_ALLOWLISTS: Dict[str, Set[str]] = {
         "reschedule_appointment",
         "get_user_appointments",
         "get_crisis_resources",
+        "get_mental_health_resources",
     },
     "counselor": {
+        "get_my_assigned_cases",
         "get_case_details",
         "get_user_cases",
         "get_conversation_summary",
@@ -159,6 +161,7 @@ async def execute_tool_call(
     args: Dict[str, Any],
     db: AsyncSession,
     user_id: str,
+    requester_role: Optional[str] = None,
 ) -> Dict[str, Any]:
     """Execute a tool call through the NEW unified registry.
     
@@ -177,12 +180,16 @@ async def execute_tool_call(
     try:
         logger.info("Executing tool '%s' for user %s", tool_name, user_id)
 
-        # Execute through NEW registry (decorator pattern)
+        # Execute through NEW registry (decorator pattern). The requester's
+        # identity/role ride in `context` so scoping-aware tools can verify
+        # access WITHOUT trusting model-supplied arguments.
         result = await execute_tool(
             tool_name=tool_name,
             args=args,
             db=db,
-            user_id=int(user_id) if isinstance(user_id, str) else user_id
+            user_id=int(user_id) if isinstance(user_id, str) else user_id,
+            requester_user_id=int(user_id) if isinstance(user_id, str) else user_id,
+            requester_role=requester_role,
         )
 
         if result.get("success") or result.get("status") == "completed":

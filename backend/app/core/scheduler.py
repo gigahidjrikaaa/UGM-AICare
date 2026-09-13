@@ -53,6 +53,7 @@ TREND_DETECTION_JOB_ID = "trend_detection_job"
 WEEKLY_IA_REPORT_JOB_ID = "weekly_ia_report_job"
 RETENTION_COHORT_JOB_ID = "retention_cohort_job"
 COUNSELOR_REMINDER_JOB_ID = "counselor_reminder_job"
+SLA_SCAN_JOB_ID = "sla_breach_scan"
 
 
 def _parse_bool_env(name: str, default: bool = True) -> bool:
@@ -399,7 +400,7 @@ async def send_counselor_reminders() -> None:
             from app.services.alert_service import get_alert_service
             from app.models.alerts import AlertType, AlertSeverity
             from app.domains.mental_health.models.cases import Case, CaseStatusEnum
-            from app.domains.mental_health.models.appointments import Psychologist
+            from app.domains.mental_health.models.appointments import Counselor
             from app.models.user import User
             from sqlalchemy.orm import joinedload as _joinedload
 
@@ -428,24 +429,24 @@ async def send_counselor_reminders() -> None:
 
             for case in stale_cases:
                 try:
-                    # Resolve counselor email: assigned_to (str) -> Psychologist.id ->
-                    # Psychologist.user_id -> User.email
+                    # Resolve counselor email: assigned_to (str) -> Counselor.id ->
+                    # Counselor.user_id -> User.email
                     psych_stmt = (
-                        select(Psychologist)
-                        .options(_joinedload(Psychologist.user))
-                        .where(Psychologist.id == int(case.assigned_to))
+                        select(Counselor)
+                        .options(_joinedload(Counselor.user))
+                        .where(Counselor.id == int(case.assigned_to))
                     )
                     psych_result = await db.execute(psych_stmt)
-                    psychologist = psych_result.scalar_one_or_none()
+                    counselor = psych_result.scalar_one_or_none()
 
-                    if not psychologist or not psychologist.user:
+                    if not counselor or not counselor.user:
                         logger.warning(
                             f"Scheduler: Cannot resolve counselor for case {case.id} "
                             f"(assigned_to={case.assigned_to}) - skipping."
                         )
                         continue
 
-                    counselor_user = psychologist.user
+                    counselor_user = counselor.user
                     days_stale = max(1, int((now - case.updated_at).days))
 
                     # --- In-app alert ---
@@ -470,7 +471,7 @@ async def send_counselor_reminders() -> None:
 
                     # --- Email reminder ---
                     if counselor_user.email:
-                        counselor_name = getattr(counselor_user, 'name', None) or psychologist.name or "Counselor"
+                        counselor_name = getattr(counselor_user, 'name', None) or counselor.name or "Counselor"
                         subject = f"[AICare] Reminder: Case {str(case.id)[:8]} needs follow-up"
                         html_body = (
                             f"<p>Dear {counselor_name},</p>"
@@ -567,6 +568,124 @@ async def compute_retention_cohort_metrics() -> None:
 
 
 # =============================================================================
+# SLA BREACH SCANNER
+# =============================================================================
+# Case.sla_breach_at is written at case creation (critical: +15 min, else
+# +60 min) but nothing ever evaluated it — a critical case could breach with
+# nobody told. This scan publishes EventType.SLA_BREACH for newly breached
+# open cases; the event bridge notifies admins (SSE) AND counselors (Alert
+# row + push). sla_breach_notified_at dedupes so the scan never re-spams.
+
+
+async def check_sla_breaches() -> None:
+    from datetime import datetime as _dt
+    from datetime import timezone as _tz
+
+    from sqlalchemy import update as _update
+
+    from app.domains.mental_health.models.cases import Case
+    from app.services.event_bus import EventType, publish_event
+
+    now = _dt.now(_tz.utc)
+    async with AsyncSessionLocal() as db:
+        rows = (
+            await db.execute(
+                select(Case.id, Case.assigned_to, Case.sla_breach_at)
+                .where(
+                    Case.sla_breach_at.is_not(None),
+                    Case.sla_breach_at < now,
+                    Case.sla_breach_notified_at.is_(None),
+                    Case.status.in_(["new", "in_progress", "waiting"]),
+                )
+                .limit(100)
+            )
+        ).all()
+
+        if not rows:
+            return
+
+        for case_id, assigned_to, breach_at in rows:
+            try:
+                await publish_event(
+                    event_type=EventType.SLA_BREACH,
+                    source_agent="system",
+                    data={
+                        "case_id": str(case_id),
+                        "assigned_to": str(assigned_to) if assigned_to else "Unassigned",
+                        "breach_time": breach_at.isoformat() if breach_at else None,
+                    },
+                )
+                await db.execute(
+                    _update(Case)
+                    .where(Case.id == case_id)
+                    .values(sla_breach_notified_at=now)
+                )
+                logger.warning(
+                    "SLA breach detected: case=%s, assigned_to=%s, breach_at=%s",
+                    case_id,
+                    assigned_to,
+                    breach_at,
+                )
+            except Exception as row_exc:
+                logger.error("SLA breach handling failed for case %s: %s", case_id, row_exc)
+
+        await db.commit()
+
+
+# =============================================================================
+# MULTI-WORKER JOB LOCKS
+# =============================================================================
+# The app runs gunicorn with N workers, and EACH worker starts its own
+# APScheduler (lifespan) — without coordination every cron job fires N times
+# (duplicate user-facing check-in emails, N IA reports, ...). Fix: each job
+# execution tries a short-lived Redis lock (SET NX EX); only the winning
+# worker actually runs the job. Fail-open without Redis keeps dev/test
+# behavior unchanged.
+
+_DISTRIBUTED_LOCK_DEFAULT_TTL_SECONDS = 900  # 15 min: longest job runtime
+
+
+async def _acquire_job_lock(job_id: str, ttl_seconds: int | None = None) -> bool:
+    from app.core.memory import get_redis_client
+
+    ttl = ttl_seconds or _DISTRIBUTED_LOCK_DEFAULT_TTL_SECONDS
+    try:
+        client = await get_redis_client()
+        result = await client.set(f"schedlock:{job_id}", "1", nx=True, ex=ttl)
+        # redis-py returns True on acquisition, None/False when held elsewhere.
+        return bool(result)
+    except Exception as exc:
+        # Fail open: running the job matters more than deduplicating it.
+        logger.warning("Job lock unavailable for '%s' (%s); running anyway.", job_id, exc)
+        return True
+
+
+def _with_distributed_lock(job_id: str, ttl_seconds: int | None = None):
+    """Wrap an async job so only one worker executes it per fire time."""
+
+    def _decorate(func):
+        async def _wrapped():
+            if await _acquire_job_lock(job_id, ttl_seconds):
+                await func()
+            else:
+                try:
+                    from app.core.metrics import scheduler_lock_skipped_total
+
+                    scheduler_lock_skipped_total.labels(job_id=job_id).inc()
+                except Exception:
+                    pass
+                logger.info(
+                    "Job '%s' skipped: another worker holds the distributed lock.",
+                    job_id,
+                )
+
+        _wrapped.__name__ = getattr(func, "__name__", job_id)
+        return _wrapped
+
+    return _decorate
+
+
+# =============================================================================
 # SCHEDULER LIFECYCLE
 # =============================================================================
 
@@ -578,7 +697,7 @@ def start_scheduler() -> None:
 
     # Schedule proactive check-in (twice daily: 10:00 AM and 7:00 PM WIB)
     scheduler.add_job(
-        send_proactive_checkins,
+        _with_distributed_lock(CHECKIN_JOB_ID)(send_proactive_checkins),
         trigger='cron',
         hour=10,
         minute=0,
@@ -590,7 +709,7 @@ def start_scheduler() -> None:
     
     # Schedule evening check-in for high-risk users
     scheduler.add_job(
-        send_proactive_checkins,
+        _with_distributed_lock(f"{CHECKIN_JOB_ID}_evening")(send_proactive_checkins),
         trigger='cron',
         hour=19,
         minute=0,
@@ -602,7 +721,7 @@ def start_scheduler() -> None:
     
     # Schedule trend detection (every 6 hours)
     scheduler.add_job(
-        detect_screening_trends,
+        _with_distributed_lock(TREND_DETECTION_JOB_ID)(detect_screening_trends),
         trigger='cron',
         hour='0,6,12,18',  # Every 6 hours
         minute=30,
@@ -614,7 +733,7 @@ def start_scheduler() -> None:
     
     # Schedule weekly IA report (every Sunday at 2:00 AM WIB)
     scheduler.add_job(
-        generate_weekly_ia_report,
+        _with_distributed_lock(WEEKLY_IA_REPORT_JOB_ID, ttl_seconds=1800)(generate_weekly_ia_report),
         trigger='cron',
         day_of_week='sun',
         hour=2,
@@ -627,7 +746,7 @@ def start_scheduler() -> None:
 
     if _parse_bool_env("ENABLE_RETENTION_COHORT_JOB", True):
         scheduler.add_job(
-            compute_retention_cohort_metrics,
+            _with_distributed_lock(RETENTION_COHORT_JOB_ID, ttl_seconds=1800)(compute_retention_cohort_metrics),
             trigger='cron',
             hour=1,
             minute=30,
@@ -644,7 +763,7 @@ def start_scheduler() -> None:
 
     # Schedule counselor reminders (daily at 9:00 AM WIB)
     scheduler.add_job(
-        send_counselor_reminders,
+        _with_distributed_lock(COUNSELOR_REMINDER_JOB_ID)(send_counselor_reminders),
         trigger='cron',
         hour=9,
         minute=0,
@@ -653,6 +772,17 @@ def start_scheduler() -> None:
         misfire_grace_time=3600,
     )
     logger.info(f"Scheduled job '{COUNSELOR_REMINDER_JOB_ID}' with trigger: cron[hour=9, minute=0]")
+
+    # SLA breach scan (every 5 minutes; lock TTL covers a slow scan)
+    scheduler.add_job(
+        _with_distributed_lock(SLA_SCAN_JOB_ID, ttl_seconds=300)(check_sla_breaches),
+        trigger='interval',
+        minutes=5,
+        id=SLA_SCAN_JOB_ID,
+        replace_existing=True,
+        misfire_grace_time=120,
+    )
+    logger.info(f"Scheduled job '{SLA_SCAN_JOB_ID}' with trigger: interval[minutes=5]")
 
     try:
         scheduler.start()

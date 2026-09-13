@@ -21,9 +21,9 @@ export const appointmentsKeys = {
   details: () => [...appointmentsKeys.all, 'detail'] as const,
   detail: (id: number) => [...appointmentsKeys.details(), id] as const,
   stats: () => [...appointmentsKeys.all, 'stats'] as const,
-  psychologists: () => ['psychologists'] as const,
-  psychologistsList: (availableOnly?: boolean) => 
-    [...appointmentsKeys.psychologists(), { availableOnly }] as const,
+  counselors: () => ['counselors'] as const,
+  counselorsList: (availableOnly?: boolean) => 
+    [...appointmentsKeys.counselors(), { availableOnly }] as const,
   appointmentTypes: () => ['appointment-types'] as const,
 };
 
@@ -83,13 +83,13 @@ export function useAppointment(id: number | null) {
 }
 
 /**
- * Fetch all psychologists/counselors
+ * Fetch all counselors/counselors
  */
-export function usePsychologists(availableOnly: boolean = false) {
+export function useCounselorOptions(availableOnly: boolean = false) {
   return useQuery({
-    queryKey: appointmentsKeys.psychologistsList(availableOnly),
-    queryFn: () => appointmentsApi.getPsychologists(availableOnly),
-    staleTime: 300000, // 5 minutes (psychologists don't change often)
+    queryKey: appointmentsKeys.counselorsList(availableOnly),
+    queryFn: () => appointmentsApi.getCounselorOptions(availableOnly),
+    staleTime: 300000, // 5 minutes (counselors don't change often)
   });
 }
 

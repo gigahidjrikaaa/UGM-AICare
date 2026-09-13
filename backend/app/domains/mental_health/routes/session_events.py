@@ -23,7 +23,7 @@ async def end_chat_session(
     request: SessionEndRequest,
     background_tasks: BackgroundTasks,
     db: AsyncSession = Depends(get_async_db), # For querying user_id
-    # current_user: User = Depends(get_current_active_user) # Optional: ensure user matches session
+    current_user: User = Depends(get_current_active_user), # Required: triggers LLM summarization for the session owner
 ):
     logger.info(f"Received request to end session: {request.session_id}")
 
@@ -41,9 +41,13 @@ async def end_chat_session(
 
     user_id = last_message_in_session.user_id
 
-    # Optional: Verify current_user.id matches user_id from session if auth is used
-    # if current_user.id != user_id:
-    #     raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Not authorized to end this session")
+    # Ownership check: an unauthenticated caller used to be able to trigger
+    # victim-scoped LLM summarization for any session_id.
+    if int(user_id) != int(current_user.id):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Not authorized to end this session",
+        )
 
     logger.info(f"Scheduling summarization for user {user_id}, session {request.session_id} due to explicit end.")
     background_tasks.add_task(summarize_and_save, user_id, request.session_id)

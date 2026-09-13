@@ -55,6 +55,9 @@ class Case(Base):
     )
     summary_redacted = Column(Text, nullable=True)
     sla_breach_at = Column(DateTime(timezone=True), nullable=True)
+    # Set by the SLA scanner job when counselors/admins have been notified
+    # of this breach — dedupes the scan so it never spams.
+    sla_breach_notified_at = Column(DateTime(timezone=True), nullable=True)
     closure_reason = Column(Text, nullable=True)
 
     # Relationships

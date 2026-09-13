@@ -22,9 +22,9 @@ import {
   FiMap
 } from 'react-icons/fi';
 import dynamic from 'next/dynamic';
-import { useMyAppointments, usePsychologists, useUpdateAppointmentNotes } from '@/hooks/useAppointments';
+import { useMyAppointments, useCounselorOptions, useUpdateAppointmentNotes } from '@/hooks/useAppointments';
 import { toast } from 'react-hot-toast';
-import type { Appointment, Psychologist } from '@/lib/appointments-api';
+import type { Appointment, Counselor } from '@/lib/appointments-api';
 
 // Dynamically import the map component to avoid SSR issues
 const AppointmentMap = dynamic(() => import('@/components/appointments/AppointmentMap'), {
@@ -65,8 +65,8 @@ export default function AppointmentsPage() {
   });
 
   const { 
-    data: psychologists = []
-  } = usePsychologists(true);
+    data: counselors = []
+  } = useCounselorOptions(true);
 
   const updateNotesMutation = useUpdateAppointmentNotes();
 
@@ -108,7 +108,7 @@ export default function AppointmentsPage() {
     // Filter by search query
     if (searchQuery) {
       filtered = filtered.filter((apt: Appointment) =>
-        apt.psychologist.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        apt.counselor.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
         apt.appointment_type.name.toLowerCase().includes(searchQuery.toLowerCase())
       );
     }
@@ -118,12 +118,12 @@ export default function AppointmentsPage() {
 
   // Filter counselors by search
   const filteredCounselors = useMemo(() => {
-    if (!searchQuery) return psychologists;
-    return psychologists.filter((psy: Psychologist) =>
+    if (!searchQuery) return counselors;
+    return counselors.filter((psy: Counselor) =>
       psy.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
       psy.specialization?.toLowerCase().includes(searchQuery.toLowerCase())
     );
-  }, [psychologists, searchQuery]);
+  }, [counselors, searchQuery]);
 
   // Get status badge
   const getStatusBadge = (status: string) => {
@@ -175,7 +175,7 @@ export default function AppointmentsPage() {
     const startTime = new Date(appointment.appointment_datetime);
     const endTime = new Date(startTime.getTime() + 60 * 60 * 1000); // 1 hour duration
 
-    const googleCalendarUrl = `https://calendar.google.com/calendar/render?action=TEMPLATE&text=${encodeURIComponent(appointment.appointment_type.name + ' - ' + appointment.psychologist.name)}&dates=${startTime.toISOString().replace(/[-:]/g, '').replace(/\.\d{3}/, '')}/${endTime.toISOString().replace(/[-:]/g, '').replace(/\.\d{3}/, '')}&details=${encodeURIComponent(appointment.notes || '')}&location=${encodeURIComponent(DEFAULT_LOCATION.address)}&sf=true&output=xml`;
+    const googleCalendarUrl = `https://calendar.google.com/calendar/render?action=TEMPLATE&text=${encodeURIComponent(appointment.appointment_type.name + ' - ' + appointment.counselor.name)}&dates=${startTime.toISOString().replace(/[-:]/g, '').replace(/\.\d{3}/, '')}/${endTime.toISOString().replace(/[-:]/g, '').replace(/\.\d{3}/, '')}&details=${encodeURIComponent(appointment.notes || '')}&location=${encodeURIComponent(DEFAULT_LOCATION.address)}&sf=true&output=xml`;
 
     window.open(googleCalendarUrl, '_blank');
   };
@@ -360,10 +360,10 @@ export default function AppointmentsPage() {
                         </div>
                         <div className="flex-1">
                           <h3 className="text-lg font-semibold text-white mb-1">
-                            {appointment.psychologist.name}
+                            {appointment.counselor.name}
                           </h3>
                           <p className="text-sm text-gray-300 mb-2">
-                            {appointment.psychologist.specialization}
+                            {appointment.counselor.specialization}
                           </p>
                           <div className="flex flex-wrap gap-2 mb-3">
                             {getStatusBadge(appointment.status)}
@@ -434,7 +434,7 @@ export default function AppointmentsPage() {
               exit={{ opacity: 0, y: -20 }}
               className="grid gap-4 md:grid-cols-2 lg:grid-cols-3"
             >
-              {filteredCounselors.map((counselor: Psychologist) => (
+              {filteredCounselors.map((counselor: Counselor) => (
                 <motion.div
                   key={counselor.id}
                   layout
@@ -507,7 +507,7 @@ export default function AppointmentsPage() {
                   <div>
                     <h2 className="text-xl font-bold text-white mb-1">Pre-Appointment Notes</h2>
                     <p className="text-sm text-gray-300">
-                      Share information that {selectedAppointment.psychologist.name} should know before your session
+                      Share information that {selectedAppointment.counselor.name} should know before your session
                     </p>
                   </div>
                   <button

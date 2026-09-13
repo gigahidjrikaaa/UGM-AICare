@@ -21,7 +21,7 @@ from app.domains.mental_health.models import (
     Appointment,
     Conversation,
     JournalEntry,
-    Psychologist,
+    Counselor,
 )
 from app.routes.admin.utils import (
     decrypt_user_email,
@@ -32,7 +32,7 @@ from app.schemas.admin.appointments import (
     AppointmentResponse,
     AppointmentUpdate,
     AppointmentUser,
-    PsychologistResponse,
+    CounselorResponse,
     TherapistScheduleCreate,
     TherapistScheduleResponse,
     TherapistScheduleUpdate,
@@ -44,8 +44,8 @@ logger = logging.getLogger(__name__)
 router = APIRouter(tags=["Admin - Appointments"])
 
 
-@router.get("/psychologists", response_model=List[TherapistSummary])
-async def get_psychologists(
+@router.get("/counselors", response_model=List[TherapistSummary])
+async def get_counselors(
     db: AsyncSession = Depends(get_async_db),
     admin_user: User = Depends(get_admin_user),
 ) -> List[TherapistSummary]:
@@ -98,11 +98,11 @@ async def get_psychologists(
 
     therapist_ids = [user.id for user, *_ in therapist_rows]
 
-    psychologist_rows = await db.execute(
-        select(Psychologist).where(Psychologist.id.in_(therapist_ids))
+    counselor_rows = await db.execute(
+        select(Counselor).where(Counselor.id.in_(therapist_ids))
     )
-    psychologist_map: Dict[int, Psychologist] = {
-        item.id: item for item in psychologist_rows.scalars().all()
+    counselor_map: Dict[int, Counselor] = {
+        item.id: item for item in counselor_rows.scalars().all()
     }
 
     schedule_rows = await db.execute(
@@ -129,7 +129,7 @@ async def get_psychologists(
 
     therapists: List[TherapistSummary] = []
     for user, _, _, _, appointment_count in therapist_rows:
-        psychologist = psychologist_map.get(user.id)
+        counselor = counselor_map.get(user.id)
         schedules = schedule_map.get(user.id, [])
         schedules.sort(key=sort_key)
 
@@ -142,13 +142,13 @@ async def get_psychologists(
         display_name_candidates = [
             name_plain,
             " ".join(filter(None, [first_name_plain, last_name_plain])) or None,
-            psychologist.name if psychologist else None,
+            counselor.name if counselor else None,
             email_plain,
         ]
         display_name = next((value for value in display_name_candidates if value), "Therapist")
 
         fallback_avatar = build_avatar_url(email_plain, user.id, size=192)
-        display_image = psychologist.image_url if psychologist and psychologist.image_url else fallback_avatar
+        display_image = counselor.image_url if counselor and counselor.image_url else fallback_avatar
 
         therapists.append(
             TherapistSummary(
@@ -158,8 +158,8 @@ async def get_psychologists(
                 first_name=first_name_plain,
                 last_name=last_name_plain,
                 phone=phone_plain,
-                specialization=psychologist.specialization if psychologist else None,
-                is_available=psychologist.is_available if psychologist else True,
+                specialization=counselor.specialization if counselor else None,
+                is_available=counselor.is_available if counselor else True,
                 allow_email_checkins=user.allow_email_checkins,
                 total_appointments=int(appointment_count or 0),
                 upcoming_schedules=[
@@ -174,13 +174,13 @@ async def get_psychologists(
     return therapists
 
 
-def _map_psychologist(psychologist: Psychologist) -> PsychologistResponse:
-    return PsychologistResponse(
-        id=psychologist.id,
-        name=psychologist.name,
-        specialization=psychologist.specialization,
-        image_url=psychologist.image_url,
-        is_available=psychologist.is_available,
+def _map_counselor(counselor: Counselor) -> CounselorResponse:
+    return CounselorResponse(
+        id=counselor.id,
+        name=counselor.name,
+        specialization=counselor.specialization,
+        image_url=counselor.image_url,
+        is_available=counselor.is_available,
     )
 
 
@@ -206,7 +206,7 @@ async def get_appointments(
         select(Appointment)
         .options(
             selectinload(Appointment.user),
-            selectinload(Appointment.psychologist),
+            selectinload(Appointment.counselor),
             selectinload(Appointment.appointment_type),
         )
         .order_by(desc(Appointment.appointment_datetime))
@@ -214,15 +214,15 @@ async def get_appointments(
 
     appointments = []
     for appointment in result.scalars().all():
-        if not appointment.user or not appointment.psychologist:
-            logger.warning("Appointment %s missing related user or psychologist", appointment.id)
+        if not appointment.user or not appointment.counselor:
+            logger.warning("Appointment %s missing related user or counselor", appointment.id)
             continue
 
         appointments.append(
             AppointmentResponse(
                 id=appointment.id,
                 user=_map_user(appointment.user),
-                psychologist=_map_psychologist(appointment.psychologist),
+                counselor=_map_counselor(appointment.counselor),
                 appointment_type=(
                     appointment.appointment_type.name if appointment.appointment_type else None
                 ),
@@ -250,19 +250,19 @@ async def get_appointment(
         select(Appointment)
         .options(
             selectinload(Appointment.user),
-            selectinload(Appointment.psychologist),
+            selectinload(Appointment.counselor),
             selectinload(Appointment.appointment_type),
         )
         .filter(Appointment.id == appointment_id)
     )
     appointment = result.scalar_one_or_none()
-    if not appointment or not appointment.user or not appointment.psychologist:
+    if not appointment or not appointment.user or not appointment.counselor:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Appointment not found")
 
     return AppointmentResponse(
         id=appointment.id,
         user=_map_user(appointment.user),
-        psychologist=_map_psychologist(appointment.psychologist),
+        counselor=_map_counselor(appointment.counselor),
         appointment_type=(appointment.appointment_type.name if appointment.appointment_type else None),
         appointment_datetime=appointment.appointment_datetime,
         notes=appointment.notes,
@@ -291,13 +291,13 @@ async def update_appointment(
         select(Appointment)
         .options(
             selectinload(Appointment.user),
-            selectinload(Appointment.psychologist),
+            selectinload(Appointment.counselor),
             selectinload(Appointment.appointment_type),
         )
         .filter(Appointment.id == appointment_id)
     )
     db_appointment = result.scalar_one_or_none()
-    if not db_appointment or not db_appointment.user or not db_appointment.psychologist:
+    if not db_appointment or not db_appointment.user or not db_appointment.counselor:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Appointment not found")
 
     db_appointment.status = appointment_data.status
@@ -308,7 +308,7 @@ async def update_appointment(
     return AppointmentResponse(
         id=db_appointment.id,
         user=_map_user(db_appointment.user),
-        psychologist=_map_psychologist(db_appointment.psychologist),
+        counselor=_map_counselor(db_appointment.counselor),
         appointment_type=(
             db_appointment.appointment_type.name if db_appointment.appointment_type else None
         ),

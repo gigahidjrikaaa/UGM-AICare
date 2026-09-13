@@ -6,9 +6,17 @@ import pytest
 
 
 def test_get_system_prompt_falls_back_to_general() -> None:
-    from app.agents.tca.gemini_plan_generator import _get_system_prompt, GENERAL_COPING_SYSTEM_PROMPT
+    from app.agents.tca.gemini_plan_generator import (
+        _get_system_prompt,
+        _CRISIS_BACKSTOP,
+        GENERAL_COPING_SYSTEM_PROMPT,
+    )
 
-    assert _get_system_prompt("unknown") == GENERAL_COPING_SYSTEM_PROMPT
+    # Unknown plan type falls back to general_coping, and every system
+    # prompt MUST carry the shared crisis backstop.
+    assert _get_system_prompt("unknown") == GENERAL_COPING_SYSTEM_PROMPT + _CRISIS_BACKSTOP
+    for plan_type in ("calm_down", "break_down_problem", "cognitive_restructuring", "behavioral_activation"):
+        assert "PENGAMAN KRISIS" in _get_system_prompt(plan_type)
 
 
 def test_build_user_prompt_includes_activity_context(monkeypatch: pytest.MonkeyPatch) -> None:

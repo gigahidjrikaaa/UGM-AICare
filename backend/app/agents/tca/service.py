@@ -142,6 +142,8 @@ class TherapeuticCoachService:
                         gemini_context["demographics"] = payload.options["demographics"]
                     if "previous_sessions" in payload.options:
                         gemini_context["previous_sessions"] = payload.options["previous_sessions"]
+                    if payload.options.get("guidance_block"):
+                        gemini_context["guidance_block"] = payload.options["guidance_block"]
                 
                 # Generate personalized plan
                 plan_data = await generate_personalized_plan(

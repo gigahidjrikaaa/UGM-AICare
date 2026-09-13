@@ -13,6 +13,9 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.auth_utils import create_access_token, decrypt_and_validate_token
+from app.core.settings import settings
+from app.core.auth import get_current_user as _get_current_user_core
+from app.core.ip_rate_limiter import enforce_ip_rate_limit
 from app.database import get_async_db
 from app.models import User
 from app.services.user_normalization import allow_email_checkins as allow_email_checkins_for_user
@@ -63,7 +66,12 @@ class ForgotPasswordRequest(BaseModel):
 
 class OAuthTokenRequest(BaseModel):
     provider: str
-    provider_account_id: str
+    # Legacy field. Identity decisions now come from the verified id_token;
+    # this value is only honored in the hardened legacy migration path.
+    provider_account_id: str | None = None
+    # Signed Google ID token from the NextAuth account object. Required by
+    # default (OAUTH_REQUIRE_ID_TOKEN=true) — see core/google_auth.py.
+    id_token: str | None = None
     email: str | None = None
     name: str | None = None
     picture: str | None = None
@@ -105,7 +113,13 @@ def serialize_user(
 
 
 def build_token_payload(user: User) -> dict[str, str]:
-    payload: dict[str, str] = {"sub": str(user.id), "role": user.role}
+    payload: dict[str, str] = {
+        "sub": str(user.id),
+        "role": user.role,
+        # Revocation epoch: dependencies.py rejects tokens whose tv lags the
+        # user's current token_version (bumped on password reset).
+        "tv": str(int(getattr(user, "token_version", 0) or 0)),
+    }
     if user.google_sub:
         payload["google_sub"] = user.google_sub
     return payload
@@ -143,40 +157,98 @@ def _cookie_flags() -> tuple[bool, str]:
 async def exchange_oauth_token(
     payload: OAuthTokenRequest,
     response: Response,
+    http_request: Request,
     db: AsyncSession = Depends(get_async_db),
 ) -> dict:
-    """Upsert a user coming from an OAuth provider and issue an internal token."""
+    """Upsert a user coming from Google sign-in and issue an internal token.
+
+    SECURITY: the identity (google_sub, email, name, picture) comes ONLY from
+    a cryptographically verified Google ID token — never from client-supplied
+    fields. Historical vulnerabilities closed here: (1) the endpoint trusted a
+    raw ``provider_account_id``, letting anyone with a victim's email claim
+    their session; (2) an email fallback matched accounts without proof of
+    email ownership and OVERWROTE the victim's google_sub. Verified-email
+    linking is still supported, but only when Google itself asserts
+    ``email_verified`` and the local account is not already linked to a
+    DIFFERENT Google identity.
+    """
+    await enforce_ip_rate_limit(http_request, bucket="oauth:m", limit=10, window_seconds=60)
     if payload.provider.lower() != "google":
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="Unsupported OAuth provider",
         )
 
-    provider_account_id = payload.provider_account_id
+    if payload.id_token:
+        from app.core.google_auth import verify_google_id_token
+
+        claims = await verify_google_id_token(payload.id_token)
+    elif settings.oauth_require_id_token:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="A verified Google id_token is required for sign-in.",
+        )
+    else:
+        # Hardened legacy migration path (OAUTH_REQUIRE_ID_TOKEN=false):
+        # identity comes from the client, so linking by email is disabled and
+        # existing google_sub values are never touched.
+        if not payload.provider_account_id:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Missing provider account id",
+            )
+        claims = {
+            "sub": payload.provider_account_id,
+            "email": payload.email,
+            "email_verified": True,
+            "name": payload.name,
+            "picture": payload.picture,
+        }
+
+    provider_account_id = str(claims.get("sub") or "").strip()
     if not provider_account_id:
         raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Missing provider account id",
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Google token is missing the subject claim.",
         )
-
-    encrypted_email = payload.email
+    encrypted_email = claims.get("email") or None
+    # Only a cryptographically verified token may LINK accounts by email —
+    # the legacy migration path asserts nothing about email ownership.
+    is_verified_flow = payload.id_token is not None
 
     stmt = select(User).where(User.google_sub == provider_account_id)
     result = await db.execute(stmt)
     user = result.scalar_one_or_none()
 
-    if not user and encrypted_email:
+    # Verified-email linking: only when Google asserts email_verified (the
+    # verifier enforces this) and the local account is not already linked to
+    # a DIFFERENT Google identity — that would be account hijacking.
+    if user is None and encrypted_email:
         stmt = select(User).where(User.email == encrypted_email)
         result = await db.execute(stmt)
-        user = result.scalar_one_or_none()
+        candidate = result.scalar_one_or_none()
+        if candidate is not None:
+            if candidate.google_sub and candidate.google_sub != provider_account_id:
+                logger.warning(
+                    "Rejected Google link for email-linked account %s: already bound to another google_sub.",
+                    candidate.id,
+                )
+                raise HTTPException(
+                    status_code=status.HTTP_403_FORBIDDEN,
+                    detail="This email is already linked to a different Google account.",
+                )
+            if is_verified_flow and claims.get("email_verified"):
+                candidate.google_sub = provider_account_id
+                db.add(candidate)
+                user = candidate
 
     try:
         if user is None:
-            role = normalize_oauth_role(payload.email, payload.role)
+            role = normalize_oauth_role(encrypted_email, payload.role)
             user = User(
                 google_sub=provider_account_id,
                 email=encrypted_email,
-                name=payload.name,
+                name=claims.get("name") or payload.name,
                 role=role,
                 is_active=True,
                 email_verified=True,
@@ -190,20 +262,20 @@ async def exchange_oauth_token(
             from app.models import UserProfile
             user_profile = UserProfile(
                 user_id=user.id,
-                profile_photo_url=payload.picture,
+                profile_photo_url=claims.get("picture") or payload.picture,
             )
             db.add(user_profile)
         else:
             updated = False
-            if user.google_sub != provider_account_id:
-                user.google_sub = provider_account_id
-                updated = True
-            if encrypted_email and user.email != encrypted_email:
+            # NOTE: google_sub is NEVER overwritten — a mismatch means the
+            # local row belongs to a different Google identity.
+            if is_verified_flow and encrypted_email and claims.get("email_verified") and user.email != encrypted_email:
                 user.email = encrypted_email
                 updated = True
-            if payload.name:
-                if user.name != payload.name:
-                    user.name = payload.name
+            verified_name = claims.get("name") or payload.name
+            if verified_name:
+                if user.name != verified_name:
+                    user.name = verified_name
                     updated = True
             if not user.is_active:
                 user.is_active = True
@@ -215,7 +287,8 @@ async def exchange_oauth_token(
                 db.add(user)
 
             # Store OAuth picture only if UserProfile has no photo yet
-            if payload.picture:
+            picture = claims.get("picture") or payload.picture
+            if picture:
                 from app.models import UserProfile
                 from sqlalchemy import select as _select
                 profile_result = await db.execute(
@@ -225,11 +298,11 @@ async def exchange_oauth_token(
                 if existing_profile is None:
                     new_profile = UserProfile(
                         user_id=user.id,
-                        profile_photo_url=payload.picture,
+                        profile_photo_url=picture,
                     )
                     db.add(new_profile)
                 elif not existing_profile.profile_photo_url:
-                    existing_profile.profile_photo_url = payload.picture
+                    existing_profile.profile_photo_url = picture
                     db.add(existing_profile)
 
         user.last_login = datetime.utcnow()
@@ -281,9 +354,15 @@ def get_password_hash(password: str) -> str:
 async def login_for_access_token(
     request: UserLoginRequest,
     response: Response,
+    http_request: Request,
     db: AsyncSession = Depends(get_async_db),
 ) -> dict:
-    logger.info("Login attempt for: %s", request.email)
+    # Brute-force protection: the role-aware limiter only covers logged-in users.
+    await enforce_ip_rate_limit(http_request, bucket="login:m", limit=10, window_seconds=60)
+    await enforce_ip_rate_limit(http_request, bucket="login:h", limit=50, window_seconds=3600)
+    # Never log emails: hashed domain only, for ops signal without PII.
+    _email_domain = request.email.split("@")[-1].lower() if request.email and "@" in request.email else "unknown"
+    logger.info("Login attempt (email domain: %s)", _email_domain)
 
     stmt = select(User).where(User.email == request.email)
     result = await db.execute(stmt)
@@ -375,8 +454,11 @@ async def login_for_access_token(
 @router.post("/register", response_model=RegisterResponse)
 async def register_user(
     request: RegisterRequest,
+    http_request: Request,
     db: AsyncSession = Depends(get_async_db),
 ) -> dict:
+    await enforce_ip_rate_limit(http_request, bucket="register:m", limit=5, window_seconds=60)
+    await enforce_ip_rate_limit(http_request, bucket="register:h", limit=20, window_seconds=3600)
     try:
         logger.info("User registration attempt for: %s", request.email)
 
@@ -506,11 +588,15 @@ async def register_user(
 @router.post("/forgot-password", response_model=ForgotPasswordResponse)
 async def forgot_password(
     request: ForgotPasswordRequest,
+    http_request: Request,
     db: AsyncSession = Depends(get_async_db)
 ) -> ForgotPasswordResponse:
     """Initiate password reset process."""
+    # Email-bombing protection.
+    await enforce_ip_rate_limit(http_request, bucket="forgot:m", limit=3, window_seconds=60)
+    await enforce_ip_rate_limit(http_request, bucket="forgot:h", limit=10, window_seconds=3600)
     try:
-        logger.info("Password reset request for: %s", request.email)
+        logger.info("Password reset requested.")
 
         from app.utils.password_reset import create_password_reset_token
         
@@ -689,8 +775,16 @@ async def get_current_user_info(request: Request, db: AsyncSession = Depends(get
     return serialize_user(user)
 
 
-@router.get("/debug-cookies")
-async def debug_cookies(request: Request):
+@router.get("/debug-cookies", include_in_schema=False)
+async def debug_cookies(request: Request, current_user: User = Depends(_get_current_user_core)):
+    from app.core.role_utils import normalize_role
+
+    # Serves cookie names + truncated values: admins only. (Module-level
+    # get_admin_user would create an import cycle via app.dependencies.)
+    if normalize_role(current_user.role) != "admin":
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN, detail="Admin access required."
+        )
     """Return auth-related cookies (names and first 8 chars of value) for debugging.
 
     Do NOT expose in production unless gated; kept lightweight here.

@@ -41,16 +41,16 @@ logger = logging.getLogger(__name__)
 
 
 class BaseWeb3Client:
-    """Base class for Web3 interactions with SOMNIA blockchain"""
-    
+    """Base class for Web3 interactions with EVM-compatible blockchains"""
+
     def __init__(self, rpc_url: Optional[str] = None):
         """
         Initialize Web3 connection
-        
+
         Args:
-            rpc_url: SOMNIA RPC URL (defaults to env var SOMNIA_RPC_URL)
+            rpc_url: RPC URL (defaults to env var BLOCKCHAIN_RPC_URL)
         """
-        self.rpc_url = rpc_url or os.getenv("SOMNIA_RPC_URL", "https://api.infra.mainnet.somnia.network/")
+        self.rpc_url = rpc_url or os.getenv("BLOCKCHAIN_RPC_URL", "")
         
         # Initialize Web3
         self.w3 = Web3(Web3.HTTPProvider(self.rpc_url))
@@ -58,7 +58,7 @@ class BaseWeb3Client:
         # Connection status (do not hard-fail by default in development)
         self.is_connected: bool = False
         
-        # Add POA middleware for EVM-compatible chains (SOMNIA uses POA consensus)
+        # Add POA middleware for EVM-compatible chains (many L2s use POA consensus)
         # Note: Web3.py v6+ renamed ExtraDataToPOAMiddleware to geth_poa_middleware
         if geth_poa_middleware is not None:
             self.w3.middleware_onion.inject(geth_poa_middleware, layer=0)
@@ -68,15 +68,15 @@ class BaseWeb3Client:
         if not self.is_connected:
             strict = (os.getenv("BLOCKCHAIN_STRICT", "").strip().lower() in {"1", "true", "yes", "on"})
             if strict:
-                raise ConnectionError(f"Failed to connect to SOMNIA blockchain at {self.rpc_url}")
+                raise ConnectionError(f"Failed to connect to blockchain at {self.rpc_url}")
 
             logger.warning(
-                "⚠️  Failed to connect to SOMNIA blockchain at %s (blockchain features disabled)",
+                "⚠️  Failed to connect to blockchain at %s (blockchain features disabled)",
                 self.rpc_url,
             )
             return
 
-        logger.info("✅ Connected to SOMNIA blockchain")
+        logger.info("✅ Connected to blockchain")
         logger.info("   RPC: %s", self.rpc_url)
         try:
             logger.info("   Chain ID: %s", self.w3.eth.chain_id)
@@ -216,7 +216,7 @@ class BaseWeb3Client:
     
     def get_balance(self, address: str) -> int:
         """
-        Get native token balance (STT) for an address
+        Get native token balance for an address
         
         Args:
             address: Ethereum address

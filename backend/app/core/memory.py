@@ -72,7 +72,23 @@ class MockRedis:
     def __init__(self):
         self.data = {}
         self.expiries = {}
-        logger.warning("Using MockRedis. Data will be lost on restart and is not shared across workers.")
+        # Observability: a silent MockRedis swap in production quietly makes
+        # rate limits, DP budgets, SSE fan-out, and scheduler locks
+        # per-process. Export a gauge (alertable) and escalate the log level.
+        try:
+            from app.core.metrics import redis_mock_fallback_active
+
+            redis_mock_fallback_active.set(1)
+        except Exception:
+            pass
+        if os.getenv("APP_ENV", "").lower() in {"production", "prod"}:
+            logger.error(
+                "Using MockRedis IN PRODUCTION. Rate limiting, DP budget "
+                "accounting, SSE fan-out, and scheduler job locks are now "
+                "per-process. Fix REDIS_HOST/REDIS_URL connectivity."
+            )
+        else:
+            logger.warning("Using MockRedis. Data will be lost on restart and is not shared across workers.")
 
     async def get(self, key):
         self._check_expiry(key)
@@ -110,9 +126,33 @@ class MockRedis:
             return 1
         return 0
 
+    async def keys(self, pattern: str = "*"):
+        """FNMATCH-style key lookup so cache invalidation (delete_pattern)
+        works without a real Redis server."""
+        import fnmatch
+
+        self._sweep_expired()
+        return [k for k in self.data if fnmatch.fnmatchcase(k, pattern)]
+
+    async def delete_pattern(self, pattern: str):
+        matched = await self.keys(pattern)
+        for k in matched:
+            self.data.pop(k, None)
+            self.expiries.pop(k, None)
+        return len(matched)
+
+    def _sweep_expired(self):
+        import time as _time
+
+        now = _time.time()
+        expired = [k for k, ts in self.expiries.items() if now > ts]
+        for k in expired:
+            self.data.pop(k, None)
+            self.expiries.pop(k, None)
+
     async def ping(self):
         return True
-    
+
     async def close(self):
         pass
 

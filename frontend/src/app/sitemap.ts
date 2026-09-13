@@ -22,7 +22,6 @@ const publicRoutes: Array<{
   { path: "/about/privacy", changeFrequency: "monthly", priority: 0.7 },
   { path: "/resources", changeFrequency: "weekly", priority: 0.85 },
   { path: "/activities", changeFrequency: "weekly", priority: 0.75 },
-  { path: "/caretoken", changeFrequency: "weekly", priority: 0.7 },
   { path: "/carequest", changeFrequency: "weekly", priority: 0.7 },
   { path: "/privacy", changeFrequency: "monthly", priority: 0.6 },
   { path: "/terms", changeFrequency: "yearly", priority: 0.5 },

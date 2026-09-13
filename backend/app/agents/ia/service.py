@@ -8,30 +8,50 @@ from fastapi import Depends
 from sqlalchemy import text, Row
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.agents.ia.dp import build_engine
+from app.agents.ia.dp_accountant import DPBudgetAccountant
 from app.agents.ia.queries import ALLOWED_QUERIES
-from app.agents.ia.schemas import IAQueryRequest, IAQueryResponse
+from app.agents.ia.schemas import DPMetadata, IAQueryRequest, IAQueryResponse
+from app.core.settings import settings
 from app.database import get_async_db
 
 
 class InsightsAgentService:
-    """Executes allow-listed analytics questions with k-anonymity enforcement."""
+    """Executes allow-listed analytics questions with k-anonymity and
+    differential privacy enforcement.
+
+    Privacy pipeline (per query execution):
+        1. Reserve epsilon from the rolling budget (fails closed when the
+           window budget is exhausted — see ``dp_accountant``).
+        2. Add calibrated Laplace noise to the raw per-group rows
+           (see ``dp`` for the sensitivity analysis and composition).
+        3. Format the noised rows with the unchanged per-question formatters.
+           Charts, notes, totals, LLM interpretation, and PDF exports are
+           therefore deterministic post-processing of DP outputs.
+    """
 
     def __init__(self, session: AsyncSession) -> None:
         self._session = session
 
-    async def query(self, payload: IAQueryRequest) -> IAQueryResponse:
+    async def query(
+        self,
+        payload: IAQueryRequest,
+        requested_by: str | None = None,
+        accountant: DPBudgetAccountant | None = None,
+    ) -> IAQueryResponse:
         """
         Execute allow-listed SQL query with date range parameters.
-        All queries enforce k-anonymity (minimum group size k=5).
+        All queries enforce k-anonymity (minimum group size k=5) and
+        event-level epsilon-differential privacy (Laplace mechanism).
         """
         question_id = payload.question_id
         if question_id not in ALLOWED_QUERIES:
             raise ValueError(f"Unsupported question_id: {question_id}")
-        
+
         start, end = payload.params.start, payload.params.end
         if start >= end:
             raise ValueError("Parameter 'from' must be before 'to'")
-        
+
         # Execute raw SQL query with parameters
         sql_query = ALLOWED_QUERIES[question_id]
         result = await self._session.execute(
@@ -39,10 +59,40 @@ class InsightsAgentService:
             {"start_date": start, "end_date": end}
         )
         rows = result.fetchall()
-        
+
+        # Differential privacy: reserve budget, then noise the raw rows so
+        # every downstream artifact (table, chart, notes, interpretation,
+        # PDF) is post-processing of DP outputs.
+        dp_metadata = DPMetadata(dp_enabled=False)
+        if settings.dp_enabled and rows:
+            accountant = accountant or DPBudgetAccountant()
+            budget_remaining = await accountant.check_and_reserve(
+                question_id,
+                settings.dp_epsilon_per_query,
+                requested_by=requested_by,
+            )
+            engine = build_engine(epsilon=settings.dp_epsilon_per_query)
+            dp_result = engine.privatize_rows(question_id, rows)
+            rows = dp_result.rows
+            dp_metadata = DPMetadata(
+                dp_enabled=True,
+                epsilon_spent=settings.dp_epsilon_per_query,
+                delta=settings.dp_delta,
+                statistics_noised=dp_result.statistics_noised,
+                budget_remaining=round(budget_remaining, 4),
+            )
+
         # Format results based on query type
         handler = self._resolve_formatter(question_id)
-        return handler(rows, start, end)
+        response = handler(rows, start, end)
+        if dp_metadata.dp_enabled:
+            response.notes.append(
+                "Differential privacy: Laplace noise applied "
+                f"(epsilon={settings.dp_epsilon_per_query} per query, "
+                f"delta={settings.dp_delta}); values may deviate from exact counts."
+            )
+        response.privacy_metadata = dp_metadata
+        return response
 
     def _resolve_formatter(
         self,

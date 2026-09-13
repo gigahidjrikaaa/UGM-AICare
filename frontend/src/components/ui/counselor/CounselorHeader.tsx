@@ -1,6 +1,7 @@
 "use client";
 
 import Link from 'next/link';
+import { useCounselorAlerts } from '@/contexts/CounselorAlertsContext';
 import { signOut, useSession } from 'next-auth/react';
 import { FiBell, FiMenu, FiSearch, FiChevronDown, FiUser, FiSettings, FiLogOut, FiAlertTriangle, FiClipboard } from 'react-icons/fi';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
@@ -104,6 +105,7 @@ export default function CounselorHeader({ onMenuToggle }: { onMenuToggle?: () =>
 
   const [searchQuery, setSearchQuery] = useState('');
   const [notificationCount, setNotificationCount] = useState(0);
+  const { refetchSignal, lastAlert } = useCounselorAlerts();
   const [isAlertsOpen, setIsAlertsOpen] = useState(false);
   const [isProfileOpen, setIsProfileOpen] = useState(false);
   const [counselorAlerts, setCounselorAlerts] = useState<CounselorAlertItem[]>([]);
@@ -197,7 +199,18 @@ export default function CounselorHeader({ onMenuToggle }: { onMenuToggle?: () =>
   }, [addSourceToCasesHref, closeMenus, markAlertSeen, router]);
 
   useEffect(() => {
-    void fetchUnreadStats();
+    void   // SSE push: refetch instantly when a counselor_alert event arrives
+  useEffect(() => {
+    if (refetchSignal > 0) {
+      fetchUnreadStats();
+      if (isAlertsOpen) {
+        fetchAlerts();
+      }
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [refetchSignal]);
+
+fetchUnreadStats();
 
     const interval = setInterval(() => {
       if (document.visibilityState !== 'visible') {

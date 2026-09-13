@@ -152,6 +152,8 @@ async def get_conversation_history(
 async def get_conversation_summary(
     db: AsyncSession,
     conversation_id: str,
+    requester_user_id: Optional[int] = None,
+    requester_role: Optional[str] = None,
     **kwargs
 ) -> Dict[str, Any]:
     """
@@ -162,6 +164,18 @@ async def get_conversation_summary(
     SENSITIVE DATA - conversation content.
     """
     try:
+        # Counselor scoping: target conversation must be in assigned scope.
+        from app.domains.mental_health.services.counselor_scope import (
+            check_counselor_tool_access,
+            tool_access_denied,
+        )
+
+        _access = await check_counselor_tool_access(
+            db, requester_user_id, requester_role, conversation_id=str(conversation_id)
+        )
+        if not _access.allowed:
+            logger.warning("Tool access denied: get_conversation_summary (%s)", _access.reason)
+            return tool_access_denied(_access.reason)
         # Get conversation turns
         query = (
             select(Conversation)
@@ -241,6 +255,8 @@ async def search_conversations(
     user_id: str,
     query: str,
     limit: int = MAX_SEARCH_RESULTS,
+    requester_user_id: Optional[int] = None,
+    requester_role: Optional[str] = None,
     **kwargs
 ) -> Dict[str, Any]:
     """
@@ -250,6 +266,23 @@ async def search_conversations(
     SENSITIVE DATA - searches user messages.
     """
     try:
+        # Counselor scoping: target patient must be in assigned scope.
+        from app.domains.mental_health.services.counselor_scope import (
+            check_counselor_tool_access,
+            tool_access_denied,
+        )
+
+        try:
+            _target_patient = int(user_id)
+        except (TypeError, ValueError):
+            _target_patient = None
+
+        _access = await check_counselor_tool_access(
+            db, requester_user_id, requester_role, patient_user_id=_target_patient
+        )
+        if not _access.allowed:
+            logger.warning("Tool access denied: search_conversations/get_conversation_stats (%s)", _access.reason)
+            return tool_access_denied(_access.reason)
         if limit > MAX_SEARCH_RESULTS:
             limit = MAX_SEARCH_RESULTS
             
@@ -356,6 +389,8 @@ async def get_conversation_stats(
     db: AsyncSession,
     user_id: str,
     days: int = 30,
+    requester_user_id: Optional[int] = None,
+    requester_role: Optional[str] = None,
     **kwargs
 ) -> Dict[str, Any]:
     """
@@ -365,6 +400,23 @@ async def get_conversation_stats(
     Used for engagement tracking.
     """
     try:
+        # Counselor scoping: target patient must be in assigned scope.
+        from app.domains.mental_health.services.counselor_scope import (
+            check_counselor_tool_access,
+            tool_access_denied,
+        )
+
+        try:
+            _target_patient = int(user_id)
+        except (TypeError, ValueError):
+            _target_patient = None
+
+        _access = await check_counselor_tool_access(
+            db, requester_user_id, requester_role, patient_user_id=_target_patient
+        )
+        if not _access.allowed:
+            logger.warning("Tool access denied: search_conversations/get_conversation_stats (%s)", _access.reason)
+            return tool_access_denied(_access.reason)
         normalized_user_id = _coerce_user_id(user_id)
         if normalized_user_id is None:
             return {
@@ -445,14 +497,14 @@ async def get_conversation_stats(
 
 \u2705 CALL WHEN (Counselor/Admin only):
 - Asked to analyse or assess a specific conversation: "analyze conversation #xyz", "run risk assessment on user X's last session"
-- Need deep clinical insights about a student's conversation: risk trend, symptoms, psychologist report
+- Need deep clinical insights about a student's conversation: risk trend, symptoms, counselor report
 - Want to check screening dimensions (PHQ-9/GAD-7/DASS-21 alignment) for a past session
 - Want to force-refresh an existing assessment with updated model
 
 Returns a structured clinical report including:
 - Overall risk level and trend (stable / escalating / de-escalating)
 - Detected mental health indicators (depression, anxiety, stress, sleep quality, social isolation, etc.)
-- Conversation summary and key themes for psychologist review
+- Conversation summary and key themes for counselor review
 - Recommendation on whether a Case Management (CMA) referral is warranted
 - Assessment record ID for dashboard reference
 """,
@@ -484,6 +536,8 @@ async def trigger_conversation_analysis(
     conversation_id: Optional[str] = None,
     user_id: Optional[int] = None,
     force_refresh: bool = False,
+    requester_user_id: Optional[int] = None,
+    requester_role: Optional[str] = None,
     **kwargs,
 ) -> Dict[str, Any]:
     """Manually trigger STA conversation analysis and return the clinical report.
@@ -492,6 +546,22 @@ async def trigger_conversation_analysis(
     persists the result, and returns a structured clinical summary.
     """
     try:
+        # Counselor scoping: target conversation/patient must be in assigned scope.
+        from app.domains.mental_health.services.counselor_scope import (
+            check_counselor_tool_access,
+            tool_access_denied,
+        )
+
+        _access = await check_counselor_tool_access(
+            db,
+            requester_user_id,
+            requester_role,
+            conversation_id=str(conversation_id) if conversation_id else None,
+            patient_user_id=int(user_id) if user_id is not None else None,
+        )
+        if not _access.allowed:
+            logger.warning("Tool access denied: trigger_conversation_analysis (%s)", _access.reason)
+            return tool_access_denied(_access.reason)
         from app.agents.sta.conversation_analyzer import analyze_conversation_risk
         from app.domains.mental_health.services.conversation_assessments import (
             upsert_conversation_assessment,

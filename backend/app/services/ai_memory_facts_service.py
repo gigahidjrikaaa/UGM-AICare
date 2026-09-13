@@ -24,7 +24,48 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models import User, UserAIMemoryFact
 
+from app.core.settings import settings
+
 logger = logging.getLogger(__name__)
+
+
+# ---------------------------------------------------------------------------
+# Fact-at-rest encryption (Fernet, keyed by EMAIL_ENCRYPTION_KEY)
+# ---------------------------------------------------------------------------
+# The fact_encrypted column historically stored plaintext ("encryption
+# removed for performance") while keeping its name — an honest-to-goodness
+# privacy regression for a mental-health platform. Facts are again encrypted
+# at rest and sanitized before storage. Reads tolerate legacy plaintext rows
+# (undecryptable values are returned as-is) so no data migration is needed.
+
+_fernet = None
+
+
+def _get_fernet():
+    global _fernet
+    if _fernet is None:
+        from cryptography.fernet import Fernet
+
+        _fernet = Fernet(settings.email_encryption_key.encode("utf-8"))
+    return _fernet
+
+
+def _encrypt_fact(text: str) -> str:
+    from app.core.redaction import sanitize_text
+
+    sanitized, _counts = sanitize_text(text or "")
+    return _get_fernet().encrypt(sanitized.encode("utf-8")).decode("utf-8")
+
+
+def _decrypt_fact(value: str | None) -> str:
+    """Decrypt a stored fact; legacy plaintext rows pass through unchanged."""
+    if not value:
+        return ""
+    try:
+        return _get_fernet().decrypt(value.encode("utf-8")).decode("utf-8")
+    except Exception:
+        # Not a valid Fernet token -> legacy plaintext row or key rotation.
+        return value
 
 
 async def _is_ai_memory_consented(db: AsyncSession, user_id: int) -> bool:
@@ -132,7 +173,7 @@ async def upsert_facts(
                 insert(UserAIMemoryFact)
                 .values(
                     user_id=user_id,
-                    fact_encrypted=fact.text,  # No longer encrypted, kept column name for compatibility
+                    fact_encrypted=_encrypt_fact(fact.text),
                     fact_hash=fact_hash,
                     category=fact.category,
                     source=source,
@@ -166,7 +207,7 @@ async def upsert_facts(
                 db.add(
                     UserAIMemoryFact(
                         user_id=user_id,
-                        fact_encrypted=fact.text,  # No longer encrypted
+                        fact_encrypted=_encrypt_fact(fact.text),
                         fact_hash=fact_hash,
                         category=fact.category,
                         source=source,
@@ -229,9 +270,8 @@ async def list_user_fact_texts_for_agent(db: AsyncSession, user: User, limit: in
     rows = await list_user_facts(db, user_id, limit=limit)
     texts: List[str] = []
     for row in rows:
-        # fact_encrypted column now stores plaintext (encryption removed for performance)
         if row.fact_encrypted:
-            texts.append(row.fact_encrypted)
+            texts.append(_decrypt_fact(row.fact_encrypted))
     return texts
 
 

@@ -6,7 +6,13 @@ from app.agents.tca.schemas import ResourceCard
 
 
 def get_default_resources(intent: str) -> Iterable[ResourceCard]:
-    """Return static resource cards until dynamic lookup is wired."""
+    """Return static fallback resource cards.
+
+    Cards are in-app (no external URL): the frontend resolves ``resource_id``
+    against its activity/resource registry. A fabricated
+    ``https://aicare.example/...`` URL would ship dead links to distressed
+    users, so ``url`` stays ``None`` here by design.
+    """
 
     intent_key = intent.strip().lower()
 
@@ -14,71 +20,71 @@ def get_default_resources(intent: str) -> Iterable[ResourceCard]:
         "academic_stress": [
             ResourceCard(
                 resource_id="academic_focus_journal",
-                title="Academic Focus Journal",
-                description="Guided prompts to break coursework into manageable chunks.",
-                url="https://aicare.example/academic/journal",
+                title="Jurnal Fokus Akademik",
+                description="Panduan terstruktur untuk memecah tugas kuliah menjadi bagian yang bisa dikelola.",
+                url=None,
             ),
             ResourceCard(
                 resource_id="study_break_micro",
-                title="Micro Study-Break Routine",
-                description="Three-minute reset combining stretching and grounding.",
-                url="https://aicare.example/academic/micro-break",
+                title="Rutinitas Istirahat Mikro",
+                description="Reset tiga menit: peregangan ringan dan grounding singkat.",
+                url=None,
             ),
         ],
         "acute_distress": [
             ResourceCard(
                 resource_id="grounding_audio",
-                title="5-4-3-2-1 Grounding Audio",
-                description="An audio walkthrough to reorient during panic or overwhelm.",
-                url="https://aicare.example/distress/grounding-audio",
+                title="Audio Grounding 5-4-3-2-1",
+                description="Panduan audio untuk kembali fokus saat panik atau kewalahan.",
+                url=None,
             ),
             ResourceCard(
                 resource_id="safety_plan_template",
-                title="Personal Safety Plan Template",
-                description="Document trusted contacts, coping steps, and emergency numbers.",
-                url="https://aicare.example/safety/plan-template",
+                title="Templat Rencana Keamanan Pribadi",
+                description="Catat kontak terpercaya, langkah menenangkan diri, dan nomor darurat (SEJIWA 119 tekan 8 / 112).",
+                url=None,
             ),
         ],
         "relationship_strain": [
             ResourceCard(
                 resource_id="communication_script",
-                title="Courageous Conversation Script",
-                description="Template to express needs without escalating conflict.",
-                url="https://aicare.example/relationships/script",
+                title="Kerangka Percakapan Berani",
+                description="Templat menyampaikan kebutuhan tanpa menaikkan konflik.",
+                url=None,
             ),
             ResourceCard(
                 resource_id="support_warmline",
-                title="Campus Support Warmline",
-                description="Talk with a peer counselor trained in conflict navigation.",
-                url="https://aicare.example/support/warmline",
+                title="Layanan Konseling Kampus",
+                description="Informasi jadwal dan cara menghubungi konselor universitas.",
+                url=None,
             ),
         ],
         "financial_pressure": [
             ResourceCard(
                 resource_id="budget_calc",
-                title="Student Budget Worksheet",
-                description="Adaptive budgeting sheet with essentials vs. optional costs.",
-                url="https://aicare.example/finance/budget",
+                title="Lembar Anggaran Mahasiswa",
+                description="Sheet pengeluaran: kebutuhan pokok vs. opsional.",
+                url=None,
             ),
             ResourceCard(
                 resource_id="aid_office",
-                title="Financial Aid Office Checklist",
-                description="Prepare documents for bursar or scholarship conversations.",
-                url="https://aicare.example/finance/checklist",
+                title="Persiapan Konsultasi Bantuan Finansial",
+                description="Checklist dokumen untuk mengurus beasiswa atau bantuan biaya.",
+                url=None,
             ),
         ],
         "general_support": [
             ResourceCard(
                 resource_id="self_compassion",
-                title="Self-Compassion Break",
-                description="Three-step practice to soften harsh self-talk.",
-                url="https://aicare.example/general/self-compassion",
+                title="Latihan Self-Compassion",
+                description="Latihan tiga langkah untuk meredakan bicara pada diri yang terlalu keras.",
+                url=None,
             ),
             ResourceCard(
                 resource_id="contact_counseling",
-                title="Contact Counseling Centre",
-                description="Direct line and scheduling instructions for university counselors.",
-                url="https://aicare.example/general/counseling",
+                title="Hubungi Layanan Konseling",
+                description="Cara menjadwalkan konseling di kampus; untuk kondisi darurat hubungi 119 tekan 8 atau 112.",
+                url=None,
             ),
         ],
     }

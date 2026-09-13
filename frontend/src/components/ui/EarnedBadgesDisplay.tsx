@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import Image from "next/image";
 import toast from "react-hot-toast";
+import { motion, useReducedMotion, type Variants } from "framer-motion";
 import { FiAward, FiExternalLink, FiHelpCircle, FiLoader, FiLock, FiRefreshCw } from "react-icons/fi";
 
 import apiClient from "@/services/api";
@@ -20,6 +21,24 @@ import {
 // HACKATHON: Fallback chain changed to BSC Testnet for BNB Chain hackathon.
 // TODO: Consider making this configurable or derive from API response.
 const FALLBACK_CHAIN_ID = 97; // BSC Testnet (changed from EDU Chain 656476)
+
+/** Signature easing — heavy mass, fluid settle (matches the console system). */
+const EASE = [0.32, 0.72, 0, 1] as const;
+
+const gridVariants: Variants = {
+  hidden: {},
+  show: { transition: { staggerChildren: 0.07, delayChildren: 0.05 } },
+};
+
+const cardVariants: Variants = {
+  hidden: { opacity: 0, y: 28, filter: "blur(8px)" },
+  show: {
+    opacity: 1,
+    y: 0,
+    filter: "blur(0px)",
+    transition: { duration: 0.75, ease: EASE },
+  },
+};
 
 interface EarnedBadge {
   badge_id: number;
@@ -92,6 +111,10 @@ export default function EarnedBadgesDisplay() {
   const [syncError, setSyncError] = useState<string | null>(null);
 
   const [lastSyncedAt, setLastSyncedAt] = useState<Date | null>(null);
+  /** Badge ids unlocked by the most recent sync — drives the celebration pop. */
+  const [recentlyEarned, setRecentlyEarned] = useState<Set<number>>(new Set());
+
+  const prefersReducedMotion = useReducedMotion();
 
   const badgeCatalog = useMemo(() => {
     return Object.keys(badgeMetadataMap)
@@ -150,6 +173,9 @@ export default function EarnedBadgesDisplay() {
           }, index * 350);
         });
 
+        // Mark the fresh unlocks so their cards play the celebration pop.
+        setRecentlyEarned(new Set(newlyAwarded.map((item) => item.badge_id)));
+
         await fetchBadges();
       } else {
         toast.success("Achievements are already up to date!");
@@ -193,11 +219,17 @@ export default function EarnedBadgesDisplay() {
     }
 
     return (
-      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+      <motion.div
+        variants={prefersReducedMotion ? undefined : gridVariants}
+        initial={prefersReducedMotion ? undefined : "hidden"}
+        animate={prefersReducedMotion ? undefined : "show"}
+        className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3"
+      >
         {badgeCatalog.map((badgeId) => {
           const meta = getBadgeMeta(badgeId);
           const earnedBadge = earnedBadges[badgeId];
           const isEarned = Boolean(earnedBadge);
+          const isNew = isEarned && recentlyEarned.has(badgeId);
           const awardedDate = formatAwardDate(earnedBadge?.awarded_at);
           const chainId = earnedBadge?.chain_id ?? FALLBACK_CHAIN_ID;
           const explorerUrl = earnedBadge?.transaction_hash
@@ -218,20 +250,49 @@ export default function EarnedBadgesDisplay() {
 
               <div className="mt-5 flex flex-1 items-center justify-center">
                 {isEarned ? (
-                  <Image
-                    src={getIpfsUrl(meta.image)}
-                    alt={meta.name}
-                    width={88}
-                    height={88}
-                    className="h-20 w-20 rounded-full border border-[#FFCA40]/40 bg-black/30 object-cover shadow-[0_0_24px_rgba(255,202,64,0.35)]"
-                    onError={(event) => {
-                      event.currentTarget.src = DEFAULT_BADGE_PLACEHOLDER_IMAGE;
-                    }}
-                  />
+                  <motion.div
+                    className="relative"
+                    whileHover={prefersReducedMotion ? undefined : { scale: 1.08, rotate: -3 }}
+                    transition={{ duration: 0.5, ease: EASE }}
+                  >
+                    {/* Pulsing halo — opacity-only loop, GPU-safe */}
+                    {!prefersReducedMotion && (
+                      <motion.div
+                        aria-hidden
+                        className="absolute inset-0 rounded-full bg-[#FFCA40]/30 blur-xl"
+                        animate={{ opacity: [0.25, 0.55, 0.25], scale: [1, 1.12, 1.12, 1] }}
+                        transition={{ duration: 3.2, ease: EASE, repeat: Infinity }}
+                      />
+                    )}
+                    {/* One-time celebration ring for freshly synced badges */}
+                    {isNew && !prefersReducedMotion && (
+                      <motion.span
+                        aria-hidden
+                        className="absolute inset-0 rounded-full ring-2 ring-[#FFCA40]"
+                        initial={{ scale: 0.7, opacity: 0.9 }}
+                        animate={{ scale: 1.7, opacity: 0 }}
+                        transition={{ duration: 1.1, ease: EASE, repeat: 2, repeatDelay: 0.35 }}
+                      />
+                    )}
+                    <Image
+                      src={getIpfsUrl(meta.image)}
+                      alt={meta.name}
+                      width={88}
+                      height={88}
+                      className="relative h-20 w-20 rounded-full border border-[#FFCA40]/40 bg-black/30 object-cover shadow-[0_0_24px_rgba(255,202,64,0.35)]"
+                      onError={(event) => {
+                        event.currentTarget.src = DEFAULT_BADGE_PLACEHOLDER_IMAGE;
+                      }}
+                    />
+                  </motion.div>
                 ) : (
-                  <span className="flex h-20 w-20 items-center justify-center rounded-full border border-white/10 bg-white/5 text-white/40">
+                  <motion.span
+                    className="flex h-20 w-20 items-center justify-center rounded-full border border-white/10 bg-white/5 text-white/40"
+                    whileHover={prefersReducedMotion ? undefined : { scale: 1.05 }}
+                    transition={{ duration: 0.5, ease: EASE }}
+                  >
                     <FiHelpCircle className="h-8 w-8" />
-                  </span>
+                  </motion.span>
                 )}
               </div>
 
@@ -257,40 +318,36 @@ export default function EarnedBadgesDisplay() {
             </div>
           );
 
+          const cardClassName = `relative flex h-full flex-col rounded-2xl border p-6 transition duration-200 ${
+            isEarned
+              ? "border-[#FFCA40]/50 bg-linear-to-br from-[#FFCA40]/15 via-white/10 to-white/5 hover:border-[#FFCA40]/80 hover:shadow-[0_0_25px_rgba(255,202,64,0.35)]"
+              : "border-white/10 bg-white/5 opacity-80"
+          }`;
+
+          const cardProps = {
+            className: cardClassName,
+            href: isEarned ? explorerUrl : undefined,
+            isEarned,
+            ariaLabel: isEarned ? `View blockchain details for ${meta.name}` : `${meta.name} is locked`,
+          };
+
           return tooltipTitle ? (
-            <Tooltip key={badgeId} title={tooltipTitle} placement="top">
-              <InteractiveBadgeCard
-                className={`relative flex h-full flex-col rounded-2xl border p-6 transition duration-200 ${
-                  isEarned
-                    ? "border-[#FFCA40]/50 bg-linear-to-br from-[#FFCA40]/15 via-white/10 to-white/5 hover:border-[#FFCA40]/80 hover:shadow-[0_0_25px_rgba(255,202,64,0.35)]"
-                    : "border-white/10 bg-white/5 opacity-80"
-                }`}
-                href={isEarned ? explorerUrl : undefined}
-                isEarned={isEarned}
-                ariaLabel={isEarned ? `View blockchain details for ${meta.name}` : `${meta.name} is locked`}
-              >
-                {badgeBody}
-              </InteractiveBadgeCard>
-            </Tooltip>
+            <motion.div key={badgeId} variants={prefersReducedMotion ? undefined : cardVariants}>
+              <Tooltip title={tooltipTitle} placement="top">
+                <InteractiveBadgeCard {...cardProps}>
+                  {badgeBody}
+                </InteractiveBadgeCard>
+              </Tooltip>
+            </motion.div>
           ) : (
-            <InteractiveBadgeCard
-              key={badgeId}
-              className={`relative flex h-full flex-col rounded-2xl border p-6 transition duration-200 ${
-                isEarned
-                  ? "border-[#FFCA40]/50 bg-linear-to-br from-[#FFCA40]/15 via-white/10 to-white/5 hover:border-[#FFCA40]/80 hover:shadow-[0_0_25px_rgba(255,202,64,0.35)]"
-                  : "border-white/10 bg-white/5 opacity-80"
-              }`}
-              href={isEarned ? explorerUrl : undefined}
-              isEarned={isEarned}
-              ariaLabel={isEarned ? `View blockchain details for ${meta.name}` : `${meta.name} is locked`}
-            >
-              {badgeBody}
-            </InteractiveBadgeCard>
+            <motion.div key={badgeId} variants={prefersReducedMotion ? undefined : cardVariants}>
+              <InteractiveBadgeCard {...cardProps}>{badgeBody}</InteractiveBadgeCard>
+            </motion.div>
           );
         })}
-      </div>
+      </motion.div>
     );
-  }, [badgeCatalog, earnedBadges, isLoading]);
+  }, [badgeCatalog, earnedBadges, isLoading, recentlyEarned, prefersReducedMotion]);
 
   return (
     <div className="w-full space-y-6 text-white">
@@ -310,10 +367,14 @@ export default function EarnedBadgesDisplay() {
               <span>Progress</span>
               <span>{progressPercent}%</span>
             </div>
-            <div className="mt-2 h-2 w-full rounded-full bg-white/10">
-              <div
-                className="h-full rounded-full bg-[#FFCA40]"
-                style={{ width: `${progressPercent}%` }}
+            {/* scaleX — transform-only, no layout thrash */}
+            <div className="mt-2 h-2 w-full overflow-hidden rounded-full bg-white/10">
+              <motion.div
+                className="h-full origin-left rounded-full bg-[#FFCA40]"
+                initial={prefersReducedMotion ? false : { scaleX: 0 }}
+                animate={{ scaleX: progressPercent / 100 }}
+                transition={{ duration: 1.0, ease: EASE }}
+                style={{ width: "100%" }}
               />
             </div>
           </div>

@@ -88,6 +88,12 @@ try:
 except ImportError as e:
     logger.error(f"❌ Could not load safety_tools: {e}")
 
+try:
+    from . import knowledge_tools  # noqa: F401
+    logger.info("✅ Loaded knowledge_tools (get_mental_health_resources — RAG)")
+except ImportError as e:
+    logger.error(f"❌ Could not load knowledge_tools: {e}")
+
 # Log registry stats after all imports
 try:
     all_tools = get_all_tools()  # Returns Dict[str, Dict]

@@ -346,6 +346,7 @@ async def get_profile_overview(
         consent_emergency_contact=user.consent_emergency_contact,
         consent_marketing=user.consent_marketing,
         consent_ai_memory=getattr(user, "consent_ai_memory", False),
+        consent_proactive_chat=getattr(user, "consent_proactive_chat", False),
     )
 
     preferred_language = (user.preferences.preferred_language if user.preferences else None) or "id"
@@ -432,7 +433,7 @@ async def update_profile_overview(
     consent_fields = {
         "consent_data_sharing", "consent_research",
         "consent_emergency_contact", "consent_marketing",
-        "consent_ai_memory",
+        "consent_ai_memory", "consent_proactive_chat",
     }
     clinical_fields = {
         "risk_level",
@@ -654,13 +655,16 @@ async def list_ai_memory_facts(
     Facts are always visible to the user to enable explicit deletion control,
     regardless of whether consent is currently enabled.
     """
-    from app.services.ai_memory_facts_service import list_user_facts
+    from app.services.ai_memory_facts_service import (
+        _decrypt_fact,
+        list_user_facts,
+    )
 
     facts = await list_user_facts(db, current_user.id, limit=100)
     return [
         AIMemoryFactResponse(
             id=fact.id,
-            fact=fact.fact_encrypted or "",  # Column stores plaintext now (encryption removed)
+            fact=_decrypt_fact(fact.fact_encrypted),  # tolerate legacy plaintext rows
             category=fact.category,
             source=fact.source,
             created_at=fact.created_at,
@@ -843,4 +847,128 @@ async def import_simaster_data(
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="Failed to import SIMASTER data"
+        ) from exc
+
+@router.delete("/account", status_code=status.HTTP_200_OK)
+async def erase_account(
+    db: AsyncSession = Depends(get_async_db),
+    current_user: User = Depends(get_current_active_user),
+) -> dict:
+    """Erase the authenticated account (GDPR-style right to erasure).
+
+    Strategy: DELETE all sensitive content owned by the user (journals,
+    conversations + messages, summaries, AI memory facts, risk assessments,
+    triage assessments, intervention plans, proactive messages), then
+    PSEUDONYMIZE the account row (identity fields scrubbed, deactivated,
+    password randomized) and append ``account_erasure`` to the consent
+    ledger. Append-only compliance tables (consent ledger, audit log) are
+    retained with the scrubbed user id, per their append-only contracts.
+
+    The account cannot be recovered and every issued token is revoked
+    (token_version bump).
+    """
+    import logging as _logging
+
+    from sqlalchemy import delete as _delete
+
+    from app.models import ProactiveMessage, UserConsentLedger
+    from app.models.user_ai_memory_fact import UserAIMemoryFact
+    from passlib.context import CryptContext
+
+    from app.domains.mental_health.models import (
+        ConversationRiskAssessment,
+        InterventionPlanRecord,
+        JournalTag,
+        Message,
+        TriageAssessment,
+        UserSummary,
+    )
+    _pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
+
+    _log = _logging.getLogger(__name__)
+    user_id = current_user.id
+
+    try:
+        # ---- 1. Journals + tags ----
+        await db.execute(
+            _delete(JournalTag).where(
+                JournalTag.journal_entry_id.in_(
+                    select(JournalEntry.id).where(JournalEntry.user_id == user_id)
+                )
+            )
+        )
+        await db.execute(_delete(JournalEntry).where(JournalEntry.user_id == user_id))
+
+        # ---- 2. Conversations + messages (messages key on session_id) ----
+        session_ids = (
+            await db.execute(
+                select(Conversation.session_id).where(Conversation.user_id == user_id)
+            )
+        ).scalars().all()
+        if session_ids:
+            await db.execute(_delete(Message).where(Message.session_id.in_(session_ids)))
+        await db.execute(_delete(Conversation).where(Conversation.user_id == user_id))
+
+        # ---- 3. Other owned content ----
+        for model in (
+            UserAIMemoryFact,
+            UserSummary,
+            ProactiveMessage,
+            InterventionPlanRecord,
+            ConversationRiskAssessment,
+            TriageAssessment,
+        ):
+            try:
+                await db.execute(_delete(model).where(model.user_id == user_id))
+            except Exception as model_exc:
+                _log.warning(
+                    "Account erasure: skipping %s (%s)", model.__name__, model_exc
+                )
+
+        # ---- 4. Pseudonymize the account row ----
+        import secrets as _secrets
+        import uuid as _uuid
+
+        erasure_id = _uuid.uuid4().hex[:12]
+        user = await db.get(User, user_id)
+        user.email = f"erased_{erasure_id}@invalid"
+        user.google_sub = None
+        user.name = "Deleted User"
+        user.preferred_name = None
+        user.first_name = None
+        user.profile_photo_url = None
+        user.is_active = False
+        user.password_hash = _pwd_context.hash(_secrets.token_urlsafe(32))
+        user.token_version = int(user.token_version or 0) + 1  # revoke all tokens
+
+        # ---- 5. Compliance trail ----
+        db.add(
+            UserConsentLedger(
+                user_id=user_id,
+                consent_type="account_erasure",
+                granted=True,
+                consent_version="v1.0",
+                consent_language="id",
+                consent_method="account_self_service",
+                timestamp=datetime.utcnow(),
+            )
+        )
+
+        await db.commit()
+        _log.info("Account erased: user_id=%s, erasure_id=%s", user_id, erasure_id)
+        return {
+            "success": True,
+            "message": "Akun dan seluruh data pribadi telah dihapus.",
+            "erasure_id": erasure_id,
+        }
+
+    except HTTPException:
+        await db.rollback()
+        raise
+    except Exception as exc:
+        await db.rollback()
+        _log.error("Account erasure failed for user %s: %s", user_id, exc, exc_info=True)
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Account erasure failed; please contact support.",
         ) from exc

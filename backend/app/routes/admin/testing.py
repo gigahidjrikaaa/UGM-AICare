@@ -28,7 +28,7 @@ from app.dependencies import get_admin_user
 from app.models import User  # Core model
 from app.domains.mental_health.models import Conversation, Message
 from app.domains.mental_health.models.messages import MessageRoleEnum
-from app.domains.mental_health.models.appointments import Psychologist, AppointmentType
+from app.domains.mental_health.models.appointments import Counselor, AppointmentType
 from app.domains.mental_health.models.assessments import UserScreeningProfile
 from app.agents.sta.service import SafetyTriageService
 from app.domains.mental_health.schemas.chat import ChatRequest, ChatResponse
@@ -194,7 +194,7 @@ class FullUserFlowSimulationResponse(BaseModel):
     case_id: Optional[str] = None
     case_status: Optional[str] = None
     case_severity: Optional[str] = None
-    assigned_psychologist_id: Optional[int] = None
+    assigned_counselor_id: Optional[int] = None
     assigned_counselor_user_id: Optional[int] = None
     assigned_counselor_name: Optional[str] = None
     counselor_can_see_case: bool = False
@@ -634,7 +634,7 @@ async def seed_database(
         db.add(user)
         created_details.append(f"Student: {name} ({email})")
     
-    # --- Create Counselors with Full Psychologist Profiles ---
+    # --- Create Counselors with Full Counselor Profiles ---
     for i in range(min(request.counselors_count, len(counselor_data))):
         data = counselor_data[i]
         name = data["name"]
@@ -669,8 +669,8 @@ async def seed_database(
         db.add(user)
         await db.flush()  # Get user.id
         
-        # Create Psychologist profile (linked to user)
-        psychologist = Psychologist(
+        # Create Counselor profile (linked to user)
+        counselor = Counselor(
             user_id=user.id,
             name=name,
             specialization=data["specialization"],
@@ -686,7 +686,7 @@ async def seed_database(
             rating=data["rating"],
             total_reviews=data["total_reviews"],
         )
-        db.add(psychologist)
+        db.add(counselor)
         created_details.append(f"Counselor: {name} ({email}) - Schedule: {list(data['availability_schedule'].keys())}")
     
     # --- Create Admins ---
@@ -1108,20 +1108,20 @@ async def simulate_full_user_flow(
 
     escalation_triggered = latest_case is not None
 
-    assigned_psychologist_id: Optional[int] = None
+    assigned_counselor_id: Optional[int] = None
     assigned_counselor_user_id: Optional[int] = None
     assigned_counselor_name: Optional[str] = None
     counselor_can_see_case = False
 
     if latest_case is not None and latest_case.assigned_to:
         try:
-            assigned_psychologist_id = int(str(latest_case.assigned_to))
+            assigned_counselor_id = int(str(latest_case.assigned_to))
         except ValueError:
-            assigned_psychologist_id = None
+            assigned_counselor_id = None
 
-        if assigned_psychologist_id is not None:
+        if assigned_counselor_id is not None:
             psych = (
-                await db.execute(select(Psychologist).where(Psychologist.id == assigned_psychologist_id))
+                await db.execute(select(Counselor).where(Counselor.id == assigned_counselor_id))
             ).scalar_one_or_none()
             if psych is not None and psych.user_id is not None:
                 assigned_counselor_user_id = int(psych.user_id)
@@ -1169,7 +1169,7 @@ async def simulate_full_user_flow(
         case_id=(str(latest_case.id) if latest_case is not None else None),
         case_status=(latest_case.status.value if latest_case is not None and hasattr(latest_case.status, "value") else None),
         case_severity=(latest_case.severity.value if latest_case is not None and hasattr(latest_case.severity, "value") else None),
-        assigned_psychologist_id=assigned_psychologist_id,
+        assigned_counselor_id=assigned_counselor_id,
         assigned_counselor_user_id=assigned_counselor_user_id,
         assigned_counselor_name=assigned_counselor_name,
         counselor_can_see_case=counselor_can_see_case,

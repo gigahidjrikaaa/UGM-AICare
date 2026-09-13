@@ -47,6 +47,14 @@ async def test_generate_plan_node_calls_service(monkeypatch: pytest.MonkeyPatch)
 
     monkeypatch.setattr(module, "TherapeuticCoachService", lambda: FakeService())
 
+    # RAG retrieval must be stubbed offline: no embedding API calls in tests.
+    async def fake_retrieve(_db, _query, **_kwargs):
+        return []
+
+    monkeypatch.setattr(
+        "app.services.knowledge_retrieval_service.retrieve", fake_retrieve
+    )
+
     state = {
         "errors": [],
         "execution_path": [],
@@ -56,7 +64,8 @@ async def test_generate_plan_node_calls_service(monkeypatch: pytest.MonkeyPatch)
         "message": "m",
     }
 
-    out = await module.generate_plan_node(state)
+    config = {"configurable": {"db": AsyncMock()}}
+    out = await module.generate_plan_node(state, config=config)
     assert out["tca_context"]["intervention_plan"]["plan_steps"][0]["title"] == "A"
     assert out["tca_context"]["intervention_plan"]["resource_cards"][0]["resource_id"] == "r1"
 

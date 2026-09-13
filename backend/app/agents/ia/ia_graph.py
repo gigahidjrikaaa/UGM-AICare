@@ -15,7 +15,9 @@ Privacy Safeguards:
 - Allow-listed queries only (no arbitrary SQL)
 - Date range validation (prevent excessive historical data access)
 - LLM only receives k-anonymized aggregated data (never individual records)
-- Differential privacy budget tracking (future enhancement)
+- Differential privacy: Laplace mechanism (pure ε-DP) on all released
+  aggregates, with a rolling epsilon budget enforced by
+  ``app.agents.ia.dp_accountant.DPBudgetAccountant``
 """
 from __future__ import annotations
 
@@ -249,21 +251,31 @@ async def execute_analytics_node(state: IAState, config: RunnableConfig) -> IASt
             params=query_params
         )
         
-        # Execute query (service handles k-anonymity and privacy)
-        response: IAQueryResponse = await ia_service.query(request)
-        
+        # Execute query (service handles k-anonymity and differential privacy)
+        requested_by = state.get("ia_context", {}).get("user_hash")
+        response: IAQueryResponse = await ia_service.query(request, requested_by=requested_by)
+
         # Check k-anonymity satisfaction
         # Queries from Phase 1 have k-anonymity built-in via HAVING COUNT(*) >= 5
         k_satisfied = len(response.table) > 0  # If table has data, k-anonymity was satisfied
         total_records = len(response.table) if response.table else 0
-        
+
+        # Differential privacy metadata from the service (Laplace mechanism;
+        # epsilon is spent against a rolling budget — see agents/ia/dp*.py)
+        privacy = getattr(response, "privacy_metadata", None)
+
         # Store results in state with privacy metadata
         state.setdefault("ia_context", {})["analytics_result"] = {
             "data": response.table,  # Frontend expects 'data' instead of 'table'
             "chart": response.chart,
             "notes": response.notes,
             "k_anonymity_satisfied": k_satisfied,
-            "differential_privacy_budget_used": 0.0,  # TODO: Implement in Phase 3
+            "differential_privacy_budget_used": (
+                privacy.epsilon_spent if privacy is not None else 0.0
+            ),
+            "dp_enabled": bool(privacy.dp_enabled) if privacy is not None else False,
+            "dp_delta": privacy.delta if privacy is not None else 0.0,
+            "dp_budget_remaining": privacy.budget_remaining if privacy is not None else None,
             "total_records_anonymized": total_records
         }
         state.setdefault("execution_path", []).append("ia:execute_analytics")

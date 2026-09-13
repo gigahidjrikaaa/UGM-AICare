@@ -45,7 +45,21 @@ class InterventionPlanService:
         db.add(db_plan)
         await db.commit()
         await db.refresh(db_plan)
-        
+
+        # Closed-loop plans: schedule the promised next_check_in follow-up
+        # (tool-created plans follow up too; guardrails live in the service).
+        try:
+            from app.services.plan_followup_service import schedule_plan_followup
+
+            await schedule_plan_followup(db, db_plan, commit=True)
+        except Exception as followup_exc:
+            # Scheduling failure must never break plan creation.
+            import logging
+
+            logging.getLogger(__name__).warning(
+                "Plan follow-up scheduling skipped: %s", followup_exc
+            )
+
         return db_plan
 
     @staticmethod

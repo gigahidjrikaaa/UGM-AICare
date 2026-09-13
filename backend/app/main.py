@@ -41,22 +41,20 @@ from app.domains.mental_health.routes import (
     agents_command,
     agents_graph,
     surveys,
-    # cbt_modules - DEPRECATED: Use TCA intervention plans instead
     safety_triage,
     clinical_analytics_routes,
     intervention_plans,
+    proactive_messages,
+    user_sse,
     langgraph_analytics,
     aika_stream,
 )
 
-# Finance domain routes (commented out - domain incomplete)
-# from app.domains.finance import finance_router
-from app.domains.blockchain import blockchain_router  # Blockchain domain routes
+# Mental health domain routes
 from app.agents.sta.router import router as sta_router
 from app.agents.tca.router import router as tca_router
 from app.agents.cma.router import router as cma_router
 from app.agents.ia.router import router as ia_router
-# app.include_router(aika_router)  # Aika Meta-Agent orchestrator - REMOVED (Legacy)
 from contextlib import asynccontextmanager
 from app.core.scheduler import start_scheduler, shutdown_scheduler
 from fastapi.middleware.cors import CORSMiddleware # type: ignore
@@ -223,10 +221,6 @@ async def lifespan(app: FastAPI):
                 )
         except Exception:
             logger.warning("Failed to start autopilot worker (non-blocking)", exc_info=True)
-    # Start the finance revenue scheduler
-    from app.domains.finance import start_scheduler as start_finance_scheduler
-    start_finance_scheduler()
-    startup_log("Finance revenue scheduler started")
     # Initialize event bus subscriptions for SSE broadcasting
     from app.services.event_sse_bridge import initialize_event_subscriptions
     sub_result = initialize_event_subscriptions()
@@ -245,10 +239,6 @@ async def lifespan(app: FastAPI):
             autopilot_worker_task.cancel()
         except Exception:
             logger.warning("Autopilot worker shutdown failed (non-blocking)", exc_info=True)
-    # Stop the finance revenue scheduler
-    from app.domains.finance import stop_scheduler as stop_finance_scheduler
-    stop_finance_scheduler()
-    startup_log("Finance revenue scheduler stopped")
     # Close database connections
     try:
         from app.core.langgraph_checkpointer import close_langgraph_checkpointer
@@ -404,17 +394,14 @@ app.include_router(sta_router)
 app.include_router(tca_router)
 app.include_router(cma_router)
 app.include_router(ia_router)
-# app.include_router(aika_router)  # Aika Meta-Agent orchestrator
 app.include_router(aika_stream.router, prefix="/api/v1")  # Aika Streaming Endpoint
 app.include_router(intervention_plans.router)  # Intervention plan records
-# app.include_router(sca_admin.router)  # REMOVED (Legacy)
+app.include_router(proactive_messages.router, prefix="/api/v1")  # Aika-initiated proactive messages
+app.include_router(user_sse.router, prefix="/api/v1")  # User-scoped SSE (proactive channel)
 app.include_router(appointments.router)
 app.include_router(surveys.router)
 app.include_router(surveys.user_router)
-# app.include_router(cbt_modules.router) - DEPRECATED: Use /api/v1/agents/sca for CBT-based intervention plans
 app.include_router(clinical_analytics_routes.router)  # New clinical analytics endpoints
-# app.include_router(finance_router, prefix="/api/v1/finance", tags=["Finance"])  # Finance domain routes (commented out - domain incomplete)
-app.include_router(blockchain_router, prefix="/api/v1/blockchain", tags=["Blockchain"])  # Blockchain domain routes
 # logger.info(f"List of routers (/api/v1): {app.routes}")
 startup_log(f"Allowed origins: {origins}")
 

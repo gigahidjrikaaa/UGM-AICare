@@ -143,7 +143,7 @@ flowchart LR
  B --> C[Gemini semantic\nrisk analysis]
  C --> D[Clinical instrument\nindicator extraction]
  D --> E[Longitudinal trend\nanalysis across history]
- E --> F[Psychologist report\ngeneration]
+ E --> F[Counselor report\ngeneration]
  F --> G[CMA referral\nrecommendation]
  G --> H[Persist to DB\nConversationRiskAssessment\nScreeningProfile]
 ```
@@ -242,7 +242,7 @@ The STA produces a structured `ConversationRiskAssessment` record:
  "phq9_indicators": ["anhedonia", "low_energy", "concentration_difficulty"],
  "gad7_indicators": ["excessive_worry", "restlessness"],
  "trend": "worsening",
- "counsellor_recommendation": "Priority referral to clinical psychologist within 48h",
+ "counsellor_recommendation": "Priority counselor referral within 48h",
  "summary": "Student expressed persistent hopelessness about academic performance...",
  "analysed_at": "2026-02-27T14:23:11Z"
 }

@@ -11,13 +11,13 @@ const faqs = [
     qKey: 'landing.faq.q1',
     qDefault: 'Does Aika replace professional counselors?',
     aKey: 'landing.faq.a1',
-    aDefault: "No. Aika is trained to provide immediate coping support and risk assessment. For clinical issues, it explicitly guides you to connect with UGM's psychologists via our integrated booking system."
+    aDefault: "No. Aika is trained to provide immediate coping support and risk assessment. For clinical issues, it explicitly guides you to connect with UGM's counselors via our integrated booking system."
   },
   {
     qKey: 'landing.faq.q2',
     qDefault: "Is my conversation private?",
     aKey: 'landing.faq.a2',
-    aDefault: 'Yes. Your chats are end-to-end encrypted. Psychologists only receive a structured clinical summary if you explicitly agree to escalate the case or book a session.'
+    aDefault: 'Yes. Your chats are end-to-end encrypted. Counselors only receive a structured clinical summary if you explicitly agree to escalate the case or book a session.'
   },
   {
     qKey: 'landing.faq.q3',

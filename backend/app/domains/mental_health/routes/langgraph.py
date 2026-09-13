@@ -4,10 +4,10 @@ from typing import Iterable, List
 from fastapi import APIRouter, Depends, Query, WebSocket, WebSocketDisconnect
 
 from app.agents.safety_graph_specs import (
+    CMA_GRAPH_SPEC as SDA_GRAPH_SPEC,
     IA_GRAPH_SPEC,
-    SCA_GRAPH_SPEC,
-    SDA_GRAPH_SPEC,
     STA_GRAPH_SPEC,
+    TCA_GRAPH_SPEC as SCA_GRAPH_SPEC,
 )
 from app.agents.execution_tracker import execution_tracker
 from app.dependencies import get_admin_user
@@ -138,8 +138,24 @@ async def get_enhanced_langgraph_state(
 
 
 @router.websocket("/ws")
-async def websocket_endpoint(websocket: WebSocket):
-    """WebSocket endpoint for real-time execution state updates."""
+async def websocket_endpoint(websocket: WebSocket, token: str = ""):
+    """WebSocket endpoint for real-time execution state updates.
+
+    SECURITY: execution state embeds input_data (raw user messages), so the
+    handshake requires a valid token AND an admin role — mirroring
+    agents_command.ws but with the stricter role check that one lacked.
+    """
+    from app.core.role_utils import normalize_role
+
+    try:
+        payload = auth_utils.decrypt_and_validate_token(token)
+    except Exception:
+        await websocket.close(code=4401)
+        return
+    if normalize_role(payload.role or "") != "admin":
+        await websocket.close(code=4403)
+        return
+
     await websocket.accept()
     
     async def send_update(event_type: str, execution_state):

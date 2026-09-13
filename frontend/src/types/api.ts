@@ -100,8 +100,8 @@ export interface JournalAnalyticsResponse {
   pad_trend: JournalPadTrendPoint[];
 }
 
-// --- Psychologist Appointment Types ---
-export interface Psychologist {
+// --- Counselor Appointment Types ---
+export interface Counselor {
   id: number;
   name: string;
   specialization?: string | null;
@@ -117,7 +117,7 @@ export interface AppointmentType {
 }
 
 export interface AppointmentBase {
-  psychologist_id: number;
+  counselor_id: number;
   appointment_type_id: number;
   appointment_datetime: string; // ISO 8601 format string
   notes?: string | null;
@@ -133,6 +133,6 @@ export interface Appointment extends AppointmentBase {
   user_id: number;
   created_at: string;
   updated_at: string;
-  psychologist: Psychologist; // Nested object
+  counselor: Counselor; // Nested object
   appointment_type: AppointmentType; // Nested object
 }

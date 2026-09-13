@@ -1,19 +1,33 @@
 #!/usr/bin/env bash
 # deploy-prod.sh
-# Minimal production deployment helper (app-only stack)
-# Uses: docker-compose.base.yml + docker-compose.prod.yml
+# Minimal production deployment helper (app-only stack: backend + frontend).
+#
+# Uses the per-service compose files that ship in this repository:
+#   backend/docker-compose.yml
+#   frontend/docker-compose.yml
+#
+# Configure managed services (DATABASE_URL, REDIS_URL, MINIO_*) via each
+# service's env file (backend/.env, frontend/.env.local). A root .env is used
+# for compose variable interpolation only when present.
 
 set -euo pipefail
 
 PROJECT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
+COMPOSE_FILES=(
+  -f "$PROJECT_DIR/backend/docker-compose.yml"
+  -f "$PROJECT_DIR/frontend/docker-compose.yml"
+)
+
 _dc() {
-  (cd "$PROJECT_DIR" && docker compose --env-file .env "$@")
+  local env_args=()
+  if [ -f "$PROJECT_DIR/.env" ]; then
+    env_args=(--env-file "$PROJECT_DIR/.env")
+  fi
+  (cd "$PROJECT_DIR" && docker compose "${env_args[@]+"${env_args[@]}"}" "${COMPOSE_FILES[@]}" "$@")
 }
 
-dc_prod() {
-  _dc -f docker-compose.base.yml -f docker-compose.prod.yml "$@"
-}
+dc_prod() { _dc "$@"; }
 
 show_help() {
   echo "UGM-AICare Production Deployment Script (app-only)"
@@ -28,8 +42,9 @@ show_help() {
   echo "  help       Show this help message"
   echo ""
   echo "Notes:"
+  echo "  - Composes backend/docker-compose.yml + frontend/docker-compose.yml."
+  echo "  - Configure managed services via backend/.env and frontend/.env.local."
   echo "  - The bundled monitoring stack has been removed from this repository."
-  echo "  - Configure managed services via .env (DATABASE_URL, REDIS_URL, etc.)."
 }
 
 cmd="${1:-deploy}"
@@ -39,10 +54,6 @@ case "$cmd" in
     echo "Starting production deployment/restart..."
     echo "Pulling latest code from Git..."
     git -C "$PROJECT_DIR" pull
-
-    if [ ! -f "$PROJECT_DIR/.env" ]; then
-      echo "⚠ WARNING: .env not found in project root." >&2
-    fi
 
     echo "Building and restarting Docker containers..."
     dc_prod up --build -d --remove-orphans

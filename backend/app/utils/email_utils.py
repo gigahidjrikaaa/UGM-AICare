@@ -37,7 +37,7 @@ def send_email(recipient_email: str, subject: str, html_content: str) -> bool:
         if port not in [465, 587]:
             logger.error(f"Invalid SMTP port: {port}. Expected 465 (SSL) or 587 (TLS).")
             return False
-        logger.debug(f"Attempting to send email via {EMAIL_SMTP_SERVER}:{port} from {EMAIL_USERNAME} to {recipient_email}")
+        logger.debug("Attempting to send email via %s:%s (recipient withheld from logs)", EMAIL_SMTP_SERVER, port)
         # Use with statement for automatic connection closing
         if port == 465: # SMTP_SSL
              with smtplib.SMTP_SSL(EMAIL_SMTP_SERVER, port) as server:

@@ -34,6 +34,7 @@ export interface ConsentAndPrivacySettings {
   consent_emergency_contact: boolean;
   consent_marketing: boolean;
   consent_ai_memory: boolean;
+    consent_proactive_chat: boolean;
 }
 
 export interface AIMemoryFact {
@@ -121,6 +122,7 @@ export interface UserProfileOverviewUpdate {
   consent_emergency_contact?: boolean;
   consent_marketing?: boolean;
   consent_ai_memory?: boolean;
+  consent_proactive_chat?: boolean;
   preferred_language?: string | null;
   preferred_timezone?: string | null;
   accessibility_needs?: string | null;

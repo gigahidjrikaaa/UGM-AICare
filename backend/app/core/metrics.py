@@ -56,6 +56,50 @@ agent_success_rate = Gauge(
 )
 
 # ============================================
+# PRIVACY METRICS (IA differential privacy)
+# ============================================
+
+ia_dp_epsilon_spent_total = Counter(
+    'ia_dp_epsilon_spent_total',
+    'Total differential privacy epsilon spent by IA aggregate queries',
+    ['question_id']
+)
+
+ia_dp_budget_exhausted_total = Counter(
+    'ia_dp_budget_exhausted_total',
+    'Total IA queries refused because the DP budget window was exhausted'
+)
+
+redis_mock_fallback_active = Gauge(
+    'redis_mock_fallback_active',
+    '1 when Redis fell back to the in-process MockRedis (per-process limits/locks)',
+)
+
+autopilot_dead_letter_total = Counter(
+    'autopilot_dead_letter_total',
+    'Autopilot actions moved to the dead-letter queue (never executed)',
+    ['action_type']
+)
+
+scheduler_lock_skipped_total = Counter(
+    'scheduler_lock_skipped_total',
+    'Scheduler job executions skipped because another worker held the lock',
+    ['job_id']
+)
+
+proactive_messages_delivered_total = Counter(
+    'proactive_messages_delivered_total',
+    'Aika-initiated proactive messages delivered',
+    ['source']
+)
+
+welcome_back_greetings_total = Counter(
+    'welcome_back_greetings_total',
+    'Welcome-back greetings served',
+    ['source']
+)
+
+# ============================================
 # LLM API METRICS
 # ============================================
 

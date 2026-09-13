@@ -1,82 +1,72 @@
-# General
-.DS_Store
-Thumbs.db
-dump.rdb
-.dev-pids
-.worktrees/
 
-# Python (Backend)
-.venv/
-__pycache__/
-*.pyc
-*.pyo
-*.pyd
-config.py
-
-# Environment files — ignore all, then re-allow examples
-.env
-.env.*
-!.env.example
 !.env.*.example
-
+!.env.example
+# Alembic
+# Database
 # Database files
+# Docker
+# Environment files — ignore all, then re-allow examples
+# FastAPI / Pydantic cache
+# General
+# Logs
+# MacOS
+# Node.js (Frontend)
+# ONNX Models - Large binary files (502 MB), auto-downloaded on build
+# Point-in-time database backups (contain user data; never commit)
+# Python (Backend)
+# Research evaluation outputs
+# See: backend/scripts/ensure_onnx_model.py
+# These are automatically rebuilt from HuggingFace during Docker build
+# VS Code
+# alembic/*.ini
+*.code-workspace
 *.db
 *.db-journal
+*.iml
+*.log
+*.pyc
+*.pyd
+*.pyo
 *.sqlite
 *.sqlite3
-
-# FastAPI / Pydantic cache
-.mypy_cache/
-.pytest_cache/
-.tox/
-.coverage
+.DS_Store
 .cache/
-pip-log.txt
-pip-delete-this-directory.txt
-
-# Logs
-logs/
-*.log
-nohup.out
-
-# Node.js (Frontend)
-node_modules/
+.coverage
+.dev-pids
+.dockerignore
+.env
+.env.*
+.idea/
+.mypy_cache/
 .next/
 .out/
-npm-debug.log
-yarn-debug.log
-yarn-error.log
-dist/
+.pytest_cache/
+.tox/
+.venv/
+.vscode/
+.worktrees/
+.zcode/
+Thumbs.db
+__pycache__/
+backend/*.db
+backend/aika.db
+backend/build.log
+backend/models/onnx/
+backend/research_evaluation/runs/
+backend/test.db
+backups/
 build/
-
-# Database
+config.py
 database/*.db
 database/migrations/
-
-# Docker
+dist/
 docker-compose.override.yml
-.dockerignore
-
-# VS Code
-.vscode/
-*.code-workspace
-
-# MacOS
-.idea/
-*.iml
-backend/aika.db
-backend/*.db
-
-# Alembic
-# alembic/*.ini
-
-# Research evaluation outputs
-backend/research_evaluation/runs/
-
-# ONNX Models - Large binary files (502 MB), auto-downloaded on build
-# These are automatically rebuilt from HuggingFace during Docker build
-# See: backend/scripts/ensure_onnx_model.py
-backend/models/onnx/
-
-# Point-in-time database backups (contain user data; never commit)
-backups/
+dump.rdb
+logs/
+node_modules/
+nohup.out
+npm-debug.log
+pip-delete-this-directory.txt
+pip-log.txt
+yarn-debug.log
+yarn-error.log

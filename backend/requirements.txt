@@ -82,11 +82,7 @@ web3>=7.0.0,<8.0.0  # Web3.py for Ethereum/SOMNIA blockchain interaction
 numpy>=1.24.0
 reportlab>=4.0.0
 
-# Social Media Integration
-tweepy==4.14.0  # For Twitter/X API integration
-
 # Task Scheduling
-celery==5.3.4
 apscheduler==3.10.4
 
 # Utils

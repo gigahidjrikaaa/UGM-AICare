@@ -16,40 +16,40 @@ router = APIRouter(prefix="/api/v1/appointments", tags=["Appointments"])
 # PUBLIC ENDPOINTS (No Auth Required)
 # ========================================
 
-@router.get("/psychologists", response_model=List[schemas.Psychologist])
-async def get_psychologists(
-    available_only: bool = Query(False, description="Filter only available psychologists"),
+@router.get("/counselors", response_model=List[schemas.Counselor])
+async def get_counselors(
+    available_only: bool = Query(False, description="Filter only available counselors"),
     db: AsyncSession = Depends(get_async_db)
 ):
     """
-    Get all psychologists, optionally filtered by availability.
+    Get all counselors, optionally filtered by availability.
     
     Public endpoint - no authentication required.
     """
-    query = select(models.Psychologist)
+    query = select(models.Counselor)
     
     if available_only:
-        query = query.where(models.Psychologist.is_available == True)
+        query = query.where(models.Counselor.is_available == True)
     
     result = await db.execute(query)
-    psychologists = result.scalars().all()
-    return psychologists
+    counselors = result.scalars().all()
+    return counselors
 
-@router.get("/psychologists/{psychologist_id}", response_model=schemas.Psychologist)
-async def get_psychologist(
-    psychologist_id: int,
+@router.get("/counselors/{counselor_id}", response_model=schemas.Counselor)
+async def get_counselor(
+    counselor_id: int,
     db: AsyncSession = Depends(get_async_db)
 ):
-    """Get a single psychologist by ID."""
+    """Get a single counselor by ID."""
     result = await db.execute(
-        select(models.Psychologist).where(models.Psychologist.id == psychologist_id)
+        select(models.Counselor).where(models.Counselor.id == counselor_id)
     )
-    psychologist = result.scalar_one_or_none()
+    counselor = result.scalar_one_or_none()
     
-    if not psychologist:
-        raise HTTPException(status_code=404, detail="Psychologist not found")
+    if not counselor:
+        raise HTTPException(status_code=404, detail="Counselor not found")
     
-    return psychologist
+    return counselor
 
 @router.get("/appointment-types", response_model=List[schemas.AppointmentType])
 async def get_appointment_types(db: AsyncSession = Depends(get_async_db)):
@@ -93,17 +93,17 @@ async def create_appointment(
     
     Requires authentication. The appointment will be created for the current user.
     """
-    # Verify psychologist exists and is available
-    psychologist_result = await db.execute(
-        select(models.Psychologist).where(models.Psychologist.id == appointment.psychologist_id)
+    # Verify counselor exists and is available
+    counselor_result = await db.execute(
+        select(models.Counselor).where(models.Counselor.id == appointment.counselor_id)
     )
-    psychologist = psychologist_result.scalar_one_or_none()
+    counselor = counselor_result.scalar_one_or_none()
     
-    if not psychologist:
-        raise HTTPException(status_code=404, detail="Psychologist not found")
+    if not counselor:
+        raise HTTPException(status_code=404, detail="Counselor not found")
     
-    if not psychologist.is_available:
-        raise HTTPException(status_code=400, detail="Psychologist is not currently available")
+    if not counselor.is_available:
+        raise HTTPException(status_code=400, detail="Counselor is not currently available")
     
     # Verify appointment type exists
     type_result = await db.execute(
@@ -152,7 +152,7 @@ async def create_appointment(
     # Create the appointment
     db_appointment = models.Appointment(
         user_id=current_user.id,
-        psychologist_id=appointment.psychologist_id,
+        counselor_id=appointment.counselor_id,
         appointment_type_id=appointment.appointment_type_id,
         appointment_datetime=appointment.appointment_datetime,
         notes=appointment.notes,

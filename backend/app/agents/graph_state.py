@@ -33,7 +33,7 @@ class CMAContext(TypedDict, total=False):
     appointment_id: Optional[int]
     appointment_datetime: Optional[str]
     appointment_confirmed: bool
-    psychologist_id: Optional[int]
+    counselor_id: Optional[int]
     preferred_time: Optional[str]
     scheduling_context: Optional[Dict[str, Any]]
     notification_sent: Optional[bool]

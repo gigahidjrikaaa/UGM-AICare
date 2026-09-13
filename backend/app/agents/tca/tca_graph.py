@@ -134,7 +134,7 @@ async def determine_intervention_type_node(state: TCAState) -> TCAState:
 
 
 @trace_agent("TCA_GeneratePlan")
-async def generate_plan_node(state: TCAState) -> TCAState:
+async def generate_plan_node(state: TCAState, config: RunnableConfig) -> TCAState:
     """Node: Generate personalized intervention plan using Gemini AI.
     
     Uses TherapeuticCoachService with Gemini-powered plan generation to create
@@ -149,11 +149,40 @@ async def generate_plan_node(state: TCAState) -> TCAState:
     execution_id = state.get("execution_id")
     if execution_id:
         execution_tracker.start_node(execution_id, "tca::generate_plan", "tca")
-    
+
     try:
+        # Skip generation entirely when the safety review blocked intervention —
+        # a blocked plan must not cost an LLM call (review now runs BEFORE
+        # generation; see graph wiring below).
+        if not state.get("tca_context", {}).get("should_intervene", True):
+            logger.info("TCA skipping plan generation (should_intervene=False)")
+            state["execution_path"].append("generate_plan")
+            if execution_id:
+                execution_tracker.complete_node(execution_id, "tca::generate_plan")
+            return state
+
         # Get TCA service
         sca_service = TherapeuticCoachService()
-        
+
+        # Ground the plan in the clinical knowledge base (RAG): retrieve
+        # official guidance for the user's message so plan generation cites
+        # the platform's curated content instead of parametric memory only.
+        # Retrieval degrades to empty on any infrastructure problem.
+        guidance_block = ""
+        try:
+            from app.services.knowledge_retrieval_service import (
+                render_guidance_block,
+                retrieve,
+            )
+
+            db: AsyncSession = config["configurable"]["db"]
+            retrieved = await retrieve(db, state.get("message", "") or "")
+            guidance_block = render_guidance_block(retrieved)
+            if guidance_block:
+                logger.info("TCA RAG grounding: %d chunk(s) retrieved", len(retrieved))
+        except Exception as rag_exc:
+            logger.warning("TCA RAG retrieval skipped: %s", rag_exc)
+
         # Build intervention request
         request = TCAInterveneRequest(
             intent=state.get("sta_context", {}).get("intent", "general_support"),
@@ -161,7 +190,8 @@ async def generate_plan_node(state: TCAState) -> TCAState:
             session_id=state["session_id"],
             options={
                 "risk_level": state.get("sta_context", {}).get("severity", "moderate"),  # Use severity from STA
-                "severity": state.get("sta_context", {}).get("severity", "moderate")
+                "severity": state.get("sta_context", {}).get("severity", "moderate"),
+                "guidance_block": guidance_block,
             }
         )
         
@@ -230,10 +260,10 @@ async def generate_plan_node(state: TCAState) -> TCAState:
 
 @trace_agent("TCA_SafetyReview")
 async def safety_review_node(state: TCAState) -> TCAState:
-    """Node: Apply safety checks before plan activation.
-    
-    Ensures plans are appropriate for user's risk level and applies
-    any necessary safety guardrails.
+    """Node: Apply safety checks BEFORE plan generation.
+
+    Runs upstream of generate_plan so a blocked plan never costs an LLM
+    call. Ensures plans are appropriate for the user's risk level.
     
     Args:
         state: Current graph state
@@ -386,7 +416,18 @@ async def persist_plan_node(state: TCAState, config: RunnableConfig) -> TCAState
         # NOTE: Only flush here — the outer orchestrator or chat route owns
         # the final commit boundary.  This prevents premature commits when TCA
         # runs inside parallel_crisis_node (shared db session with CMA).
-        
+
+        # Closed-loop plans: schedule the promised next_check_in follow-up
+        # (guardrails — consent, quiet hours, caps — are applied by the
+        # service; commit stays with the caller, same boundary as above).
+        try:
+            from app.services.plan_followup_service import schedule_plan_followup
+
+            await schedule_plan_followup(db, plan, commit=False)
+        except Exception as followup_exc:
+            # Scheduling failure must never break plan persistence.
+            logger.warning("Plan follow-up scheduling skipped: %s", followup_exc)
+
         # DEBUG: Log plan creation details
         logger.info(f"TCA persisted intervention plan: ID={plan.id}, user_id={plan.user_id}, is_active={plan.is_active}, status={plan.status}")
         
@@ -418,7 +459,7 @@ def _build_tca_graph() -> CompiledStateGraph:
 
     Graph structure:
         START → ingest_triage_signal → determine_intervention_type →
-        generate_plan → safety_review → persist_plan → END
+        safety_review → generate_plan → persist_plan → END
 
     Returns:
         Compiled StateGraph ready for execution
@@ -433,11 +474,14 @@ def _build_tca_graph() -> CompiledStateGraph:
     workflow.add_node("persist_plan", persist_plan_node)
 
     # Define linear flow
+    # Linear flow: safety review gates BEFORE generation so a blocked plan
+    # never pays for an LLM call. (Previously: generate → review, which spent
+    # the generation cost and only then discarded the plan.)
     workflow.set_entry_point("ingest_triage_signal")
     workflow.add_edge("ingest_triage_signal", "determine_intervention_type")
-    workflow.add_edge("determine_intervention_type", "generate_plan")
-    workflow.add_edge("generate_plan", "safety_review")
-    workflow.add_edge("safety_review", "persist_plan")
+    workflow.add_edge("determine_intervention_type", "safety_review")
+    workflow.add_edge("safety_review", "generate_plan")
+    workflow.add_edge("generate_plan", "persist_plan")
     workflow.add_edge("persist_plan", END)
 
     return workflow.compile()

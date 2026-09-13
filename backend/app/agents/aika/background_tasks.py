@@ -143,6 +143,14 @@ async def trigger_sta_conversation_analysis_background(
                 conversation_id,
                 assessment.reasoning,
             )
+            await _escalate_conversation_if_needed(
+                db=db,
+                user_id=user_id,
+                conversation_id=conversation_id,
+                session_id=state.get("session_id"),
+                assessment=assessment,
+                last_message=state.get("message", ""),
+            )
 
     except Exception as exc:
         logger.error("[BACKGROUND] STA analysis failed: %s", exc, exc_info=True)
@@ -218,4 +226,210 @@ async def _update_screening_profile_from_assessment(
     except Exception as exc:
         logger.warning(
             "[BACKGROUND] Screening profile update failed (non-critical): %s", exc
+        )
+
+async def _escalate_conversation_if_needed(
+    *,
+    db: AsyncSession,
+    user_id: Any,
+    conversation_id: Any,
+    session_id: Any,
+    assessment: Any,
+    last_message: str,
+) -> None:
+    """Open a counselor case + alert when the conversation review demands it.
+
+    Previously ``should_invoke_cma=True`` only logged a warning: the review
+    ran, the assessment was stored, and nobody was ever notified — the
+    escalation leg of the review pipeline simply did not exist. Mirrors
+    ``SafetyTriageService._maybe_create_case`` (dedupe on open case, redacted
+    summary, CASE_CREATED event) and adds an admin alert with the
+    conversation id so a counselor can open the transcript immediately.
+    Failures are logged without re-raising: the analysis itself is already
+    durably stored.
+    """
+    import hashlib
+
+    from app.core.redaction import prelog_redact
+    from app.domains.mental_health.models.cases import (
+        Case,
+        CaseSeverityEnum,
+        CaseStatusEnum,
+    )
+    from app.services.event_bus import EventType, publish_event
+
+    if not user_id:
+        return
+
+    # Same pseudonymization scheme as the chat stream (aika_stream.py).
+    user_hash = hashlib.sha256(f"user_{user_id}".encode()).hexdigest()[:16]
+    risk = (assessment.overall_risk_level or "").lower()
+    severity_map = {
+        "critical": CaseSeverityEnum.critical,
+        "high": CaseSeverityEnum.high,
+        "moderate": CaseSeverityEnum.med,
+    }
+    severity = severity_map.get(risk, CaseSeverityEnum.high)
+
+    case: Case | None = None
+    try:
+        # Dedupe: one open case per user+session is enough.
+        existing = await db.execute(
+            select(Case)
+            .where(Case.user_hash == user_hash)
+            .where(Case.status != CaseStatusEnum.closed)
+            .where(Case.session_id == session_id)
+        )
+        existing_case = existing.scalar_one_or_none()
+        if existing_case is not None:
+            case = existing_case
+            logger.info(
+                "[BACKGROUND] Escalation deduped: open case already exists for user %s.",
+                user_id,
+            )
+        else:
+            summary_source = (
+                getattr(assessment, "conversation_summary", None) or last_message or ""
+            )
+            case = Case(
+                status=CaseStatusEnum.new,
+                severity=severity,
+                assigned_to=None,
+                user_hash=user_hash,
+                session_id=session_id,
+                summary_redacted=prelog_redact(summary_source),
+            )
+            db.add(case)
+            await db.flush()
+
+            # Auto-assign: without this, directly-created review cases stayed
+            # unassigned forever — invisible to counselors, whose case list
+            # filters assigned_to == me. Reuses CMA's deterministic counselor
+            # selection; status stays "new" so it still shows in the
+            # escalations intake queue. Assignment publishes CASE_ASSIGNED,
+            # which the event bridge turns into a counselor-scoped alert.
+            try:
+                from app.agents.cma.cma_graph import _select_optimal_counselor
+
+                counselor_id = await _select_optimal_counselor(
+                    db, severity.value, preferences={}
+                )
+                if counselor_id is not None:
+                    case.assigned_to = str(counselor_id)
+                    db.add(case)
+                    logger.info(
+                        "[BACKGROUND] Review case auto-assigned: case=%s → counselor=%s",
+                        case.id,
+                        counselor_id,
+                    )
+            except Exception as assign_exc:
+                logger.warning(
+                    "[BACKGROUND] Auto-assignment failed (case stays unassigned for admin triage): %s",
+                    assign_exc,
+                )
+
+            try:
+                event_data = {
+                    "case_id": str(case.id),
+                    "severity": severity.value,
+                    "title": "Conversation review escalation",
+                    "user_hash": user_hash,
+                    "session_id": session_id,
+                    "conversation_id": str(conversation_id or ""),
+                }
+                await publish_event(
+                    event_type=EventType.CASE_CREATED,
+                    source_agent="sta",
+                    data=event_data,
+                )
+                if case.assigned_to:
+                    await publish_event(
+                        event_type=EventType.CASE_ASSIGNED,
+                        source_agent="sta",
+                        data={
+                            "case_id": str(case.id),
+                            "assigned_to": case.assigned_to,
+                            "is_reassignment": False,
+                        },
+                    )
+            except Exception as event_exc:
+                logger.error(
+                    "[BACKGROUND] Case events failed (case still created): %s",
+                    event_exc,
+                )
+
+            logger.warning(
+                "[BACKGROUND] Case created from conversation review: case_id=%s, "
+                "severity=%s, assigned_to=%s, conversation=%s",
+                case.id,
+                severity.value,
+                case.assigned_to,
+                conversation_id,
+            )
+
+        # Counselor/admin alert pointing at the reviewed conversation.
+        # audience + recipient_user_ids make it visible in the counselor bell;
+        # the SSE push makes it instant (falls back to the 30s poll otherwise).
+        try:
+            from app.models.alerts import AlertSeverity, AlertType
+            from app.services.alert_service import get_alert_service
+
+            recipient_user_ids: list[int] = []
+            if case is not None and case.assigned_to:
+                from app.domains.mental_health.models import Counselor
+
+                counselor = (
+                    await db.execute(
+                        select(Counselor).where(
+                            Counselor.id == int(case.assigned_to)
+                        )
+                    )
+                ).scalar_one_or_none()
+                if counselor is not None and counselor.user_id is not None:
+                    recipient_user_ids = [int(counselor.user_id)]
+
+            await get_alert_service(db).create_alert(
+                alert_type=AlertType.CASE_CREATED,
+                severity=(
+                    AlertSeverity.CRITICAL if risk == "critical" else AlertSeverity.HIGH
+                ),
+                title="Conversation review recommends human follow-up",
+                message=(
+                    f"STA conversation review flagged risk='{risk}' "
+                    f"(trend={assessment.risk_trend}). Reasoning: "
+                    f"{(assessment.reasoning or '')[:200]}"
+                ),
+                alert_metadata={
+                    "audience": "counselor",
+                    "recipient_user_ids": recipient_user_ids,
+                    "user_id": user_id,
+                    "conversation_id": str(conversation_id or ""),
+                    "session_id": session_id,
+                    "risk_level": risk,
+                },
+            )
+
+            if recipient_user_ids:
+                from app.services.sse_broadcaster import get_broadcaster
+
+                push_payload = {
+                    "title": "Conversation review recommends human follow-up",
+                    "message": f"Risk '{risk}' detected in a reviewed conversation.",
+                    "severity": risk,
+                    "conversation_id": str(conversation_id or ""),
+                }
+                for recipient_user_id in recipient_user_ids:
+                    await get_broadcaster().broadcast(
+                        "counselor_alert", push_payload, user_id=recipient_user_id
+                    )
+        except Exception as alert_exc:
+            logger.warning(
+                "[BACKGROUND] Escalation alert failed (non-blocking): %s", alert_exc
+            )
+
+    except Exception as exc:
+        logger.error(
+            "[BACKGROUND] Conversation escalation failed (assessment already stored): %s",
+            exc,
+            exc_info=True,
         )

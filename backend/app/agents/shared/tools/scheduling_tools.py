@@ -2,7 +2,7 @@
 Appointment Scheduling Tools (Decorator Pattern)
 
 Conversational appointment scheduling capabilities for Aika, allowing students
-to book, cancel, and reschedule appointments with psychologists through natural language.
+to book, cancel, and reschedule appointments with counselors through natural language.
 
 All tools are registered using @register_tool decorator for zero-redundancy architecture.
 """
@@ -15,7 +15,7 @@ from sqlalchemy import select, and_, or_, func
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.domains.mental_health.models.appointments import (
-    Psychologist,
+    Counselor,
     Appointment,
     AppointmentType
 )
@@ -145,7 +145,7 @@ def _matches_preferred_language(
 
 @register_tool(
     name="get_available_counselors",
-    description="""Get list of available psychologists/counselors at UGM.
+    description="""Get list of available counselors/counselors at UGM.
 
 ✅ CALL WHEN:
 - User asks "siapa psikolog yang ada?", "counselor available?"
@@ -164,7 +164,7 @@ Example flow:
 User: "Aku mau ketemu psikolog nih"
 You: Call get_available_counselors → Present options
 User: "Yang Pak Budi aja"
-You: Note psychologist_id → Call book_appointment""",
+You: Note counselor_id → Call book_appointment""",
     parameters={
         "type": "object",
         "properties": {
@@ -194,31 +194,31 @@ async def get_available_counselors(
     days_ahead: int = 14,
     **kwargs
 ) -> Dict[str, Any]:
-    """Get list of available psychologists."""
+    """Get list of available counselors."""
     try:
-        # Query psychologists
-        query = select(Psychologist).where(Psychologist.is_available == True)
+        # Query counselors
+        query = select(Counselor).where(Counselor.is_available == True)
         
         if specialization:
             query = query.where(
-                Psychologist.specialization.ilike(f"%{specialization}%")
+                Counselor.specialization.ilike(f"%{specialization}%")
             )
         
         result = await db.execute(query)
-        psychologists = result.scalars().all()
+        counselors = result.scalars().all()
 
         bounded_days = max(1, min(days_ahead, 30))
         today = datetime.now().date()
         horizon_start = datetime.combine(today, time.min)
         horizon_end = horizon_start + timedelta(days=bounded_days + 1)
 
-        psychologist_ids = [p.id for p in psychologists]
-        appointments_by_psychologist: Dict[int, List[datetime]] = {pid: [] for pid in psychologist_ids}
-        if psychologist_ids:
+        counselor_ids = [p.id for p in counselors]
+        appointments_by_counselor: Dict[int, List[datetime]] = {pid: [] for pid in counselor_ids}
+        if counselor_ids:
             appt_result = await db.execute(
                 select(Appointment)
                 .where(
-                    Appointment.psychologist_id.in_(psychologist_ids),
+                    Appointment.counselor_id.in_(counselor_ids),
                     Appointment.appointment_datetime >= horizon_start,
                     Appointment.appointment_datetime < horizon_end,
                     Appointment.status.in_(["scheduled", "pending", "confirmed", "in_progress"]),
@@ -226,11 +226,11 @@ async def get_available_counselors(
                 .order_by(Appointment.appointment_datetime.asc())
             )
             for appt in appt_result.scalars().all():
-                appointments_by_psychologist.setdefault(appt.psychologist_id, []).append(appt.appointment_datetime)
+                appointments_by_counselor.setdefault(appt.counselor_id, []).append(appt.appointment_datetime)
         
         # Format response
         counselors = []
-        for p in psychologists:
+        for p in counselors:
             if not _matches_preferred_language(p.languages, preferred_language):
                 continue
 
@@ -241,7 +241,7 @@ async def get_available_counselors(
                 days_ahead=bounded_days,
             )
 
-            blocked_times = appointments_by_psychologist.get(p.id, [])
+            blocked_times = appointments_by_counselor.get(p.id, [])
             free_windows: List[Dict[str, str]] = []
             for window in slot_windows:
                 if any(_windows_conflict(window, appt_time) for appt_time in blocked_times):
@@ -312,16 +312,16 @@ User can then choose one or request alternatives.""",
     parameters={
         "type": "object",
         "properties": {
-            "psychologist_id": {
+            "counselor_id": {
                 "type": "integer",
-                "description": "ID of the psychologist"
+                "description": "ID of the counselor"
             },
             "preferences_text": {
                 "type": "string",
                 "description": "Natural language time preferences from student"
             }
         },
-        "required": ["psychologist_id", "preferences_text"]
+        "required": ["counselor_id", "preferences_text"]
     },
     category="scheduling",
     requires_db=True,
@@ -330,22 +330,22 @@ User can then choose one or request alternatives.""",
 async def suggest_appointment_times(
     db: AsyncSession,
     user_id: int,
-    psychologist_id: int,
+    counselor_id: int,
     preferences_text: str,
     **kwargs
 ) -> Dict[str, Any]:
     """Use AI to suggest optimal appointment times."""
     try:
-        # Get psychologist
+        # Get counselor
         result = await db.execute(
-            select(Psychologist).where(Psychologist.id == psychologist_id)
+            select(Counselor).where(Counselor.id == counselor_id)
         )
-        psychologist = result.scalar_one_or_none()
+        counselor = result.scalar_one_or_none()
         
-        if not psychologist:
+        if not counselor:
             return {
                 "success": False,
-                "error": f"Psychologist with ID {psychologist_id} not found",
+                "error": f"Counselor with ID {counselor_id} not found",
                 "suggestions": []
             }
         
@@ -375,8 +375,8 @@ async def suggest_appointment_times(
         return {
             "success": True,
             "suggestions": suggestions,
-            "psychologist_name": psychologist.name,
-            "message": f"Ini beberapa waktu yang mungkin cocok dengan {psychologist.name}"
+            "counselor_name": counselor.name,
+            "message": f"Ini beberapa waktu yang mungkin cocok dengan {counselor.name}"
         }
         
     except Exception as e:
@@ -394,7 +394,7 @@ async def suggest_appointment_times(
 
 @register_tool(
     name="book_appointment",
-    description="""Book a counseling appointment with a psychologist at UGM.
+    description="""Book a counseling appointment with a counselor at UGM.
 
 ✅ CALL WHEN USER:
 - Explicitly requests appointment: "mau booking", "jadwalin konseling"
@@ -412,14 +412,14 @@ IMPORTANT FLOW:
 
 Returns appointment confirmation with:
 - Appointment ID, date/time, location
-- Psychologist info
+- Counselor info
 - How to cancel/reschedule""",
     parameters={
         "type": "object",
         "properties": {
-            "psychologist_id": {
+            "counselor_id": {
                 "type": "integer",
-                "description": "ID of psychologist (from get_available_counselors). Optional if auto-assign."
+                "description": "ID of counselor (from get_available_counselors). Optional if auto-assign."
             },
             "appointment_datetime": {
                 "type": "string",
@@ -444,7 +444,7 @@ async def book_appointment(
     db: AsyncSession,
     user_id: int,
     appointment_datetime: str,
-    psychologist_id: Optional[int] = None,
+    counselor_id: Optional[int] = None,
     appointment_type_id: int = 1,
     notes: str = "",
     **kwargs
@@ -454,35 +454,35 @@ async def book_appointment(
         # Parse datetime
         appt_dt = datetime.fromisoformat(appointment_datetime.replace("Z", "+00:00"))
         
-        # Auto-assign psychologist if not specified
-        if not psychologist_id:
+        # Auto-assign counselor if not specified
+        if not counselor_id:
             result = await db.execute(
-                select(Psychologist)
-                .where(Psychologist.is_available == True)
+                select(Counselor)
+                .where(Counselor.is_available == True)
                 .limit(1)
             )
-            psychologist = result.scalar_one_or_none()
-            if not psychologist:
+            counselor = result.scalar_one_or_none()
+            if not counselor:
                 return {
                     "success": False,
-                    "error": "No available psychologists found"
+                    "error": "No available counselors found"
                 }
-            psychologist_id = psychologist.id
+            counselor_id = counselor.id
         else:
             result = await db.execute(
-                select(Psychologist).where(Psychologist.id == psychologist_id)
+                select(Counselor).where(Counselor.id == counselor_id)
             )
-            psychologist = result.scalar_one_or_none()
-            if not psychologist:
+            counselor = result.scalar_one_or_none()
+            if not counselor:
                 return {
                     "success": False,
-                    "error": f"Psychologist ID {psychologist_id} not found"
+                    "error": f"Counselor ID {counselor_id} not found"
                 }
         
         # Create appointment
         appointment = Appointment(
             user_id=user_id, # Fixed: student_id -> user_id
-            psychologist_id=psychologist_id,
+            counselor_id=counselor_id,
             appointment_datetime=appt_dt,
             appointment_type_id=appointment_type_id,
             status="scheduled",
@@ -505,17 +505,17 @@ async def book_appointment(
             "appointment": {
                 "id": appointment.id,
                 "student_id": appointment.user_id,
-                "psychologist_id": appointment.psychologist_id,
+                "counselor_id": appointment.counselor_id,
                 "appointment_datetime": appointment.appointment_datetime.isoformat(),
                 "status": appointment.status,
                 "notes": appointment.notes,
                 # "location": appointment.location, # Removed
-                "psychologist": {
-                    "id": psychologist.id,
-                    "name": psychologist.name,
-                    "specialization": psychologist.specialization,
-                    # "contact_email": psychologist.contact_email, # Removed
-                    # "contact_phone": psychologist.contact_phone # Removed
+                "counselor": {
+                    "id": counselor.id,
+                    "name": counselor.name,
+                    "specialization": counselor.specialization,
+                    # "contact_email": counselor.contact_email, # Removed
+                    # "contact_phone": counselor.contact_phone # Removed
                 },
                 "appointment_type": {
                     "id": appt_type.id if appt_type else None,
@@ -523,7 +523,7 @@ async def book_appointment(
                     "duration_minutes": appt_type.duration_minutes if appt_type else 60
                 }
             },
-            "message": f"Appointment successfully booked with {psychologist.name}"
+            "message": f"Appointment successfully booked with {counselor.name}"
         }
         
     except Exception as e:
@@ -780,11 +780,11 @@ async def get_user_appointments(
         result = await db.execute(query)
         appointments = result.scalars().all()
         
-        # Get psychologist details for each appointment
+        # Get counselor details for each appointment
         appt_list = []
         for appt in appointments:
             psych_result = await db.execute(
-                select(Psychologist).where(Psychologist.id == appt.psychologist_id)
+                select(Counselor).where(Counselor.id == appt.counselor_id)
             )
             psych = psych_result.scalar_one_or_none()
             
@@ -792,7 +792,7 @@ async def get_user_appointments(
                 "id": appt.id,
                 "datetime": appt.appointment_datetime.isoformat(),
                 "status": appt.status,
-                "psychologist_name": psych.name if psych else "Unknown",
+                "counselor_name": psych.name if psych else "Unknown",
                 # "location": appt.location, # Removed
                 "notes": appt.notes
             })

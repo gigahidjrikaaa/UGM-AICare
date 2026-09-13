@@ -8,8 +8,6 @@ services:
     # Cloud services required (set via Coolify env vars):
     # - DATABASE_URL
     # - REDIS_URL
-    # - CELERY_BROKER_URL
-    # - CELERY_RESULT_BACKEND
     # - MINIO_ENDPOINT
     # - MINIO_ACCESS_KEY
     # - MINIO_SECRET_KEY

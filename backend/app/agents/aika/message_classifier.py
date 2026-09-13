@@ -42,17 +42,24 @@ __all__ = [
 # ---------------------------------------------------------------------------
 
 def detect_crisis_keywords(text: str) -> list[str]:
-    """Return all crisis keywords found in *text* (case-insensitive).
+    """Return all crisis signals found in *text* (case-insensitive).
+
+    Delegates to the canonical lexicon in ``app.agents.shared.crisis_lexicon``
+    (substring keywords + regex patterns), so the deterministic safety net
+    and the STA prescreen always agree on what counts as a crisis signal.
 
     An empty list means no crisis signals were detected.
 
     >>> detect_crisis_keywords("I want to bunuh diri")
     ['bunuh diri']
+    >>> detect_crisis_keywords("mau gantung diri nih")
+    ['gantung diri']
     >>> detect_crisis_keywords("just feeling a bit stressed")
     []
     """
-    lowered = (text or "").lower()
-    return [kw for kw in CRISIS_KEYWORDS if kw in lowered]
+    from app.agents.shared.crisis_lexicon import detect_crisis_keywords as _lexicon_detect
+
+    return _lexicon_detect(text)
 
 
 # ---------------------------------------------------------------------------

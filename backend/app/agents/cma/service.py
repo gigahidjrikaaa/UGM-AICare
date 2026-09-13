@@ -48,6 +48,9 @@ class CaseManagementService:
 
         previous_assignee = cast(str | None, getattr(case, "assigned_to", None))
 
+        from app.models.agent_user import ensure_agent_user
+
+        await ensure_agent_user(self._session, str(payload.assignee_id))
         assignee_result = await self._session.execute(
             select(AgentUser).where(AgentUser.id == payload.assignee_id)
         )

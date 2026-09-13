@@ -3,10 +3,10 @@ import { CalendarDays, CheckCircle2, ChevronRight, Loader2, UserRound } from 'lu
 import {
   createAppointment,
   getAppointmentTypes,
-  getPsychologists,
+  getCounselorOptions,
   type Appointment as ApiAppointment,
   type AppointmentType,
-  type Psychologist,
+  type Counselor,
 } from '@/lib/appointments-api';
 import type { Appointment } from '@/types/chat';
 
@@ -19,17 +19,17 @@ function mapApiAppointmentToChat(appointment: ApiAppointment): Appointment {
   return {
     id: appointment.id,
     student_id: appointment.user_id,
-    psychologist_id: appointment.psychologist_id,
+    counselor_id: appointment.counselor_id,
     appointment_datetime: appointment.appointment_datetime,
     appointment_type_id: appointment.appointment_type_id,
     status: appointment.status === 'moved' ? 'scheduled' : appointment.status,
     notes: appointment.notes ?? undefined,
-    psychologist: appointment.psychologist
+    counselor: appointment.counselor
       ? {
-          id: appointment.psychologist.id,
-          full_name: appointment.psychologist.name,
-          specialization: appointment.psychologist.specialization
-            ? [appointment.psychologist.specialization]
+          id: appointment.counselor.id,
+          full_name: appointment.counselor.name,
+          specialization: appointment.counselor.specialization
+            ? [appointment.counselor.specialization]
             : undefined,
         }
       : undefined,
@@ -49,7 +49,7 @@ export function AikaSchedulingWidget({ onScheduled, onAikaFollowup }: AikaSchedu
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const [counselors, setCounselors] = useState<Psychologist[]>([]);
+  const [counselors, setCounselors] = useState<Counselor[]>([]);
   const [types, setTypes] = useState<AppointmentType[]>([]);
 
   const [selectedCounselorId, setSelectedCounselorId] = useState<number | null>(null);
@@ -65,8 +65,8 @@ export function AikaSchedulingWidget({ onScheduled, onAikaFollowup }: AikaSchedu
       setLoadingInitial(true);
       setError(null);
       try {
-        const [psychologists, appointmentTypes] = await Promise.all([
-          getPsychologists(true),
+        const [counselors, appointmentTypes] = await Promise.all([
+          getCounselorOptions(true),
           getAppointmentTypes(),
         ]);
 
@@ -74,10 +74,10 @@ export function AikaSchedulingWidget({ onScheduled, onAikaFollowup }: AikaSchedu
           return;
         }
 
-        setCounselors(psychologists);
+        setCounselors(counselors);
         setTypes(appointmentTypes);
-        if (psychologists.length > 0) {
-          setSelectedCounselorId(psychologists[0].id);
+        if (counselors.length > 0) {
+          setSelectedCounselorId(counselors[0].id);
         }
         if (appointmentTypes.length > 0) {
           setSelectedTypeId(appointmentTypes[0].id);
@@ -120,7 +120,7 @@ export function AikaSchedulingWidget({ onScheduled, onAikaFollowup }: AikaSchedu
     setError(null);
     try {
       const apiAppointment = await createAppointment({
-        psychologist_id: selectedCounselorId,
+        counselor_id: selectedCounselorId,
         appointment_type_id: selectedTypeId,
         appointment_datetime: new Date(selectedDateTime).toISOString(),
         notes: notes.trim() || undefined,
@@ -130,7 +130,7 @@ export function AikaSchedulingWidget({ onScheduled, onAikaFollowup }: AikaSchedu
       setCreatedAppointment(mapped);
       onScheduled?.(mapped);
       onAikaFollowup?.(
-        `Saya sudah jadwalkan konseling dengan ${mapped.psychologist?.full_name || 'psikolog'} pada ${mapped.appointment_datetime}.`
+        `Saya sudah jadwalkan konseling dengan ${mapped.counselor?.full_name || 'psikolog'} pada ${mapped.appointment_datetime}.`
       );
     } catch (submitError) {
       setError(submitError instanceof Error ? submitError.message : 'Gagal membuat appointment.');
@@ -147,7 +147,7 @@ export function AikaSchedulingWidget({ onScheduled, onAikaFollowup }: AikaSchedu
           <div>
             <p className="text-sm font-semibold text-green-200">Appointment berhasil dibuat</p>
             <p className="mt-1 text-xs text-white/80">
-              {createdAppointment.psychologist?.full_name || 'Psikolog'} •{' '}
+              {createdAppointment.counselor?.full_name || 'Psikolog'} •{' '}
               {new Date(createdAppointment.appointment_datetime).toLocaleString('id-ID', {
                 dateStyle: 'medium',
                 timeStyle: 'short',

@@ -5,14 +5,12 @@ Core/Shared Models Only
 
 This module contains only core models used across all domains:
 - User authentication and authorization
-- Revenue reporting (shared finance model)
 - System administration and infrastructure
 - Social features (tweets, badges)
 - LangGraph tracking and monitoring
 
 Domain-specific models have been migrated:
 - Mental Health: app.domains.mental_health.models
-- Finance: app.domains.finance.models
 - Blockchain: app.domains.blockchain.models
 
 Always import from domain modules directly:
@@ -33,14 +31,13 @@ from .user_clinical_record import UserClinicalRecord
 from .user_preferences import UserPreferences
 from .user_emergency_contact import UserEmergencyContact
 from .user_consent_ledger import UserConsentLedger
+from .proactive_message import ProactiveMessage, ProactiveMessageSource, ProactiveMessageStatus
 from .user_audit_log import UserAuditLog
 from .user_session import UserSession
 from .user_ai_memory_fact import UserAIMemoryFact
 from .user_activity import UserDailyActivity, UserEvent, RetentionCohortDaily
 
-# Revenue reporting - imported directly from models file to avoid loading blockchain dependencies
-from app.domains.finance.models import RevenueReport, RevenueApproval, ReportStatus, CareTokenMint
-
+# Revenue reporting - removed with the CARE token economy.
 # Social features
 from .social import Tweet, UserBadge, PendingBadgeGrant
 
@@ -102,12 +99,6 @@ __all__ = [
     "UserEvent",
     "RetentionCohortDaily",
     
-    # Revenue Models (Shared)
-    "RevenueReport",
-    "RevenueApproval",
-    "ReportStatus",
-    "CareTokenMint",
-    
     # Social Models
     "Tweet",
     "UserBadge",
@@ -153,6 +144,9 @@ __all__ = [
     "AutopilotActionType",
     "AutopilotPolicyDecision",
     "AutopilotActionStatus",
+    "ProactiveMessage",
+    "ProactiveMessageSource",
+    "ProactiveMessageStatus",
     
     # Real-time Alert Models
     "Alert",

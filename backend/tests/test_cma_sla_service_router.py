@@ -7,7 +7,7 @@ from unittest.mock import AsyncMock
 import pytest
 from fastapi import HTTPException
 
-from app.agents.cma.sla import compute_sla_deadline, notify_sla_breach
+from app.agents.cma.sla import compute_sla_deadline
 from app.agents.cma.service import CaseManagementService
 
 
@@ -16,10 +16,6 @@ def test_compute_sla_deadline() -> None:
     assert compute_sla_deadline(started_at, minutes=30) == datetime(2025, 1, 1, 0, 30, 0)
 
 
-@pytest.mark.asyncio
-async def test_notify_sla_breach_raises() -> None:
-    with pytest.raises(NotImplementedError):
-        await notify_sla_breach("case")
 
 
 @pytest.mark.asyncio

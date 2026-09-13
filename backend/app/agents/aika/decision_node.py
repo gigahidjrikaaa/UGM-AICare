@@ -43,6 +43,7 @@ from app.agents.execution_tracker import execution_tracker
 from app.agents.graph_state import AikaOrchestratorState
 from langchain_core.runnables import RunnableConfig
 from app.agents.aika.constants import MAX_HISTORY_TURNS as _MAX_HISTORY_TURNS
+from app.core.crisis_resources import HOTLINE_LINE
 from app.agents.aika.message_classifier import (
     detect_crisis_keywords as _detect_crisis_keywords,
     is_smalltalk_message as _is_smalltalk_message,
@@ -495,25 +496,146 @@ def _normalize_discordance_level(value: Optional[str]) -> Literal["none", "low",
     return "none"
 
 
-def _build_rate_limit_fallback(error_str: str) -> dict[str, Any]:
-    """Return a state-update dict for the rate-limit / resource-exhausted error path."""
-    return {
-        "needs_agents": False,
-        "intent": "system_busy",
-        "intent_confidence": 1.0,
-        "immediate_risk_level": "none",
-        "risk_score": 0.0,
-        "aika_direct_response": (
-            "Maaf ya, saat ini aku sedang melayani banyak teman-teman lain. "
-            "Boleh coba kirim pesan lagi dalam 1 menit? "
-            "Kalau kamu butuh bantuan darurat, jangan ragu hubungi Crisis Centre UGM."
+async def _maybe_enqueue_conversation_end_sta(
+    state: dict[str, Any],
+    db: AsyncSession,
+    current_message: str,
+    *,
+    recompute: bool = True,
+) -> None:
+    """Detect conversation end and enqueue the durable STA analysis.
+
+    Shared by the normal decision path and the deterministic smalltalk
+    short-circuit — previously a farewell like "bye" hit the smalltalk
+    route and never reached the end-of-conversation enqueue, so the most
+    natural way to end a mental-health conversation skipped the
+    post-conversation risk assessment entirely.
+
+    ``recompute=False`` on the normal path: step 5 has already evaluated
+    the end signal (and bumped ``last_message_timestamp``), and recomputing
+    against the bumped timestamp would wrongly miss the inactivity signal.
+    """
+    if recompute or state.get("conversation_ended") is None:
+        now_ts = time.time()
+        state["conversation_ended"] = _detect_conversation_end(
+            current_message,
+            state.get("last_message_timestamp"),
+            now_ts,
+        )
+        state["last_message_timestamp"] = now_ts
+
+    if not state.get("conversation_ended", False) or state.get(
+        "sta_analysis_completed", False
+    ):
+        return
+
+    logger.info(
+        "Conversation ended — enqueueing durable STA analysis (includes screening)."
+    )
+    from app.domains.mental_health.models.autopilot_actions import (
+        AutopilotActionType,
+    )
+    from app.domains.mental_health.services.autopilot_action_service import (
+        build_idempotency_key,
+        enqueue_action,
+    )
+
+    queue_key = (
+        state.get("conversation_id")
+        or state.get("session_id")
+        or f"msg:{hashlib.sha256(str(state.get('message') or '').encode('utf-8')).hexdigest()[:16]}"
+    )
+    started_at = state.get("started_at")
+    await enqueue_action(
+        db,
+        action_type=AutopilotActionType.sta_conversation_analysis,
+        risk_level=str(state.get("immediate_risk_level") or "none"),
+        idempotency_key=build_idempotency_key(
+            f"sta-analysis:{queue_key}:{state.get('user_id')}"
         ),
-        "response_source": "aika_direct",
-        "is_fallback": True,
-        "fallback_type": "rate_limit",
-        "retry_after_ms": 60_000,
-        "agent_reasoning": "System overloaded (Rate Limit): %s" % error_str,
+        payload_json={
+            "conversation_id": state.get("conversation_id"),
+            "user_id": state.get("user_id"),
+            "session_id": state.get("session_id"),
+            "message": state.get("message"),
+            # Bound payload growth — the analyzer only needs recent turns.
+            "conversation_history": (state.get("conversation_history") or [])[-40:],
+            "personal_context": state.get("personal_context") or {},
+            "preferred_model": state.get("preferred_model"),
+            "started_at_ts": (
+                started_at.timestamp()
+                if isinstance(started_at, datetime)
+                else None
+            ),
+        },
+        commit=True,
+    )
+
+
+def _smalltalk_blocked_by_crisis(
+    message: str, conversation_history: list[dict[str, Any]] | None
+) -> tuple[bool, list[str]]:
+    """Return (blocked, crisis_hits) for the deterministic smalltalk gate.
+
+    A short social filler ("iya", "bye") must NOT bypass the LLM when the
+    current message or the recent conversation carries crisis signals —
+    e.g. a bare "iya" replying to a safety question inside an active
+    crisis conversation still needs the full risk assessment.
+    """
+    message_hits = _detect_crisis_keywords(message)
+    recent_history = (conversation_history or [])[-6:]
+    history_text = " ".join(
+        str(msg.get("content") or "") for msg in recent_history if isinstance(msg, dict)
+    )
+    history_hits = [
+        h for h in _detect_crisis_keywords(history_text) if h not in message_hits
+    ]
+    all_hits = message_hits + history_hits
+    return bool(all_hits), all_hits
+
+
+def _build_rate_limit_fallback(error_str: str, crisis_hits: list[str] | None = None) -> dict[str, Any]:
+    """Return a state-update dict for the rate-limit / resource-exhausted error path.
+
+    Fail-safe: when the failing message contains crisis signals the fallback
+    escalates exactly like ``_build_model_error_fallback`` — a quota outage
+    must never silently downgrade a crisis message to "system busy" with
+    risk=none.
+    """
+    crisis_hits = crisis_hits or []
+    base: dict[str, Any] = {
+        "needs_agents": bool(crisis_hits),
+        "intent": "crisis_intervention" if crisis_hits else "system_busy",
+        "intent_confidence": 1.0,
+        "immediate_risk_level": "high" if crisis_hits else "none",
+        "risk_score": 0.75 if crisis_hits else 0.0,
+        "crisis_keywords_detected": crisis_hits,
+        "next_step": "cma" if crisis_hits else "none",
+        "agent_reasoning": (
+            "Rate limit hit with crisis keywords detected; escalating to CMA: %s" % error_str
+            if crisis_hits
+            else "System overloaded (Rate Limit): %s" % error_str
+        ),
     }
+    if crisis_hits:
+        base["aika_direct_response"] = _CRISIS_HOLDING_RESPONSE
+        base["response_source"] = "crisis_holding"
+        base["is_fallback"] = True
+        base["fallback_type"] = "rate_limit_crisis"
+        base["retry_after_ms"] = 60_000
+    else:
+        base.update({
+            "aika_direct_response": (
+                "Maaf ya, saat ini aku sedang melayani banyak teman-teman lain. "
+                "Boleh coba kirim pesan lagi dalam 1 menit? "
+                f"Kalau kamu butuh bantuan darurat, hubungi {HOTLINE_LINE}."
+            ),
+            "response_source": "aika_direct",
+            "is_fallback": True,
+            "fallback_type": "rate_limit",
+            "retry_after_ms": 60_000,
+        })
+    return base
 
 
 def _build_model_error_fallback(
@@ -951,56 +1073,86 @@ async def aika_decision_node(
         # -----------------------------------------------------------------
         # 2. Deterministic smalltalk short-circuit
         #    Bypasses the LLM call entirely for greetings and filler phrases.
+        #    Defense: never short-circuit when the current message OR the
+        #    recent conversation carries crisis signals — a bare "iya" reply
+        #    inside an active crisis conversation must still reach the LLM
+        #    risk assessment.
         # -----------------------------------------------------------------
         if normalized_role == "user" and _is_smalltalk_message(current_message):
-            cast(dict[str, Any], state).update({
-                "intent": "casual_chat",
-                "intent_confidence": 1.0,
-                "needs_agents": False,
-                "next_step": "none",
-                "agent_reasoning": (
-                    "Deterministic smalltalk route (no agent/tool invocation needed)."
-                ),
-                "immediate_risk_level": "none",
-                "crisis_keywords_detected": [],
-                "risk_reasoning": "No distress or risk signal detected from greeting/smalltalk.",
-                "aika_direct_response": _build_smalltalk_response(normalized_role),
-                "response_source": "aika_direct",
-            })
-            state["final_response"] = state.get("aika_direct_response")
-            state.setdefault("execution_path", []).append("aika_decision")
+            blocked, crisis_hits_smalltalk = _smalltalk_blocked_by_crisis(
+                current_message, state.get("conversation_history")
+            )
 
-            elapsed_ms = (time.time() - start_time) * 1000
-            if execution_id:
-                execution_tracker.complete_node(
-                    execution_id,
-                    "aika::decision",
-                    metrics={
-                        "intent": "casual_chat",
-                        "needs_agents": False,
-                        "duration_ms": elapsed_ms,
+            if blocked:
+                logger.warning(
+                    "Smalltalk-like message suppressed from short-circuit: "
+                    "crisis_hits=%d — deferring to LLM decision.",
+                    len(crisis_hits_smalltalk),
+                )
+            else:
+                cast(dict[str, Any], state).update({
+                    "intent": "casual_chat",
+                    "intent_confidence": 1.0,
+                    "needs_agents": False,
+                    "next_step": "none",
+                    "agent_reasoning": (
+                        "Deterministic smalltalk route (no agent/tool invocation needed)."
+                    ),
+                    "immediate_risk_level": "none",
+                    "crisis_keywords_detected": [],
+                    "risk_reasoning": "No distress or risk signal detected from greeting/smalltalk.",
+                    "aika_direct_response": _build_smalltalk_response(normalized_role),
+                    "response_source": "aika_direct",
+                })
+                state["final_response"] = state.get("aika_direct_response")
+                state.setdefault("execution_path", []).append("aika_decision")
+
+                elapsed_ms = (time.time() - start_time) * 1000
+                if execution_id:
+                    execution_tracker.complete_node(
+                        execution_id,
+                        "aika::decision",
+                        metrics={
+                            "intent": "casual_chat",
+                            "needs_agents": False,
+                            "duration_ms": elapsed_ms,
+                        },
+                    )
+                logger.info(
+                    "Aika Decision (deterministic smalltalk): duration=%.0fms", elapsed_ms
+                )
+                audit_id = await _record_decision_audit(
+                    db,
+                    state,
+                    raw_decision={
+                        "mode": "deterministic_smalltalk",
+                        "message": current_message,
+                        "decision": {
+                            "intent": state.get("sta_context", {}).get("intent"),
+                            "needs_agents": state.get("needs_agents"),
+                            "next_step": state.get("sta_context", {}).get("next_step"),
+                            "immediate_risk": state.get("immediate_risk_level"),
+                        },
                     },
                 )
-            logger.info(
-                "Aika Decision (deterministic smalltalk): duration=%.0fms", elapsed_ms
-            )
-            audit_id = await _record_decision_audit(
-                db,
-                state,
-                raw_decision={
-                    "mode": "deterministic_smalltalk",
-                    "message": current_message,
-                    "decision": {
-                        "intent": state.get("sta_context", {}).get("intent"),
-                        "needs_agents": state.get("needs_agents"),
-                        "next_step": state.get("sta_context", {}).get("next_step"),
-                        "immediate_risk": state.get("immediate_risk_level"),
-                    },
-                },
-            )
-            if audit_id:
-                state["decision_event_id"] = audit_id
-            return state
+                if audit_id:
+                    state["decision_event_id"] = audit_id
+
+                # Farewell fix: a goodbye must still trigger the durable
+                # end-of-conversation STA analysis even though we skip the
+                # LLM decision.
+                try:
+                    await _maybe_enqueue_conversation_end_sta(
+                        state, db, current_message, recompute=True
+                    )
+                except Exception as enqueue_err:
+                    logger.error(
+                        "Failed to enqueue end-of-conversation STA analysis on "
+                        "smalltalk route: %s",
+                        enqueue_err,
+                        exc_info=True,
+                    )
+                return state
 
         # -----------------------------------------------------------------
         # 3. LLM routing decision
@@ -1234,57 +1386,21 @@ async def aika_decision_node(
         # request-scoped DB session — a crash or session close before the task
         # finished silently dropped the crisis analysis. The analysis is now
         # enqueued as an autopilot action: executed by the worker in its own
-        # session with retry/backoff and dead-lettering.
-        if state.get("conversation_ended", False) and not state.get(
-            "sta_analysis_completed", False
-        ):
-            logger.info(
-                "Conversation ended — enqueueing durable STA analysis (includes screening)."
-            )
-            from app.domains.mental_health.models.autopilot_actions import (
-                AutopilotActionType,
-            )
-            from app.domains.mental_health.services.autopilot_action_service import (
-                build_idempotency_key,
-                enqueue_action,
-            )
-
-            queue_key = (
-                state.get("conversation_id")
-                or state.get("session_id")
-                or f"msg:{hashlib.sha256(str(state.get('message') or '').encode('utf-8')).hexdigest()[:16]}"
-            )
-            started_at = state.get("started_at")
-            await enqueue_action(
-                db,
-                action_type=AutopilotActionType.sta_conversation_analysis,
-                risk_level=str(state.get("immediate_risk_level") or "none"),
-                idempotency_key=build_idempotency_key(
-                    f"sta-analysis:{queue_key}:{state.get('user_id')}"
-                ),
-                payload_json={
-                    "conversation_id": state.get("conversation_id"),
-                    "user_id": state.get("user_id"),
-                    "session_id": state.get("session_id"),
-                    "message": state.get("message"),
-                    # Bound payload growth — the analyzer only needs recent turns.
-                    "conversation_history": (state.get("conversation_history") or [])[-40:],
-                    "personal_context": state.get("personal_context") or {},
-                    "preferred_model": state.get("preferred_model"),
-                    "started_at_ts": (
-                        started_at.timestamp()
-                        if isinstance(started_at, datetime)
-                        else None
-                    ),
-                },
-                commit=True,
-            )
+        # session with retry/backoff and dead-lettering. (Logic shared with
+        # the smalltalk short-circuit via _maybe_enqueue_conversation_end_sta.)
+        await _maybe_enqueue_conversation_end_sta(
+            state, db, current_message, recompute=False
+        )
 
     except Exception as exc:
         error_str = str(exc)
         error_msg = "Aika decision node failed: %s" % error_str
         logger.error(error_msg, exc_info=True)
         state.setdefault("errors", []).append(error_msg)
+
+        # Crisis detection runs FIRST on every failure path: an outage must
+        # never silently downgrade a message containing crisis signals.
+        crisis_hits = _detect_crisis_keywords(str(state.get("message") or ""))
 
         is_rate_limit = any(
             token in error_str
@@ -1297,15 +1413,20 @@ async def aika_decision_node(
         )
         if is_rate_limit:
             logger.warning(
-                "Rate limit hit in decision node — returning graceful fallback."
+                "Rate limit hit in decision node — returning graceful fallback "
+                "(crisis_hits=%d).",
+                len(crisis_hits),
             )
-            cast(dict[str, Any], state).update(_build_rate_limit_fallback(error_str))
+            cast(dict[str, Any], state).update(
+                _build_rate_limit_fallback(error_str, crisis_hits)
+            )
             if execution_id:
                 execution_tracker.complete_node(
-                    execution_id, "aika::decision", metrics={"fallback": "rate_limit"}
+                    execution_id,
+                    "aika::decision",
+                    metrics={"fallback": "rate_limit", "crisis_hits": len(crisis_hits)},
                 )
         else:
-            crisis_hits = _detect_crisis_keywords(str(state.get("message") or ""))
             cast(dict[str, Any], state).update(_build_model_error_fallback(error_str, crisis_hits))
             if execution_id:
                 execution_tracker.fail_node(execution_id, "aika::decision", error_str)

@@ -8,7 +8,7 @@ from app.database import Base
 from datetime import datetime
 
 if TYPE_CHECKING:
-    from .appointments import Appointment, Psychologist
+    from .appointments import Appointment, Counselor
     from .conversations import Conversation
     from .journal import JournalEntry
     from .social import UserBadge
@@ -75,14 +75,21 @@ class User(Base):
     consent_emergency_contact: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
     consent_marketing: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
     consent_ai_memory: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
+    # JWT revocation: embedded as the "tv" claim; incrementing it (password
+    # reset) invalidates every token issued before the change.
+    token_version: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
+    # Opt-in for Aika-initiated proactive chat messages (default OFF —
+    # Aika speaking first requires explicit consent; history in ledger as
+    # consent_type='proactive_chat').
+    consent_proactive_chat: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
 
     # Relationships - use string references to avoid circular imports
     conversations: Mapped[List["Conversation"]] = relationship("Conversation", back_populates="user")
     journal_entries: Mapped[List["JournalEntry"]] = relationship("JournalEntry", back_populates="user")
     awarded_badges: Mapped[List["UserBadge"]] = relationship("UserBadge", back_populates="user")
     appointments: Mapped[List["Appointment"]] = relationship("Appointment", back_populates="user")
-    psychologist_profile: Mapped[Optional["Psychologist"]] = relationship(
-        "Psychologist", 
+    counselor_profile: Mapped[Optional["Counselor"]] = relationship(
+        "Counselor", 
         back_populates="user", 
         uselist=False,
         cascade="all, delete-orphan"

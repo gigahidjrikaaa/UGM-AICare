@@ -132,7 +132,10 @@ async def test_gemini_chain_of_thought_json_decode_error_falls_back_high_risk(mo
 
 
 @pytest.mark.asyncio
-async def test_gemini_chain_of_thought_exception_falls_back_moderate(monkeypatch: pytest.MonkeyPatch) -> None:
+async def test_gemini_chain_of_thought_exception_falls_back_failsafe(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Generic exceptions must fail SAFE (high risk + human handoff), exactly
+    like JSON-parse failures — the old fail-open (risk 1 / tca) default let a
+    crashed classifier apply LESS scrutiny than a malformed response."""
     classifier = GeminiSTAClassifier()
 
     async def fake_generate_response(**_kwargs):
@@ -142,8 +145,25 @@ async def test_gemini_chain_of_thought_exception_falls_back_moderate(monkeypatch
 
     result = await classifier._gemini_chain_of_thought_assessment("hello", context={})
 
-    assert result.risk_level == 1
-    assert result.handoff is False
+    assert result.risk_level == 2
+    assert result.handoff is True
+    assert result.next_step == "human"
+
+
+@pytest.mark.asyncio
+async def test_gemini_failsafe_escalates_crisis_text_to_critical() -> None:
+    """The fail-safe default must consult the canonical lexicon: crisis text
+    during a classifier outage escalates to critical, not just high."""
+    from app.agents.sta.gemini_classifier import GeminiSTAClassifier as Cls
+
+    classifier = Cls()
+    response = classifier._failsafe_response(
+        "aku mau bunuh diri",
+        reason="Gemini outage",
+    )
+    assert response.risk_level == 3
+    assert response.next_step == "human"
+    assert response.handoff is True
 
 
 @pytest.mark.asyncio
@@ -177,7 +197,9 @@ async def test_get_cached_assessment_redis_hit(monkeypatch: pytest.MonkeyPatch) 
 
 
 @pytest.mark.asyncio
-async def test_get_cached_assessment_in_memory_fallback(monkeypatch: pytest.MonkeyPatch) -> None:
+async def test_get_cached_assessment_returns_none_on_cache_miss(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Cache miss returns None — the former in-memory fallback tier was dead
+    code (context is never passed by the service layer) and was removed."""
     classifier = GeminiSTAClassifier()
 
     class FakeRedis:
@@ -198,9 +220,7 @@ async def test_get_cached_assessment_in_memory_fallback(monkeypatch: pytest.Monk
     }
 
     result = await classifier._get_cached_assessment(payload, context=context)
-    assert result is not None
-    assert result.diagnostic_notes is not None
-    assert "Cached low-risk" in result.diagnostic_notes
+    assert result is None
 
 
 @pytest.mark.asyncio

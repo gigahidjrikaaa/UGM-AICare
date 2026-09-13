@@ -181,100 +181,81 @@ async def assess_risk_node(state: STAState, db: AsyncSession) -> STAState:
     except Exception as e:
         error_msg = f"Risk assessment failed: {str(e)}"
         state["errors"].append(error_msg)
-        state.setdefault("sta_context", {})["next_step"] = "end"  # Safe fallback
         logger.error(error_msg, exc_info=True)
-        
+
+        # Fail-safe policy (mirrors GeminiSTAClassifier._failsafe_response):
+        # the canonical lexicon decides the floor. Crisis signals escalate to
+        # CMA; otherwise we default to high severity with a human handoff —
+        # never "end" (the old fail-open default silently marked a failed
+        # assessment as safe).
+        try:
+            from app.agents.shared.crisis_lexicon import detect_crisis_keywords
+
+            crisis_hits = detect_crisis_keywords(
+                state.get("sta_context", {}).get("redacted_message") or state.get("message") or ""
+            )
+        except Exception:  # pragma: no cover - lexicon import must never fail
+            crisis_hits = []
+        sta_ctx = state.setdefault("sta_context", {})
+        if crisis_hits:
+            sta_ctx.update({
+                "severity": "critical",
+                "risk_level": 3,
+                "next_step": "cma",
+                "crisis_keywords_detected": crisis_hits[:5],
+            })
+        else:
+            sta_ctx.update({
+                "severity": "high",
+                "risk_level": 2,
+                "next_step": "human",
+            })
+        sta_ctx["assessment_failed_open_safe"] = False
+
         if execution_id:
             execution_tracker.fail_node(execution_id, "sta:assess_risk", str(e))
-    
+
     return state
-
-
-def decide_routing(state: STAState) -> str:
-    """Conditional edge: Route based on risk level and severity.
-    
-    Routing logic:
-        - High/Critical severity → escalate_sda (create case)
-        - Moderate + next_step=sca → route_sca (coaching)
-        - Otherwise → end (normal conversation)
-    
-    Args:
-        state: Current graph state
-        
-    Returns:
-        Target node name: "escalate_sda", "route_sca", or "end"
-    """
-    execution_id = state.get("execution_id")
-    
-    next_step = state.get("sta_context", {}).get("next_step", "end")
-    severity = state.get("sta_context", {}).get("severity", "low")
-    
-    # Track edge decision
-    if execution_id:
-        execution_tracker.trigger_edge(
-            execution_id, 
-            f"sta:decide_routing->{next_step}",
-            condition_result=True
-        )
-    
-    logger.info(f"STA routing decision: {next_step} (severity: {severity})")
-    
-    # High/critical always escalate to CMA
-    if severity in ("high", "critical"):
-        return "escalate_sda"
-    
-    # Moderate routes to TCA if needed
-    if next_step == "tca":
-        return "route_sca"
-    
-    return "end"
 
 
 def create_sta_graph(db: AsyncSession) -> StateGraph:
     """Create the STA LangGraph state machine.
-    
+
     Graph structure:
-        START → ingest_message → apply_redaction → assess_risk → decide_routing
-        
-        decide_routing branches:
-            - escalate_sda → END (will be handled by orchestrator)
-            - route_sca → END (will be handled by orchestrator)
-            - end → END (normal conversation continues)
-    
+        START → ingest_message → apply_redaction → assess_risk → END
+
+    NOTE on routing: this real-time graph is LEGACY — the active Aika
+    orchestrator performs triage deterministically in its decision node and
+    runs conversation-level STA via the durable background queue. The
+    conditional fan-out that used to live here ("escalate_sda" /
+    "route_sca" / "end") mapped ALL branches to END, so it pretended to
+    route while doing nothing; routing decisions are recorded in
+    ``sta_context`` by ``assess_risk`` and consumed by the orchestrator.
+
     Args:
         db: Database session for node operations
-        
+
     Returns:
         Compiled StateGraph ready for execution
     """
     workflow = StateGraph(STAState)
-    
+
     # Create async wrapper functions for db-dependent nodes
     async def apply_redaction_wrapper(state: STAState) -> STAState:
         return await apply_redaction_node(state, db)
-    
+
     async def assess_risk_wrapper(state: STAState) -> STAState:
         return await assess_risk_node(state, db)
-    
+
     # Add nodes
     workflow.add_node("ingest_message", ingest_message_node)
     workflow.add_node("apply_redaction", apply_redaction_wrapper)
     workflow.add_node("assess_risk", assess_risk_wrapper)
-    
-    # Define linear flow through nodes
+
+    # Define linear flow through nodes — routing happens downstream.
     workflow.set_entry_point("ingest_message")
     workflow.add_edge("ingest_message", "apply_redaction")
     workflow.add_edge("apply_redaction", "assess_risk")
-    
-    # Conditional routing from assess_risk
-    workflow.add_conditional_edges(
-        "assess_risk",
-        decide_routing,
-        {
-            "escalate_sda": END,  # Will be handled by orchestrator
-            "route_sca": END,     # Will be handled by orchestrator
-            "end": END
-        }
-    )
-    
+    workflow.add_edge("assess_risk", END)
+
     return workflow.compile()

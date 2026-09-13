@@ -60,6 +60,9 @@ export function ChatWindow({
   return (
     <div
       ref={chatContainerRef}
+      role="log"
+      aria-live="polite"
+      aria-label="Percakapan dengan Aika"
       className="flex-1 overflow-y-auto bg-transparent! px-2 pb-4 pt-4 sm:px-4 md:px-6"
       style={topFadeMaskStyle}
     >

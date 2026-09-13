@@ -452,8 +452,8 @@ export default function AikaChatWidget() {
                                             Appointment Created
                                         </div>
                                         <div className="space-y-1 text-white/70">
-                                            {m.appointment.psychologist?.full_name && (
-                                                <p><span className="text-white/40">Counselor:</span> {m.appointment.psychologist.full_name}</p>
+                                            {m.appointment.counselor?.full_name && (
+                                                <p><span className="text-white/40">Counselor:</span> {m.appointment.counselor.full_name}</p>
                                             )}
                                             {m.appointment.appointment_datetime && (
                                                 <p><span className="text-white/40">Time:</span> {new Date(m.appointment.appointment_datetime).toLocaleString('id-ID')}</p>

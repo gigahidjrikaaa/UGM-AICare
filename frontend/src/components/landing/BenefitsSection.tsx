@@ -26,7 +26,7 @@ const features = [
     titleKey: 'landing.benefits.card3.title',
     titleFallback: 'Human-in-the-Loop',
     descKey: 'landing.benefits.card3.desc',
-    descFallback: 'Future active integration with UGM Psychologists ensures that help reaches you proactively when high-risk patterns are detected.',
+    descFallback: 'Future active integration with UGM Counselors ensures that help reaches you proactively when high-risk patterns are detected.',
     icon: BridgeGlyph,
     span: "md:col-span-4 lg:col-span-4"
   }
@@ -45,7 +45,7 @@ export default function BenefitsSection() {
             {t('landing.benefits.title', 'More than just a chatbot.')}
           </h2>
           <p className="text-slate-400 text-lg leading-relaxed">
-            {t('landing.benefits.subtitle', 'Our vision is simple: Getting real humans to reach out before you even know you need them. UGM-AICare bridges the gap between AI triage and professional psychologist intervention.')}
+            {t('landing.benefits.subtitle', 'Our vision is simple: Getting real humans to reach out before you even know you need them. UGM-AICare bridges the gap between AI triage and professional counselor intervention.')}
           </p>
         </div>
 

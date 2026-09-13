@@ -57,7 +57,7 @@ async function handleResponse<T>(response: Response): Promise<T> {
 // Types
 // ========================================
 
-export interface Psychologist {
+export interface Counselor {
   id: number;
   name: string;
   specialization: string | null;
@@ -75,14 +75,14 @@ export interface AppointmentType {
 export interface Appointment {
   id: number;
   user_id: number;
-  psychologist_id: number;
+  counselor_id: number;
   appointment_type_id: number;
   appointment_datetime: string; // ISO 8601
   notes: string | null;
   status: 'scheduled' | 'completed' | 'cancelled' | 'moved' | 'no_show';
   created_at: string;
   updated_at: string;
-  psychologist: Psychologist;
+  counselor: Counselor;
   appointment_type: AppointmentType;
 }
 
@@ -96,7 +96,7 @@ export interface AppointmentStats {
 }
 
 export interface CreateAppointmentData {
-  psychologist_id: number;
+  counselor_id: number;
   appointment_type_id: number;
   appointment_datetime: string; // ISO 8601
   notes?: string;
@@ -122,10 +122,10 @@ export interface GetMyAppointmentsParams {
 // ========================================
 
 /**
- * Get all psychologists/counselors
+ * Get all counselors/counselors
  */
-export async function getPsychologists(availableOnly: boolean = false): Promise<Psychologist[]> {
-  const url = `${API_BASE}/api/v1/appointments/psychologists${
+export async function getCounselorOptions(availableOnly: boolean = false): Promise<Counselor[]> {
+  const url = `${API_BASE}/api/v1/appointments/counselors${
     availableOnly ? '?available_only=true' : ''
   }`;
   
@@ -135,20 +135,20 @@ export async function getPsychologists(availableOnly: boolean = false): Promise<
     }
   });
   
-  return handleResponse<Psychologist[]>(response);
+  return handleResponse<Counselor[]>(response);
 }
 
 /**
- * Get single psychologist by ID (Public - basic info only)
+ * Get single counselor by ID (Public - basic info only)
  */
-export async function getPublicPsychologist(id: number): Promise<Psychologist> {
-  const response = await fetch(`${API_BASE}/api/v1/appointments/psychologists/${id}`, {
+export async function getPublicCounselor(id: number): Promise<Counselor> {
+  const response = await fetch(`${API_BASE}/api/v1/appointments/counselors/${id}`, {
     headers: {
       'Content-Type': 'application/json'
     }
   });
   
-  return handleResponse<Psychologist>(response);
+  return handleResponse<Counselor>(response);
 }
 
 /**
@@ -303,7 +303,7 @@ export async function cancelAppointment(id: number): Promise<void> {
 }
 
 // ========================================
-// ADMIN PSYCHOLOGIST MANAGEMENT
+// ADMIN COUNSELOR MANAGEMENT
 // ========================================
 
 export interface Education {

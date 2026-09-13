@@ -1,10 +1,8 @@
 ---
-id: autopilot-architecture
-title: Autopilot Architecture
-sidebar_position: 3
+sidebar_position: 1
 ---
 
-# Autopilot Architecture
+# Autopilot Architecture &amp; Policy Governance
 
 The Aika Autopilot system enables policy-governed autonomous actions, allowing Aika to perform operational tasks (appointment booking, follow-up scheduling, check-in triggers) without human intervention — subject to configurable safety policies.
 
@@ -77,35 +75,9 @@ flowchart TD
 
 ---
 
-## Policy Matrix
+## Decision Matrix
 
-The policy matrix defines which actions are permitted at each risk level:
-
-```mermaid
-graph LR
-    subgraph "Action Types"
-        A1["book_appointment"]
-        A2["schedule_followup"]
-        A3["trigger_checkin"]
-        A4["send_resources"]
-        A5["update_screening"]
-    end
-
-    subgraph "Risk Levels"
-        R0["LOW (0)"]
-        R1["MODERATE (1)"]
-        R2["HIGH (2)"]
-        R3["CRITICAL (3)"]
-    end
-
-    subgraph "Policy Decisions"
-        ALLOW["✅ allow"]
-        APPROVAL["⚠️ require_approval"]
-        DENY["❌ deny"]
-    end
-```
-
-### Default Policy Configuration
+### Operational Actions
 
 | Action | LOW | MODERATE | HIGH | CRITICAL |
 |--------|-----|----------|------|----------|
@@ -115,9 +87,66 @@ graph LR
 | `send_resources` | allow | allow | allow | allow |
 | `update_screening` | allow | allow | allow | require_approval |
 
+### Policy-Governed Actions
+
+| Risk \ Action | create_checkin | create_case | mint_badge | publish_attestation |
+| --- | --- | --- | --- | --- |
+| none | allow | deny | allow | allow |
+| low | allow | deny | allow | allow |
+| moderate | allow | require_approval | allow | allow |
+| high | require_approval | allow | require_approval | allow |
+| critical | require_approval | allow | require_approval | allow |
+
+**Rationale:**
+- `create_case` at high/critical is `allow` to preserve safety escalation latency.
+- Reward-like on-chain actions (`mint_badge`) are approval-gated for high/critical.
+- Audit attestations (`publish_attestation`) are always auto-allowed to preserve continuous verifiability.
+- `create_case` at none/low is denied to avoid unnecessary escalation noise.
+
 ---
 
-## Execution Worker Architecture
+## Idempotency
+
+Each action includes an idempotency key computed as:
+
+```
+idempotency_key = hash(action_type + user_id + target_resource_id + time_window)
+```
+
+This prevents duplicate execution (e.g., double-booking an appointment) even if the proposal is made multiple times due to retries or re-processing. Key uniqueness is enforced at the DB level.
+
+### Per-Action Key Formulas (SHA-256)
+
+| Action | Raw Key Template |
+|--------|-----------------|
+| `create_checkin` | `create_checkin:{user_id}:{session_id}:{date_yyyy_mm_dd}` |
+| `create_case` | `create_case:{user_hash}:{session_id}:{risk_level}:{message_hash}` |
+| `mint_badge` | `mint_badge:{user_id}:{chain_id}:{badge_id}:{source_event_id}` |
+| `publish_attestation` | `publish_attestation:{subject_type}:{subject_id}:{payload_hash}` |
+
+### Minimal Hashed Attestation Payload
+
+No sensitive plaintext is written on-chain:
+
+```json
+{
+ "schema_version": "v1",
+ "event_type": "autopilot_action_confirmed",
+ "action_id": 12345,
+ "action_type": "publish_attestation",
+ "subject_type": "user",
+ "subject_id": "u_123",
+ "risk_level": "moderate",
+ "decision": "allow",
+ "payload_hash": "sha256_hex",
+ "evidence_hash": "sha256_hex",
+ "created_at": "2026-02-16T12:00:00Z"
+}
+```
+
+---
+
+## Worker Architecture
 
 ```mermaid
 flowchart TD
@@ -157,44 +186,12 @@ flowchart TD
 
 ---
 
-## Idempotency
+## Safety Guardrails
 
-Each action includes an idempotency key computed from:
-
-```
-idempotency_key = hash(action_type + user_id + target_resource_id + time_window)
-```
-
-This prevents duplicate execution of the same logical action (e.g., double-booking an appointment) even if the proposal is made multiple times due to retries or re-processing.
-
----
-
-## Admin Approval Interface
-
-```mermaid
-sequenceDiagram
-    participant AIKA as Aika
-    participant QUEUE as Action Queue
-    participant DB as PostgreSQL
-    participant ADMIN as Admin Dashboard
-    participant WORKER as Autopilot Worker
-
-    AIKA->>QUEUE: Propose action (require_approval)
-    QUEUE->>DB: INSERT AutopilotAction<br/>status = pending_approval
-    DB-->>ADMIN: Dashboard shows pending action
-
-    ADMIN->>DB: POST /admin/autopilot/{id}/approve
-    DB->>DB: UPDATE status = queued
-
-    WORKER->>DB: SELECT next queued action
-    DB-->>WORKER: Approved action
-    WORKER->>WORKER: Execute action
-    WORKER->>DB: UPDATE status = completed
-
-    Note over ADMIN,DB: Alternative: Reject
-    ADMIN->>DB: POST /admin/autopilot/{id}/reject
-    DB->>DB: UPDATE status = rejected
-```
+- Critical pathways must never bypass crisis escalation logic.
+- On-chain payloads must not include raw mental health text, names, emails, phone numbers, or identifiers.
+- Every autonomous action must have an idempotency key and status lifecycle trace.
+- Policy decision and rationale must be stored in audit logs.
 
 ---
 

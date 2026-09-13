@@ -129,7 +129,7 @@ export interface FullUserFlowSimulationResponse {
   case_id?: string | null;
   case_status?: string | null;
   case_severity?: string | null;
-  assigned_psychologist_id?: number | null;
+  assigned_counselor_id?: number | null;
   assigned_counselor_user_id?: number | null;
   assigned_counselor_name?: string | null;
   counselor_can_see_case: boolean;

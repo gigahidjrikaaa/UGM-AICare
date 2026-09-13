@@ -1,4 +1,4 @@
-"""Appointment and psychologist management models."""
+"""Appointment and counselor management models."""
 
 from typing import Optional, List, TYPE_CHECKING
 from sqlalchemy import Column, Integer, String, DateTime, ForeignKey, Text, Boolean, Float, JSON
@@ -9,9 +9,9 @@ from datetime import datetime
 if TYPE_CHECKING:
     from app.models.user import User
 
-class Psychologist(Base):
-    """Licensed psychologists available for appointments - extends User model."""
-    __tablename__ = "psychologists"
+class Counselor(Base):
+    """Licensed counselors available for appointments - extends User model."""
+    __tablename__ = "counselors"
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)
     user_id: Mapped[Optional[int]] = mapped_column(
@@ -41,8 +41,8 @@ class Psychologist(Base):
     updated_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.now, onupdate=datetime.now)
 
     # Relationships
-    user: Mapped[Optional["User"]] = relationship("User", back_populates="psychologist_profile")
-    appointments: Mapped[List["Appointment"]] = relationship("Appointment", back_populates="psychologist")
+    user: Mapped[Optional["User"]] = relationship("User", back_populates="counselor_profile")
+    appointments: Mapped[List["Appointment"]] = relationship("Appointment", back_populates="counselor")
 
 class AppointmentType(Base):
     """Types of appointments available."""
@@ -56,12 +56,12 @@ class AppointmentType(Base):
     appointments: Mapped[List["Appointment"]] = relationship("Appointment", back_populates="appointment_type")
 
 class Appointment(Base):
-    """User appointments with psychologists."""
+    """User appointments with counselors."""
     __tablename__ = "appointments"
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)
     user_id: Mapped[int] = mapped_column(Integer, ForeignKey("users.id"), nullable=False)
-    psychologist_id: Mapped[int] = mapped_column(Integer, ForeignKey("psychologists.id"), nullable=False)
+    counselor_id: Mapped[int] = mapped_column(Integer, ForeignKey("counselors.id"), nullable=False)
     appointment_type_id: Mapped[int] = mapped_column(Integer, ForeignKey("appointment_types.id"), nullable=False)
     
     appointment_datetime: Mapped[datetime] = mapped_column(DateTime, nullable=False)
@@ -72,5 +72,5 @@ class Appointment(Base):
     updated_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.now, onupdate=datetime.now)
 
     user: Mapped["User"] = relationship("User", back_populates="appointments")
-    psychologist: Mapped["Psychologist"] = relationship("Psychologist", back_populates="appointments")
+    counselor: Mapped["Counselor"] = relationship("Counselor", back_populates="appointments")
     appointment_type: Mapped["AppointmentType"] = relationship("AppointmentType", back_populates="appointments")

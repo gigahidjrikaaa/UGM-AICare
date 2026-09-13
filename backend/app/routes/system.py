@@ -11,7 +11,7 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.database import get_async_db
-from app.dependencies import get_current_active_user
+from app.dependencies import get_admin_user
 from app.models import User
 
 logger = logging.getLogger(__name__)
@@ -28,7 +28,7 @@ Tentang diriku (ini adalah bagaimana kamu memahami dirimu sendiri dan bisa kamu 
 
 @router.get("/env-check")
 async def get_env_check(
-    current_user: User = Depends(get_current_active_user),
+    current_user: User = Depends(get_admin_user),  # serves server logs: admins only
     db: AsyncSession = Depends(get_async_db),
 ) -> Dict[str, Any]:
     """Get system environment information and logs.

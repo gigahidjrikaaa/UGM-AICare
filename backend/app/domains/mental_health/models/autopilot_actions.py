@@ -22,6 +22,11 @@ class AutopilotActionType(str, enum.Enum):
     # Enqueued directly (bypasses the allow/deny policy engine) because it is
     # a safety analysis that must always run, never a user-facing action.
     sta_conversation_analysis = "sta_conversation_analysis"
+    # Closed-loop intervention plans: scheduled follow-up chat when a plan's
+    # promised next_check_in arrives. Allowed by the policy engine at every
+    # risk level — the gate is the user's proactive-chat consent, checked at
+    # creation AND at delivery (see plan_followup_service).
+    plan_followup = "plan_followup"
 
 
 class AutopilotPolicyDecision(str, enum.Enum):

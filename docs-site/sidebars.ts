@@ -12,11 +12,9 @@ const sidebars: SidebarsConfig = {
       label: 'Research & Thesis',
       collapsed: false,
       items: [
-        'research/problem-statement',
-        'research/methodology',
+        'research/problem-and-methodology',
         'research/evaluation-framework',
-        'research/evaluation',
-        'research/ethics',
+        'research/psychological-methods',
       ],
     },
     {
@@ -26,14 +24,8 @@ const sidebars: SidebarsConfig = {
       items: [
         'architecture/system-overview',
         'architecture/agentic-framework',
-        'architecture/use-cases',
-        'architecture/business-processes',
-        'architecture/user-journeys',
-        'architecture/component-architecture',
-        'architecture/database-schema',
-        'architecture/data-flow',
-        'architecture/security-architecture',
-        'architecture/deployment-topology',
+        'architecture/requirements-and-flows',
+        'architecture/data-and-security',
         'architecture/meta-agent-aika',
         'architecture/safety-triage-agent',
         'architecture/therapeutic-coach-agent',
@@ -43,13 +35,10 @@ const sidebars: SidebarsConfig = {
     },
     {
       type: 'category',
-      label: 'Passive Screening & Safeguards',
+      label: 'Covert Screening',
       collapsed: true,
       items: [
-        'passive-screening/methodology',
-        'passive-screening/screening-pipeline',
-        'passive-screening/validated-instruments',
-        'passive-screening/data-safety',
+        'passive-screening/covert-screening',
       ],
     },
     {
@@ -58,28 +47,15 @@ const sidebars: SidebarsConfig = {
       collapsed: true,
       items: [
         'aika-autopilot/autopilot-architecture',
-        'aika-autopilot/policy-governed-autonomy',
         'aika-autopilot/implementation-plan',
       ],
     },
     {
       type: 'category',
-      label: 'Care Token & Blockchain',
+      label: 'Privacy-Preserving Analytics',
       collapsed: true,
       items: [
-        'care-token/tokenomics',
-        'care-token/smart-contracts',
-        'care-token/wallet-integration',
-      ],
-    },
-    {
-      type: 'category',
-      label: 'Analytics & Data Privacy',
-      collapsed: true,
-      items: [
-        'analytics/privacy-first-data',
-        'analytics/data-privacy-lifecycle',
-        'analytics/database-best-practices',
+        'analytics/privacy-and-analytics',
       ],
     },
     {
@@ -88,11 +64,7 @@ const sidebars: SidebarsConfig = {
       collapsed: true,
       items: [
         'engineering/tech-stack',
-        'engineering/tech-stack-layers',
-        'engineering/development-workflow',
         'engineering/api-reference',
-        'engineering/api-data-contracts',
-        'engineering/frontend-overview',
       ],
     },
     {
@@ -100,12 +72,8 @@ const sidebars: SidebarsConfig = {
       label: 'Deployment & Operations',
       collapsed: true,
       items: [
-        'deployment/infrastructure-map',
-        'deployment/ci-cd-pipeline',
-        'deployment/ci-cd-flow',
-        'deployment/observability',
-        'deployment/monitoring',
         'deployment/setup',
+        'deployment/ci-cd-and-monitoring',
       ],
     },
   ],

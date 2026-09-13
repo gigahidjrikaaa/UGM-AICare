@@ -7,7 +7,7 @@ import type {
   JournalEntryItem,
   JournalReflectionPointResponse,
   JournalEntryCreate,
-  Psychologist,
+  Counselor,
   AppointmentType,
   AppointmentCreate,
   Appointment
@@ -240,14 +240,14 @@ export const getMyJournalReflections = async (limit: number = 5): Promise<Journa
   }
 };
 
-// --- Psychologist Appointments API ---
-export const getPsychologists = async (): Promise<Psychologist[]> => {
+// --- Counselor Appointments API ---
+export const getCounselorOptions = async (): Promise<Counselor[]> => {
   try {
-    const response = await apiClient.get<Psychologist[]>('/psychologists');
+    const response = await apiClient.get<Counselor[]>('/counselors');
     return response.data;
   } catch (error) {
-    console.error('Error fetching psychologists:', error);
-    let errorMessage = 'Failed to load psychologists.';
+    console.error('Error fetching counselors:', error);
+    let errorMessage = 'Failed to load counselors.';
     if (axios.isAxiosError(error) && error.response) {
       errorMessage = error.response.data?.detail || `API Error (${error.response.status}): ${error.message}`;
     } else if (error instanceof Error) {

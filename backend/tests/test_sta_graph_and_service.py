@@ -6,7 +6,7 @@ from unittest.mock import AsyncMock
 
 import pytest
 
-from app.agents.sta.sta_graph import ingest_message_node, decide_routing
+from app.agents.sta.sta_graph import ingest_message_node, assess_risk_node
 from app.agents.sta.schemas import STAClassifyRequest, STAClassifyResponse
 
 
@@ -22,19 +22,9 @@ async def test_ingest_message_node_adds_execution_path() -> None:
     assert result["execution_path"] == ["ingest_message"]
 
 
-def test_decide_routing_routes_human_for_high_severity() -> None:
-    state = {"sta_context": {"severity": "high"}}
-    assert decide_routing(state) == "escalate_sda"
-
-
-def test_decide_routing_routes_sca_for_tca_next_step() -> None:
-    state = {"sta_context": {"severity": "low", "next_step": "tca"}}
-    assert decide_routing(state) == "route_sca"
-
-
-def test_decide_routing_routes_resources_by_default() -> None:
-    state = {"sta_context": {"severity": "low", "next_step": "resource"}}
-    assert decide_routing(state) == "end"
+# NOTE: decide_routing tests removed — the legacy conditional fan-out (all
+# branches → END) was deleted; the graph is now linear and routing happens
+# downstream in the Aika orchestrator.
 
 
 @pytest.mark.asyncio

@@ -22,7 +22,7 @@ Safety Triage Agent (STA) - Post-Conversation Background Task:
     - Automatically triggered via asyncio.create_task() when a conversation ends.
     - Manually triggerable via the trigger_conversation_analysis tool.
     - Performs deep clinical analysis: risk trend, PHQ-9/GAD-7/DASS-21 screening,
-      psychologist report, and CMA referral recommendation.
+      counselor report, and CMA referral recommendation.
     - Results persisted to ConversationRiskAssessment and ScreeningProfile tables.
 
 Sub-module map:

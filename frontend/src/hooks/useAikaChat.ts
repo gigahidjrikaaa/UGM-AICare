@@ -7,6 +7,7 @@
 
 import { useState, useCallback, useRef, useEffect } from 'react';
 import { useSession } from 'next-auth/react';
+import { fetchWelcomeGreeting } from '@/services/proactiveApi';
 import { v4 as uuidv4 } from 'uuid';
 import { useAika, type AikaMessage, type AikaMetadata, type ReasoningTrace } from './useAika';
 import { useThinkingSteps } from '@/hooks/useThinkingSteps';
@@ -22,12 +23,24 @@ export interface ToolActivityLog {
   timestamp: string;
 }
 
+export interface ProactiveSeedMessage {
+  id: string;
+  content: string;
+  session_id: string;
+  source: string;
+  created_at?: string | null;
+}
+
 interface UseAikaChatOptions {
   sessionId: string;
   showAgentActivity?: boolean;
   showRiskIndicators?: boolean;
   preferredModel?: string;
   onToolActivity?: (activity: ToolActivityLog) => void;
+  /** Aika-initiated messages (plan follow-ups) awaiting display in this thread. */
+  proactiveMessages?: ProactiveSeedMessage[];
+  /** Called once per proactive message after it is rendered (server mark-read). */
+  onProactiveConsumed?: (messageId: string) => void;
 }
 
 export function useAikaChat({ 
@@ -35,7 +48,9 @@ export function useAikaChat({
   showAgentActivity = true, 
   showRiskIndicators = true,
   preferredModel,
-  onToolActivity 
+  onToolActivity,
+  proactiveMessages,
+  onProactiveConsumed 
 }: UseAikaChatOptions) {
   const { data: session } = useSession();
   const [messages, setMessages] = useState<Message[]>([]);
@@ -147,31 +162,31 @@ export function useAikaChat({
       return null;
     }
 
-    const psychologist = payload.psychologist;
+    const counselor = payload.counselor;
     const appointmentType = payload.appointment_type;
 
     return {
       id: payload.id,
       student_id: typeof payload.student_id === 'number' ? payload.student_id : 0,
-      psychologist_id: typeof payload.psychologist_id === 'number' ? payload.psychologist_id : 0,
+      counselor_id: typeof payload.counselor_id === 'number' ? payload.counselor_id : 0,
       appointment_datetime: payload.appointment_datetime,
       appointment_type_id: typeof payload.appointment_type_id === 'number' ? payload.appointment_type_id : 0,
       status: (typeof payload.status === 'string' ? payload.status : 'scheduled') as Appointment['status'],
       notes: typeof payload.notes === 'string' ? payload.notes : undefined,
       location: typeof payload.location === 'string' ? payload.location : undefined,
-      psychologist: psychologist && typeof psychologist === 'object'
+      counselor: counselor && typeof counselor === 'object'
         ? {
-            id: typeof (psychologist as Record<string, unknown>).id === 'number'
-              ? (psychologist as Record<string, unknown>).id as number
+            id: typeof (counselor as Record<string, unknown>).id === 'number'
+              ? (counselor as Record<string, unknown>).id as number
               : 0,
-            full_name: typeof (psychologist as Record<string, unknown>).full_name === 'string'
-              ? (psychologist as Record<string, unknown>).full_name as string
+            full_name: typeof (counselor as Record<string, unknown>).full_name === 'string'
+              ? (counselor as Record<string, unknown>).full_name as string
               : 'Psikolog',
-            specialization: Array.isArray((psychologist as Record<string, unknown>).specialization)
-              ? (psychologist as Record<string, unknown>).specialization as string[]
+            specialization: Array.isArray((counselor as Record<string, unknown>).specialization)
+              ? (counselor as Record<string, unknown>).specialization as string[]
               : undefined,
-            languages: Array.isArray((psychologist as Record<string, unknown>).languages)
-              ? (psychologist as Record<string, unknown>).languages as string[]
+            languages: Array.isArray((counselor as Record<string, unknown>).languages)
+              ? (counselor as Record<string, unknown>).languages as string[]
               : undefined,
           }
         : undefined,
@@ -216,7 +231,7 @@ export function useAikaChat({
     let next = rawText;
 
     next = next.replace(/```(?:json)?\s*([\s\S]*?)```/gi, (block, body) => {
-      if (/plan_steps|resource_cards|intervention_plan|appointment_datetime|psychologist_id|appointment_type_id/i.test(body)) {
+      if (/plan_steps|resource_cards|intervention_plan|appointment_datetime|counselor_id|appointment_type_id/i.test(body)) {
         return '';
       }
       return block;
@@ -224,7 +239,7 @@ export function useAikaChat({
 
     const trimmed = next.trim();
     if ((hasInterventionPlan || hasAppointment) && /^\{[\s\S]*\}$/.test(trimmed)) {
-      if (/plan_steps|resource_cards|intervention_plan|appointment_datetime|psychologist_id|appointment_type_id/i.test(trimmed)) {
+      if (/plan_steps|resource_cards|intervention_plan|appointment_datetime|counselor_id|appointment_type_id/i.test(trimmed)) {
         return '';
       }
     }
@@ -473,17 +488,46 @@ export function useAikaChat({
   /**
    * Initialize with greeting message
    */
+  const consumedProactiveIdsRef = useRef<Set<string>>(new Set());
+
+  const buildProactiveBubble = useCallback((pm: ProactiveSeedMessage): Message => {
+    const conversationId = uuidv4();
+    lastConversationIdRef.current = conversationId;
+    return {
+      id: pm.id,
+      role: 'assistant',
+      content: pm.content,
+      timestamp: new Date(pm.created_at || Date.now()),
+      session_id: pm.session_id || sessionId,
+      conversation_id: conversationId,
+      created_at: pm.created_at || new Date().toISOString(),
+      updated_at: new Date().toISOString(),
+      metadata: { isProactive: true },
+    };
+  }, [sessionId]);
+
   useEffect(() => {
     if (messages.length === 0) {
       const greetingId = uuidv4();
       const conversationId = uuidv4();
       lastConversationIdRef.current = conversationId;
 
+      const DEFAULT_GREETING = 'Halo! Aku Aika, asisten AI untuk kesehatan mentalmu. Bagaimana kabarmu hari ini? 💙';
+      const proactiveBubbles = (proactiveMessages || [])
+        .filter((pm) => !consumedProactiveIdsRef.current.has(pm.id))
+        .map(buildProactiveBubble);
+      (proactiveMessages || []).forEach((pm) => consumedProactiveIdsRef.current.add(pm.id));
+
+      // Personalized greeting only makes sense on a plain open (no proactive
+      // plan follow-up pending — that bubble IS the opener in that case).
+      const fetchPersonalized = proactiveBubbles.length === 0;
+
       setMessages([
+        ...proactiveBubbles,
         {
           id: greetingId,
           role: 'assistant',
-          content: 'Halo! Aku Aika, asisten AI untuk kesehatan mentalmu. Bagaimana kabarmu hari ini? 💙',
+          content: DEFAULT_GREETING,
           timestamp: new Date(),
           session_id: sessionId,
           conversation_id: conversationId,
@@ -494,8 +538,62 @@ export function useAikaChat({
           },
         },
       ]);
+
+      if (proactiveBubbles.length > 0) {
+        (proactiveMessages || []).forEach((pm) => onProactiveConsumed?.(pm.id));
+        return;
+      }
+
+      // "Continue where you left off": swap the default greeting for the
+      // personalized one if it arrives quickly (cache hits are ~instant).
+      // If it is slow or fails, the default greeting simply stays.
+      let cancelled = false;
+      const swapDeadlineMs = 2000;
+      (async () => {
+        const timeout = new Promise<null>((resolve) =>
+          window.setTimeout(() => resolve(null), swapDeadlineMs)
+        );
+        const greeting = await Promise.race([
+          fetchWelcomeGreeting().catch(() => null),
+          timeout,
+        ]);
+        if (cancelled || !greeting?.text) return;
+        setMessages((prev) => {
+          // Only swap while the conversation is untouched (just the seed).
+          if (prev.length !== 1) return prev;
+          const [seed] = prev;
+          if (!seed.metadata?.isSeedGreeting) return prev;
+          return [
+            {
+              ...seed,
+              content: greeting.text,
+              updated_at: new Date().toISOString(),
+            },
+          ];
+        });
+      })();
+      return () => {
+        cancelled = true;
+      };
     }
-  }, [sessionId, messages.length]);
+  }, [sessionId, messages.length, proactiveMessages, buildProactiveBubble, onProactiveConsumed]);
+
+  // Live arrival: a proactive message may arrive via SSE while the chat is open.
+  useEffect(() => {
+    if (messages.length === 0 || !proactiveMessages?.length) return;
+    const unseen = proactiveMessages.filter((pm) => !consumedProactiveIdsRef.current.has(pm.id));
+    if (unseen.length === 0) return;
+    unseen.forEach((pm) => consumedProactiveIdsRef.current.add(pm.id));
+    const bubbles = unseen.map(buildProactiveBubble);
+    setMessages((prev) => {
+      const greetingIndex = prev.findIndex((m) => m.metadata?.isSeedGreeting);
+      if (greetingIndex === -1) return [...prev, ...bubbles];
+      const next = [...prev];
+      next.splice(greetingIndex, 0, ...bubbles);
+      return next;
+    });
+    unseen.forEach((pm) => onProactiveConsumed?.(pm.id));
+  }, [proactiveMessages, messages.length, buildProactiveBubble, onProactiveConsumed]);
 
   /**
    * Handle input change

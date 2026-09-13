@@ -29,6 +29,7 @@ from typing import Any, Protocol, cast
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.core.crisis_resources import UGM_CRISIS_CENTER_PHONE
 from app.agents.execution_tracker import execution_tracker
 from app.agents.graph_state import AikaOrchestratorState, IAState
 from langchain_core.runnables import RunnableConfig
@@ -367,7 +368,9 @@ async def parallel_crisis_node(
     Returns:
         Updated state with merged TCA and CMA outputs.
     """
-    db: AsyncSession = config["configurable"]["db"]
+    # NOTE: the request-scoped session in config is intentionally NOT used
+    # for either branch — each branch opens its own isolated session below so
+    # CMA's commit/rollback can never contaminate TCA's flushes.
     execution_id = state.get("execution_id")
     if execution_id:
         execution_tracker.start_node(execution_id, "aika::parallel_crisis", "aika")
@@ -379,21 +382,53 @@ async def parallel_crisis_node(
             state.get("crisis_keywords_detected"),
         )
 
-        # Shallow-copy the state dict for each branch.  Both sub-graphs only
-        # *read* the shared mutable fields (e.g. conversation_history) and write
-        # disjoint keys (TCA → intervention_*, CMA → case_*), so a shallow copy
-        # is safe and avoids the cost of deep-copying the full conversation history.
-        tca_input = cast(dict[str, Any], state).copy()
-        cma_input = cast(dict[str, Any], state).copy()
+        # Each branch gets its OWN DB session. Previously both branches ran on
+        # the single request-scoped session: CMA commits mid-graph while TCA
+        # flushes, and CMA's error rollback could erase TCA's persisted plan —
+        # cross-branch commit/rollback contamination on the highest-stakes
+        # path. Isolated sessions follow the same pattern as parallel tool
+        # execution in tool_calling.
+        #
+        # Context dicts are deep-copied because restored checkpoint state can
+        # alias tca_context/cma_context between branches; shallow dict copies
+        # were not enough.
+        import copy
+
+        from app.database import AsyncSessionLocal
+
+        def _branch_input() -> dict[str, Any]:
+            branch = cast(dict[str, Any], state).copy()
+            for ctx_key in ("tca_context", "cma_context"):
+                branch[ctx_key] = copy.deepcopy(state.get(ctx_key) or {})
+            return branch
+
+        tca_input = _branch_input()
+        cma_input = _branch_input()
 
         # Flag TCA that it is running in parallel crisis mode so that its
         # safety_review_node does NOT block plan persistence for high/critical
         # severity — CMA handles the escalation, TCA provides coping support.
         tca_input["parallel_crisis_mode"] = True
 
+        async def _run_tca() -> AikaOrchestratorState:
+            async with AsyncSessionLocal() as tca_db:
+                branch_config = {
+                    **config,
+                    "configurable": {**config.get("configurable", {}), "db": tca_db},
+                }
+                return await execute_tca_subgraph(
+                    cast(AikaOrchestratorState, tca_input), branch_config
+                )
+
+        async def _run_cma() -> AikaOrchestratorState:
+            async with AsyncSessionLocal() as cma_db:
+                return await execute_cma_subgraph(
+                    cast(AikaOrchestratorState, cma_input), cma_db
+                )
+
         tca_result, cma_result = await asyncio.gather(
-            execute_tca_subgraph(cast(AikaOrchestratorState, tca_input), config),
-            execute_cma_subgraph(cast(AikaOrchestratorState, cma_input), db),
+            _run_tca(),
+            _run_cma(),
             return_exceptions=True,
         )
 
@@ -584,7 +619,7 @@ async def synthesize_final_response(
         state.setdefault("errors", []).append(error_msg)
         state["final_response"] = (
             "Maaf ya, aku mengalami sedikit kendala. "
-            "Kalau urgent, hubungi Crisis Centre UGM: 0851-0111-0800"
+            "Kalau urgent, hubungi Crisis Centre UGM: " + UGM_CRISIS_CENTER_PHONE
         )
         if execution_id:
             execution_tracker.fail_node(execution_id, "aika::synthesize", str(exc))

@@ -19,7 +19,6 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.domains.mental_health.models import ContentResource
-from app.core.settings import settings
 from app.database import AsyncSessionLocal
 
 logger = logging.getLogger(__name__)
@@ -160,7 +159,12 @@ async def ingest_pdf_resource(file: UploadFile) -> ResourceIngestionResult:
 
 
 async def enqueue_embedding_job(resource_id: int) -> None:
-    logger.info("Queueing embedding job for resource %s", resource_id)
+    """Run the embedding pipeline for a resource.
+
+    Scheduled as a FastAPI BackgroundTask by the content-resource routes, so it
+    executes in-process after the response is sent (no Celery worker required).
+    """
+    logger.info("Running embedding job for resource %s", resource_id)
 
     async with AsyncSessionLocal() as db:
         resource = await db.get(ContentResource, resource_id)
@@ -170,15 +174,12 @@ async def enqueue_embedding_job(resource_id: int) -> None:
         resource.embedding_status = "queued"
         await db.commit()
 
-    if not settings.celery_broker_url:
-        logger.warning("CELERY_BROKER_URL is not set; embedding job will not be processed")
-        return
+    from app.services.embedding_service import process_embedding
 
     try:
-        from app.tasks.embedding_tasks import process_embedding_job
-        process_embedding_job.delay(resource_id)
+        await process_embedding(resource_id)
     except Exception as exc:
-        logger.error("Failed to enqueue embedding job for %s: %s", resource_id, exc, exc_info=True)
+        logger.error("Embedding job failed for %s: %s", resource_id, exc, exc_info=True)
 
 
 async def ensure_resource_exists(db: AsyncSession, resource_id: int) -> ContentResource:

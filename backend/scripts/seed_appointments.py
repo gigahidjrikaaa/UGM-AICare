@@ -6,7 +6,7 @@ from sqlalchemy import create_engine
 # Add the project root to the Python path
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from app.models import Psychologist, AppointmentType
+from app.models import Counselor, AppointmentType
 from backend.app.database import Base  # <-- Ensure this is the declarative base
 
 # --- Database Setup ---
@@ -14,12 +14,12 @@ DATABASE_URL = "sqlite:///./test.db"  # Use a test database
 engine = create_engine(DATABASE_URL)
 
 def seed_data(db: Session):
-    # --- Seed Psychologists ---
-    psychologists = [
-        Psychologist(name="Dr. Budi Santoso", specialization="Clinical Psychology", image_url="https://example.com/budi.jpg", is_available=True),
-        Psychologist(name="Dr. Citra Lestari", specialization="Child Psychology", image_url="https://example.com/citra.jpg", is_available=True),
+    # --- Seed Counselors ---
+    counselors = [
+        Counselor(name="Dr. Budi Santoso", specialization="Clinical Psychology", image_url="https://example.com/budi.jpg", is_available=True),
+        Counselor(name="Dr. Citra Lestari", specialization="Child Psychology", image_url="https://example.com/citra.jpg", is_available=True),
     ]
-    db.add_all(psychologists)
+    db.add_all(counselors)
     db.commit()
 
     # --- Seed Appointment Types ---

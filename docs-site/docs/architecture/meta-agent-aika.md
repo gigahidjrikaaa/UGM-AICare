@@ -22,7 +22,7 @@ Aika is the primary interface for student interactions. To the student, Aika app
 Aika presents differently depending on who is talking to it. This is not cosmetic - the underlying tool access, system prompt, and permitted operations genuinely differ.
 
 ### For Students
-Aika is an empathetic companion. It uses casual Indonesian (matching the student's register), avoids clinical jargon, and gently steers towards healthy coping behaviours. When the student needs a psychologist, Aika handles the entire booking flow conversationally.
+Aika is an empathetic companion. It uses casual Indonesian (matching the student's register), avoids clinical jargon, and gently steers towards healthy coping behaviours. When the student needs a counselor, Aika handles the entire booking flow conversationally.
 
 ### For Counsellors
 Aika is a clinical assistant. It can retrieve case summaries, pull risk assessment histories, and trigger on-demand conversation analysis (i.e., manually invoke the STA on a specific conversation). It speaks more formally and surfaces data in structured formats.

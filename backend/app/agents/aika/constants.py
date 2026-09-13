@@ -9,19 +9,13 @@ from __future__ import annotations
 # ---------------------------------------------------------------------------
 # Crisis detection vocabulary (Indonesian + English)
 # ---------------------------------------------------------------------------
-# Checked against every incoming message in O(n·k) time.  Keep the list
-# purposefully conservative: false positives trigger unnecessary CMA escalation.
-CRISIS_KEYWORDS: tuple[str, ...] = (
-    "suicide",
-    "bunuh diri",
-    "kill myself",
-    "end my life",
-    "tidak ingin hidup lagi",
-    "self-harm",
-    "menyakiti diri",
-    "overdose",
-    "mau mati",
-    "ingin mati",
+# DEPRECATED as a source of truth: the canonical crisis lexicon lives in
+# ``app.agents.shared.crisis_lexicon`` and is consumed by the deterministic
+# safety net, the STA prescreen, and the decision prompt alike. This alias is
+# kept for backward compatibility with existing imports.
+from app.agents.shared.crisis_lexicon import (  # noqa: E402,F401
+    CRISIS_KEYWORDS,
+    has_crisis_signal,
 )
 
 # ---------------------------------------------------------------------------

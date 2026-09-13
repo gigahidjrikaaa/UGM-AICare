@@ -10,7 +10,7 @@ class AppointmentUser(BaseModel):
 
     model_config = ConfigDict(from_attributes=True)
 
-class PsychologistResponse(BaseModel):
+class CounselorResponse(BaseModel):
     id: int
     name: str
     specialization: Optional[str] = None
@@ -22,7 +22,7 @@ class PsychologistResponse(BaseModel):
 class AppointmentResponse(BaseModel):
     id: int
     user: AppointmentUser
-    psychologist: PsychologistResponse
+    counselor: CounselorResponse
     appointment_type: Optional[str] = None
     appointment_datetime: datetime
     notes: Optional[str] = None

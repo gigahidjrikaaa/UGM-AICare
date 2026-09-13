@@ -161,28 +161,28 @@ export function AppointmentCard({ appointment, onCancel, onReschedule }: Appoint
           </div>
         </div>
 
-        {/* Psychologist Info */}
-        {appointment.psychologist && (
+        {/* Counselor Info */}
+        {appointment.counselor && (
           <div className="flex items-start gap-4">
             <div className="p-3 bg-ugm-blue/5 rounded-xl">
               <User className="w-5 h-5 text-ugm-blue" />
             </div>
             <div className="flex-1">
               <p className="text-sm font-semibold text-gray-500">Psikolog</p>
-              <p className="text-base font-bold text-gray-900">{appointment.psychologist.full_name}</p>
-              {appointment.psychologist.specialization && appointment.psychologist.specialization.length > 0 && (
+              <p className="text-base font-bold text-gray-900">{appointment.counselor.full_name}</p>
+              {appointment.counselor.specialization && appointment.counselor.specialization.length > 0 && (
                 <div className="flex items-center gap-2 mt-1">
                   <Briefcase className="w-4 h-4 text-ugm-gold" />
                   <p className="text-sm text-gray-600">
-                    {appointment.psychologist.specialization.join(', ')}
+                    {appointment.counselor.specialization.join(', ')}
                   </p>
                 </div>
               )}
-              {appointment.psychologist.languages && appointment.psychologist.languages.length > 0 && (
+              {appointment.counselor.languages && appointment.counselor.languages.length > 0 && (
                 <div className="flex items-center gap-2 mt-1">
                   <Languages className="w-4 h-4 text-ugm-gold" />
                   <p className="text-sm text-gray-600">
-                    {appointment.psychologist.languages.join(', ')}
+                    {appointment.counselor.languages.join(', ')}
                   </p>
                 </div>
               )}

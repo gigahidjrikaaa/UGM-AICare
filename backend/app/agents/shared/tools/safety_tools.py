@@ -39,6 +39,14 @@ MAX_ASSESSMENTS = 10
 MAX_CASES = 5
 MAX_RESOURCES = 10
 
+# ---------------------------------------------------------------------------
+# Static crisis resources — ALWAYS available fallback, sourced from the
+# canonical registry (app.core.crisis_resources). Do not edit numbers here.
+# ---------------------------------------------------------------------------
+from app.core.crisis_resources import CRISIS_RESOURCES
+
+STATIC_CRISIS_RESOURCES: List[Dict[str, Any]] = CRISIS_RESOURCES
+
 
 def _coerce_user_id_int(user_id: str) -> Optional[int]:
     try:
@@ -82,6 +90,8 @@ async def get_risk_assessment_history(
     db: AsyncSession,
     user_id: str,
     limit: int = MAX_ASSESSMENTS,
+    requester_user_id: Optional[int] = None,
+    requester_role: Optional[str] = None,
     **kwargs
 ) -> Dict[str, Any]:
     """
@@ -91,6 +101,23 @@ async def get_risk_assessment_history(
     SENSITIVE DATA - requires consent check.
     """
     try:
+        # Counselor scoping: target patient must be in assigned scope.
+        from app.domains.mental_health.services.counselor_scope import (
+            check_counselor_tool_access,
+            tool_access_denied,
+        )
+
+        try:
+            _target_patient = int(user_id)
+        except (TypeError, ValueError):
+            _target_patient = None
+
+        _access = await check_counselor_tool_access(
+            db, requester_user_id, requester_role, patient_user_id=_target_patient
+        )
+        if not _access.allowed:
+            logger.warning("Tool access denied: get_risk_assessment_history (%s)", _access.reason)
+            return tool_access_denied(_access.reason)
         normalized_user_id = _coerce_user_id_int(user_id)
         if normalized_user_id is None:
             return {
@@ -170,6 +197,8 @@ async def get_active_safety_cases(
     db: AsyncSession,
     user_id: str,
     limit: int = MAX_CASES,
+    requester_user_id: Optional[int] = None,
+    requester_role: Optional[str] = None,
     **kwargs
 ) -> Dict[str, Any]:
     """
@@ -179,6 +208,23 @@ async def get_active_safety_cases(
     HIGHLY SENSITIVE - safety-critical data.
     """
     try:
+        # Counselor scoping: target patient must be in assigned scope.
+        from app.domains.mental_health.services.counselor_scope import (
+            check_counselor_tool_access,
+            tool_access_denied,
+        )
+
+        try:
+            _target_patient = int(user_id)
+        except (TypeError, ValueError):
+            _target_patient = None
+
+        _access = await check_counselor_tool_access(
+            db, requester_user_id, requester_role, patient_user_id=_target_patient
+        )
+        if not _access.allowed:
+            logger.warning("Tool access denied: get_active_safety_cases (%s)", _access.reason)
+            return tool_access_denied(_access.reason)
         if limit > MAX_CASES:
             limit = MAX_CASES
             
@@ -274,58 +320,66 @@ async def get_crisis_resources(
 ) -> Dict[str, Any]:
     """
     Get emergency mental health resources (hotlines, clinics).
-    
+
     Returns crisis hotlines and professional resources for immediate help.
     This is PUBLIC DATA for safety.
+
+    Robustness contract: this tool must never fail or return empty. If the
+    ContentResource table has no crisis rows (or the query errors), the
+    curated static list (``STATIC_CRISIS_RESOURCES``) is returned instead.
     """
+    if limit > MAX_RESOURCES:
+        limit = MAX_RESOURCES
+
+    resource_list: List[Dict[str, Any]] = []
     try:
-        if limit > MAX_RESOURCES:
-            limit = MAX_RESOURCES
-            
-        # Query crisis resources filtered by location
-        # Note: Using string literal since ResourceTypeEnum not available
+        # Query crisis resources from the content library. The model exposes
+        # ``type`` (string) and ``resource_metadata`` (JSON, mapped to the
+        # "metadata" column) — see domains/mental_health/models/content.py.
+        # Location filtering happens in Python to stay dialect-agnostic.
         query = (
             select(ContentResource)
-            .where(
-                and_(
-                    ContentResource.resource_type == "crisis_hotline",  # Use string instead of enum
-                    ContentResource.metadata.contains({"location": location})
-                )
-            )
-            .limit(limit)
+            .where(ContentResource.type == "crisis_hotline")
+            .limit(limit * 4)
         )
-        
+
         result = await db.execute(query)
         resources = result.scalars().all()
-        
-        resource_list = []
+
         for resource in resources:
+            metadata = resource.resource_metadata or {}
+            if metadata.get("location") and metadata["location"] != location:
+                continue
             resource_list.append({
                 "resource_id": str(resource.id),
                 "title": resource.title,
                 "description": resource.description,
                 "content": resource.content,  # Hotline numbers, clinic addresses
-                "url": resource.url,
-                "resource_type": resource.resource_type,
-                "metadata": resource.metadata,
+                "phone": metadata.get("phone"),
+                "resource_type": resource.type,
+                "metadata": metadata,
             })
-            
-        logger.info(f"✅ Retrieved {len(resource_list)} crisis resources for {location}")
-        
-        return {
-            "success": True,
-            "location": location,
-            "total_resources": len(resource_list),
-            "resources": resource_list
-        }
-        
+            if len(resource_list) >= limit:
+                break
     except Exception as e:
-        logger.error(f"❌ Error getting crisis resources for {location}: {e}")
-        return {
-            "success": False,
-            "error": str(e),
-            "location": location
-        }
+        # DB problems must not block crisis support — fall through to the
+        # static list below.
+        logger.error("Crisis-resource DB lookup failed, using static list: %s", e)
+
+    if not resource_list:
+        logger.info("No crisis rows in ContentResource (or lookup failed); serving static crisis resources.")
+        resource_list = [
+            {**entry, "resource_id": f"static_{i}", "resource_type": "crisis_hotline", "metadata": {"location": "Indonesia"}}
+            for i, entry in enumerate(STATIC_CRISIS_RESOURCES)
+        ][:limit]
+
+    logger.info("Retrieved %d crisis resources for %s", len(resource_list), location)
+    return {
+        "success": True,
+        "location": location,
+        "total_resources": len(resource_list),
+        "resources": resource_list,
+    }
 
 
 @register_tool(

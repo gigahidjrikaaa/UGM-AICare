@@ -10,12 +10,17 @@ from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.database import get_async_db
+from app.dependencies import get_admin_user
 from app.domains.mental_health.models import AgentMessage, AgentRun
 
 
 logger = logging.getLogger(__name__)
 
-router = APIRouter(prefix="/api/v1/admin/agents", tags=["Admin - Agents"])
+router = APIRouter(
+    prefix="/api/v1/admin/agents",
+    tags=["Admin - Agents"],
+    dependencies=[Depends(get_admin_user)],  # run feeds carry raw message content
+)
 
 
 @router.get("/status", summary="Get the status of the agent system")

@@ -620,7 +620,7 @@ function LanguagesAndCredentialsFields({
                         )
                       }
                       className="w-full px-3 py-2 bg-white/5 border border-white/10 rounded-lg text-white placeholder-white/40 focus:ring-2 focus:ring-[#FFCA40] focus:border-transparent transition-all"
-                      placeholder="e.g. Licensed Clinical Psychologist"
+                      placeholder="e.g. Licensed Clinical Counselor"
                     />
                   </div>
                   <div>

@@ -168,8 +168,11 @@ class IAGraphService:
             agents_invoked: List of agents invoked
             processing_time_ms: Total processing time
         """
-        # TODO: Implement anonymized metrics collection with differential privacy
-        # For now, just log silently
+        # Anonymized metrics collection is handled by the IA analytics path,
+        # which enforces k-anonymity and event-level differential privacy
+        # (Laplace mechanism with a rolling epsilon budget — see
+        # app/agents/ia/dp.py and dp_accountant.py). This hook remains a
+        # no-op until per-interaction metrics are productized.
         logger.debug(
             f"IA metrics logged: role={user_role}, intent={intent}, "
             f"risk={risk_level}, agents={len(agents_invoked)}, time={processing_time_ms}ms"

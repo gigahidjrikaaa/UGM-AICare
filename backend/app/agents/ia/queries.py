@@ -7,7 +7,10 @@ from app.agents.ia.schemas import QuestionId
 # ============================================================================
 # PRIVACY-PRESERVING ANALYTICS QUERIES
 # ============================================================================
-# All queries implement k-anonymity (k≥5) and differential privacy principles
+# All queries enforce k-anonymity (k≥5) at the SQL layer (HAVING clauses).
+# Differential privacy (Laplace mechanism, event-level ε-DP) is applied to
+# the result rows by app.agents.ia.dp before release — the DP column plans
+# in dp.QUERY_DP_PLANS MUST match each query's SELECT column order.
 # Date ranges and aggregations prevent individual user identification
 
 ALLOWED_QUERIES: Final[dict[QuestionId, str]] = {

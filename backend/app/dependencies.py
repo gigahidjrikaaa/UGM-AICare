@@ -131,6 +131,7 @@ def _build_auth_user_query(user_id: int, eager_normalized_relations: bool):
                 User.preferred_name,
                 User.first_name,
                 User.name,
+                User.token_version,
             ),
         )
         .where(User.id == user_id)
@@ -204,6 +205,23 @@ async def _resolve_current_active_user(
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Account is deactivated",
+        )
+
+    # JWT revocation: a token issued before the user's current token_version
+    # (bumped on password reset) is stale. Tokens without a tv claim count as
+    # version 0, so pre-migration tokens stay valid until the first reset.
+    token_tv = int(getattr(payload, "tv", 0) or 0)
+    if token_tv != int(getattr(user, "token_version", 0) or 0):
+        logger.warning(
+            "Stale token (tv=%s) for user %s (current=%s) rejected.",
+            token_tv,
+            user_id,
+            getattr(user, "token_version", 0),
+        )
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Session revoked. Please sign in again.",
+            headers={"WWW-Authenticate": 'Bearer error="invalid_token"'},
         )
 
     if payload.role and payload.role != user.role:

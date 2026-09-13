@@ -73,6 +73,8 @@ class ConsentAndPrivacySettings(BaseModel):
     consent_emergency_contact: bool = False
     consent_marketing: bool = False
     consent_ai_memory: bool = False
+    # Opt-in for Aika-initiated proactive chat (plan follow-ups etc.).
+    consent_proactive_chat: bool = False
 
 
 class LocalizationAndAccessibility(BaseModel):
