@@ -1,7 +1,7 @@
 """Intervention campaign and automation models."""
 
 from typing import Optional, List, TYPE_CHECKING
-from sqlalchemy import Column, Integer, String, DateTime, ForeignKey, Text, Boolean, Float
+from sqlalchemy import Column, Integer, String, DateTime, ForeignKey, Text, Boolean, Float, Index, UniqueConstraint, func
 from sqlalchemy.types import JSON
 from sqlalchemy.orm import relationship, Mapped, mapped_column
 from app.database import Base
@@ -92,9 +92,6 @@ class InterventionPlanRecord(Base):
     #   "last_updated": "2025-10-07T12:00:00Z"
     # }
     
-    total_steps: Mapped[int] = mapped_column(Integer, nullable=False)
-    completed_steps: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
-    
     # Status tracking
     status: Mapped[str] = mapped_column(String(50), default="active", index=True)
     # Values: active, completed, archived, expired
@@ -110,6 +107,76 @@ class InterventionPlanRecord(Base):
     # Relationships
     user: Mapped["User"] = relationship("User")
     conversation: Mapped[Optional["Conversation"]] = relationship("Conversation")
+
+
+class InterventionAssignment(Base):
+    """Baseline → outcome ledger for one intervention plan (JITAI Phase 2).
+
+    One row per plan (plan-as-unit). Captures the target dimensions and their
+    normalized scores at assignment, then the measured post-intervention scores
+    and the derived outcome once a later screening sample arrives. This is what
+    makes "did this plan help *this* student?" answerable.
+    """
+
+    __tablename__ = "intervention_assignments"
+    __table_args__ = (
+        UniqueConstraint("plan_id", name="uq_intervention_assignments_plan_id"),
+        Index("ix_intervention_assignments_user_status", "user_id", "status"),
+    )
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)
+    user_id: Mapped[int] = mapped_column(
+        Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True
+    )
+    plan_id: Mapped[int] = mapped_column(
+        Integer,
+        ForeignKey("intervention_plan_records.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
+    )
+
+    # What was assigned.
+    intervention_key: Mapped[str] = mapped_column(String(128), nullable=False, index=True)
+    primary_activity_id: Mapped[Optional[str]] = mapped_column(String(64), nullable=True)
+    target_dimensions: Mapped[Optional[list]] = mapped_column(JSON, nullable=True)
+    baseline_scores: Mapped[Optional[dict]] = mapped_column(JSON, nullable=True)
+    # baseline_scores: {dimension: {"current": float, "protective": float, "net": float}}
+
+    # Assignment + measurement timeline.
+    assigned_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False, server_default=func.now()
+    )
+    due_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
+    measure_after: Mapped[Optional[datetime]] = mapped_column(
+        DateTime(timezone=True), nullable=True, index=True
+    )
+
+    # Experiment bookkeeping (Phase 4 reuses these).
+    assignment_method: Mapped[str] = mapped_column(String(32), nullable=False, default="rule")
+    arm: Mapped[Optional[str]] = mapped_column(String(64), nullable=True)
+    experiment_key: Mapped[Optional[str]] = mapped_column(String(64), nullable=True)
+    policy_decision: Mapped[Optional[str]] = mapped_column(String(32), nullable=True)
+
+    # Outcome.
+    status: Mapped[str] = mapped_column(String(32), nullable=False, default="assigned", index=True)
+    # assigned | measured | unmeasured
+    measured_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
+    post_scores: Mapped[Optional[dict]] = mapped_column(JSON, nullable=True)
+    outcome: Mapped[Optional[dict]] = mapped_column(JSON, nullable=True)
+    # outcome: {dimension: {"baseline_net": float, "post_net": float, "delta": float, "direction": str}}
+    outcome_label: Mapped[Optional[str]] = mapped_column(String(32), nullable=True, index=True)
+    # improved | unchanged | worsened
+    unmeasured_reason: Mapped[Optional[str]] = mapped_column(String(64), nullable=True)
+
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False, server_default=func.now()
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False, server_default=func.now(), onupdate=func.now()
+    )
+
+    user: Mapped["User"] = relationship("User")
+    plan: Mapped["InterventionPlanRecord"] = relationship("InterventionPlanRecord")
 
 
 class InterventionPlanStepCompletion(Base):

@@ -40,8 +40,14 @@ from .interventions import (
     CampaignExecution,
     InterventionPlanRecord,
     InterventionPlanStepCompletion,
+    InterventionAssignment,
 )
-from .assessments import TriageAssessment, ConversationRiskAssessment, UserScreeningProfile
+from .assessments import (
+    TriageAssessment,
+    ConversationRiskAssessment,
+    UserScreeningProfile,
+    ScreeningDimensionSample,
+)
 
 # Agents subdomain
 from .agents import AgentRun, AgentMessage
@@ -97,9 +103,11 @@ __all__ = [
     "CampaignExecution",
     "InterventionPlanRecord",
     "InterventionPlanStepCompletion",
+    "InterventionAssignment",
     "TriageAssessment",
     "ConversationRiskAssessment",
     "UserScreeningProfile",
+    "ScreeningDimensionSample",
     # Agents
     "AgentRun",
     "AgentMessage",

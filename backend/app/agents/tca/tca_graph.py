@@ -134,6 +134,41 @@ async def determine_intervention_type_node(state: TCAState) -> TCAState:
 
 
 @trace_agent("TCA_GeneratePlan")
+async def _select_jitai_activity(state: TCAState, config: RunnableConfig):
+    """Return the JITAI Phase 4 adaptive selection, or None when disabled."""
+    from app.core.settings import settings
+
+    if not (settings.jitai_enabled and settings.jitai_experiment_enabled):
+        return None
+    db = (config.get("configurable") or {}).get("db")
+    user_id = state.get("user_id")
+    if db is None or user_id is None:
+        return None
+    from app.services.adaptive_selection_service import recommend_activity
+
+    return await recommend_activity(db, user_id=user_id)
+
+
+def _apply_selected_activity(state: TCAState, activity_id: Any) -> None:
+    """Ensure the adaptively selected activity is the plan's primary card."""
+    if not activity_id:
+        return
+    from app.agents.tca.activities_catalog import get_activity_by_id
+
+    activity = get_activity_by_id(str(activity_id))
+    if activity is None:
+        return
+
+    plan = state.setdefault("tca_context", {}).setdefault("intervention_plan", {})
+    cards = plan.setdefault("resource_cards", [])
+    if any(isinstance(c, dict) and c.get("activity_id") == activity_id for c in cards):
+        return
+
+    card = activity.to_resource_card()
+    card.setdefault("resource_type", "activity")
+    cards.insert(0, card)
+
+
 async def generate_plan_node(state: TCAState, config: RunnableConfig) -> TCAState:
     """Node: Generate personalized intervention plan using Gemini AI.
     
@@ -224,11 +259,27 @@ async def generate_plan_node(state: TCAState, config: RunnableConfig) -> TCAStat
                     "resource_id": card.resource_id,
                     "title": card.title,
                     "description": card.description,
-                    "url": card.url
+                    "url": card.url,
+                    "resource_type": getattr(card, "resource_type", "link"),
+                    "activity_id": getattr(card, "activity_id", None),
                 }
                 for card in response.resource_cards
             ]
         }
+
+        # JITAI Phase 4: adaptive activity selection (experiment-gated).
+        try:
+            selection = await _select_jitai_activity(state, config)
+            if selection is not None:
+                state.setdefault("tca_context", {})["jitai_selection"] = {
+                    "activity_id": selection.activity_id,
+                    "method": selection.method,
+                    "arm": selection.arm,
+                    "experiment_key": selection.experiment_key,
+                }
+                _apply_selected_activity(state, selection.activity_id)
+        except Exception as jitai_exc:
+            logger.warning("Adaptive selection skipped: %s", jitai_exc)
         
         state["execution_path"].append("generate_plan")
         
@@ -366,7 +417,9 @@ async def persist_plan_node(state: TCAState, config: RunnableConfig) -> TCAState
             ResourceCard(
                 title=card.get("title", "Resource"),
                 url=card.get("url", "#"),
-                description=card.get("description", card.get("summary", ""))
+                description=card.get("description", card.get("summary", "")),
+                resource_type=card.get("resource_type", "link"),
+                activity_id=card.get("activity_id"),
             )
             for card in resources_raw
         ]
@@ -388,6 +441,12 @@ async def persist_plan_node(state: TCAState, config: RunnableConfig) -> TCAState
         # Convert to dict for storage, preserving intervention_type
         plan_data_dict = validated_plan_data.model_dump(mode='json')
         plan_data_dict["intervention_type"] = intervention_type
+
+        # JITAI Phase 4: persist the adaptive-selection decision so the
+        # assignment can record method/arm/experiment_key.
+        jitai_selection = state.get("tca_context", {}).get("jitai_selection")
+        if jitai_selection:
+            plan_data_dict["jitai"] = jitai_selection
         
         total_steps = len(plan_steps)
         
@@ -427,6 +486,14 @@ async def persist_plan_node(state: TCAState, config: RunnableConfig) -> TCAState
         except Exception as followup_exc:
             # Scheduling failure must never break plan persistence.
             logger.warning("Plan follow-up scheduling skipped: %s", followup_exc)
+
+        # JITAI Phase 2: baseline + target dimensions for later measurement.
+        try:
+            from app.services.intervention_outcome_service import ensure_assignment_for_plan
+
+            await ensure_assignment_for_plan(db, plan, commit=False)
+        except Exception as assignment_exc:
+            logger.warning("Intervention assignment skipped: %s", assignment_exc)
 
         # DEBUG: Log plan creation details
         logger.info(f"TCA persisted intervention plan: ID={plan.id}, user_id={plan.user_id}, is_active={plan.is_active}, status={plan.status}")

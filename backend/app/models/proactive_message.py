@@ -25,6 +25,8 @@ from app.database import Base
 
 class ProactiveMessageSource(str, enum.Enum):
     plan_followup = "plan_followup"
+    # Weekly opt-in self-report (PHQ-2/GAD-2) prompt — JITAI Phase 1b.
+    self_report_checkin = "self_report_checkin"
 
 
 class ProactiveMessageStatus(str, enum.Enum):

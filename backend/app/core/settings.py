@@ -28,6 +28,14 @@ class Settings(BaseSettings):
     rag_min_score: float = Field(0.25, alias="RAG_MIN_SCORE")
     rag_embedding_model: str = Field("text-embedding-004", alias="RAG_EMBEDDING_MODEL")
     rag_embedding_dim: int = Field(768, alias="RAG_EMBEDDING_DIM")
+
+    # JITAI — outcome-adaptive intervention loop.
+    # Phase 1 (screening time series + self-report) is gated by this flag so the
+    # deploy is a no-op until it is explicitly enabled.
+    jitai_enabled: bool = Field(False, alias="JITAI_ENABLED")
+    # Phase 4: adaptive activity selection experiment (Thompson sampling + A/B).
+    jitai_experiment_enabled: bool = Field(False, alias="JITAI_EXPERIMENT_ENABLED")
+    jitai_exploration_rate: float = Field(0.1, alias="JITAI_EXPLORATION_RATE")
     followup_cooldown_hours: int = Field(24, alias="FOLLOWUP_COOLDOWN_HOURS")
     sda_sla_minutes: int = Field(15, alias="SDA_SLA_MINUTES")
     policy_deny_experiments_on_crisis: bool = Field(True, alias="POLICY_DENY_EXPERIMENTS_ON_CRISIS")

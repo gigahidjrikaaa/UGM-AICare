@@ -132,6 +132,7 @@ async def trigger_sta_conversation_analysis_background(
                 user_id=user_id,
                 assessment=assessment,
                 session_id=state.get("session_id"),
+                conversation_id=conversation_id,
             )
 
         state["sta_analysis_completed"] = True
@@ -162,6 +163,7 @@ async def _update_screening_profile_from_assessment(
     user_id: int,
     assessment: Any,
     session_id: Any,
+    conversation_id: Any = None,
 ) -> None:
     """Map STA dimension scores onto the user's longitudinal screening profile.
 
@@ -213,6 +215,8 @@ async def _update_screening_profile_from_assessment(
             extraction_result=extraction,
             session_id=session_id,
             decay_factor=0.95,  # Slow decay for longitudinal tracking.
+            source="conversation",
+            source_entity_id=(str(conversation_id) if conversation_id is not None else None),
         )
         logger.info(
             "[BACKGROUND] Screening profile updated — user=%s, risk=%s, "

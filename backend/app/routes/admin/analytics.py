@@ -51,6 +51,9 @@ class SCAAnalytics(BaseModel):
     timeframe_days: int
     generated_at: datetime
 
+    # JITAI Phase 3: real pre/post intervention outcomes (may be absent).
+    outcomes: Optional[dict] = None
+
 
 class CBTModuleUsage(BaseModel):
     """CBT module usage statistics."""
@@ -288,6 +291,29 @@ async def get_intervention_analytics(
     avg_days_result = await db.execute(avg_days_query)
     avg_days_to_completion = avg_days_result.scalar()
     
+    # JITAI Phase 3: attach real pre/post intervention outcomes (best-effort;
+    # never fail the engagement analytics if outcome data is unavailable).
+    outcomes = None
+    try:
+        from app.services.intervention_effectiveness_service import (
+            compute_intervention_effectiveness,
+        )
+
+        eff = await compute_intervention_effectiveness(
+            db, days=days, requested_by=f"admin:{current_user.id}"
+        )
+        outcomes = {
+            "k_anonymity": eff["k_anonymity"],
+            "dp_applied": eff["dp_applied"],
+            "total_assignments": eff["total_assignments"],
+            "suppressed_groups": eff["suppressed"],
+            "interventions": eff["interventions"],
+        }
+    except Exception as exc:  # outcome analytics is additive
+        import logging
+
+        logging.getLogger(__name__).warning("Outcome analytics unavailable: %s", exc)
+
     return SCAAnalytics(
         total_plans=total_plans,
         active_plans=active_plans,
@@ -301,7 +327,8 @@ async def get_intervention_analytics(
         completion_rate=round(completion_rate, 2),
         abandonment_rate=round(abandonment_rate, 2),
         timeframe_days=days,
-        generated_at=datetime.now()
+        generated_at=datetime.now(),
+        outcomes=outcomes,
     )
 
 

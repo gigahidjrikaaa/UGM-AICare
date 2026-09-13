@@ -1,7 +1,7 @@
 """Assessment and triage models."""
 
 from typing import Optional, TYPE_CHECKING
-from sqlalchemy import Column, Integer, String, DateTime, ForeignKey, Float, Boolean, Text, func
+from sqlalchemy import Column, Integer, String, DateTime, ForeignKey, Float, Boolean, Text, Index, func
 from sqlalchemy.types import JSON
 from sqlalchemy.orm import relationship, Mapped, mapped_column
 from app.database import Base
@@ -129,6 +129,56 @@ class ConversationRiskAssessment(Base):
     )
     updated_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), onupdate=func.now(), nullable=False
+    )
+
+    user: Mapped["User"] = relationship("User")
+
+
+class ScreeningDimensionSample(Base):
+    """Append-only longitudinal time series of screening dimension scores.
+
+    ``user_screening_profiles`` keeps only the *latest* score per dimension, so
+    pre/post comparisons ("did this intervention help?") are impossible from it
+    alone. This table records one row per (user, dimension, observation) every
+    time the profile updates (conversation analysis) or a self-report is
+    submitted, giving a queryable series for outcome measurement (JITAI).
+
+    ``source``:
+        - ``conversation``: covert extraction from an Aika conversation
+        - ``self_report``:  opt-in weekly micro-check (PHQ-2 / GAD-2)
+        - ``backfill``:     historical import
+    """
+
+    __tablename__ = "screening_dimension_samples"
+    __table_args__ = (
+        Index("ix_screening_samples_user_dim_time", "user_id", "dimension", "created_at"),
+    )
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)
+    user_id: Mapped[int] = mapped_column(
+        Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True
+    )
+    dimension: Mapped[str] = mapped_column(String(32), nullable=False, index=True)
+
+    # Normalized 0-1 scores (same scale as the covert screening engine).
+    current_score: Mapped[float] = mapped_column(Float, nullable=False, default=0.0)
+    protective_score: Mapped[float] = mapped_column(Float, nullable=False, default=0.0)
+    net_score: Mapped[float] = mapped_column(Float, nullable=False, default=0.0)
+
+    # Instrument provenance (for instrument-aware comparison).
+    instrument: Mapped[Optional[str]] = mapped_column(String(32), nullable=True)
+    raw_score: Mapped[Optional[float]] = mapped_column(Float, nullable=True)
+    max_score: Mapped[Optional[float]] = mapped_column(Float, nullable=True)
+    normalized_score: Mapped[float] = mapped_column(Float, nullable=False, default=0.0)
+
+    source: Mapped[str] = mapped_column(
+        String(32), nullable=False, default="conversation", index=True
+    )
+    source_entity_id: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
+    confidence: Mapped[Optional[float]] = mapped_column(Float, nullable=True)
+
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False, index=True
     )
 
     user: Mapped["User"] = relationship("User")

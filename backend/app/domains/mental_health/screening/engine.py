@@ -315,12 +315,60 @@ class ScreeningProfile(BaseModel):
 # PROFILE UPDATE SERVICE
 # =============================================================================
 
+def _jitai_enabled() -> bool:
+    """True when the outcome-adaptive (JITAI) loop is enabled."""
+    try:
+        from app.core.settings import settings
+
+        return bool(settings.jitai_enabled)
+    except Exception:
+        return False
+
+
+def build_dimension_samples(
+    *,
+    user_id: int,
+    profile: ScreeningProfile,
+    source: str = "conversation",
+    source_entity_id: Optional[str] = None,
+    confidence: Optional[float] = None,
+) -> List["ScreeningDimensionSample"]:
+    """Build append-only samples for every tracked dimension in *profile*.
+
+    Pure (no DB access) so it can be unit-tested and reused by the
+    self-report path. ``net_score`` mirrors the engine's ranking formula
+    (``current - protective * 0.5``), clamped at 0.
+    """
+    from app.domains.mental_health.models.assessments import ScreeningDimensionSample
+
+    samples: List[ScreeningDimensionSample] = []
+    for dim_key, dim in profile.dimension_scores.items():
+        net = max(0.0, float(dim.current_score) - float(dim.protective_score) * 0.5)
+        samples.append(
+            ScreeningDimensionSample(
+                user_id=user_id,
+                dimension=dim_key,
+                current_score=float(dim.current_score),
+                protective_score=float(dim.protective_score),
+                net_score=net,
+                instrument=(dim.instrument or None),
+                normalized_score=float(dim.current_score),
+                source=source,
+                source_entity_id=source_entity_id,
+                confidence=confidence,
+            )
+        )
+    return samples
+
+
 async def update_screening_profile(
     db: AsyncSession,
     user_id: int,
     extraction_result: ExtractionResult,
     session_id: Optional[str] = None,
-    decay_factor: float = 0.95
+    decay_factor: float = 0.95,
+    source: str = "conversation",
+    source_entity_id: Optional[str] = None,
 ) -> ScreeningProfile:
     """Update user's screening profile with new extraction results.
     
@@ -444,5 +492,33 @@ async def update_screening_profile(
         f"concerns={profile.primary_concerns}, "
         f"requires_attention={profile.requires_attention}"
     )
-    
+
+    # Longitudinal time series (JITAI Phase 1): append one sample per dimension
+    # so pre/post intervention deltas can be measured later.
+    if _jitai_enabled():
+        try:
+            samples = build_dimension_samples(
+                user_id=user_id,
+                profile=profile,
+                source=source,
+                source_entity_id=source_entity_id,
+                confidence=extraction_result.confidence,
+            )
+            if samples:
+                db.add_all(samples)
+                await db.flush()
+        except Exception as exc:  # sampling must never break the profile update
+            logger.warning("Failed to record screening samples for user %s: %s", user_id, exc)
+
+        # JITAI Phase 2: a fresh sample may complete an open intervention
+        # assignment (pre/post outcome measurement).
+        try:
+            from app.services.intervention_outcome_service import (
+                measure_open_assignments_for_user,
+            )
+
+            await measure_open_assignments_for_user(db, user_id)
+        except Exception as exc:  # measurement must never break the profile update
+            logger.warning("Outcome measurement hook failed for user %s: %s", user_id, exc)
+
     return profile

@@ -54,6 +54,8 @@ WEEKLY_IA_REPORT_JOB_ID = "weekly_ia_report_job"
 RETENTION_COHORT_JOB_ID = "retention_cohort_job"
 COUNSELOR_REMINDER_JOB_ID = "counselor_reminder_job"
 SLA_SCAN_JOB_ID = "sla_breach_scan"
+WEEKLY_SELF_REPORT_JOB_ID = "weekly_self_report_job"
+ASSIGNMENT_SWEEP_JOB_ID = "assignment_sweep_job"
 
 
 def _parse_bool_env(name: str, default: bool = True) -> bool:
@@ -633,6 +635,55 @@ async def check_sla_breaches() -> None:
 
 
 # =============================================================================
+# WEEKLY SELF-REPORT CHECK-IN JOB (JITAI Phase 1b)
+# =============================================================================
+
+async def send_weekly_self_report_checkins() -> None:
+    """Prompt consenting users to complete the weekly PHQ-2/GAD-2 check-in.
+
+    No-op unless ``JITAI_ENABLED`` is on (the deliverable is gated like every
+    other JITAI Phase 1 surface).
+    """
+    from app.core.settings import settings
+
+    if not settings.jitai_enabled:
+        return
+
+    from app.database import AsyncSessionLocal
+    from app.services.self_report_checkin_service import run_weekly_self_report_checkins
+
+    try:
+        async with AsyncSessionLocal() as db:
+            result = await run_weekly_self_report_checkins(db)
+        logger.info("Scheduler: weekly self-report check-ins complete: %s", result)
+    except Exception as exc:
+        logger.error("Scheduler: weekly self-report check-ins failed: %s", exc, exc_info=True)
+
+
+# =============================================================================
+# INTERVENTION ASSIGNMENT SWEEPER (JITAI Phase 2)
+# =============================================================================
+
+async def sweep_intervention_assignments() -> None:
+    """Expire assignments that never received a post-intervention sample."""
+    from app.core.settings import settings
+
+    if not settings.jitai_enabled:
+        return
+
+    from app.database import AsyncSessionLocal
+    from app.services.intervention_outcome_service import expire_stale_assignments
+
+    try:
+        async with AsyncSessionLocal() as db:
+            expired = await expire_stale_assignments(db)
+            await db.commit()
+        logger.info("Scheduler: expired %s stale intervention assignment(s)", expired)
+    except Exception as exc:
+        logger.error("Scheduler: assignment sweep failed: %s", exc, exc_info=True)
+
+
+# =============================================================================
 # MULTI-WORKER JOB LOCKS
 # =============================================================================
 # The app runs gunicorn with N workers, and EACH worker starts its own
@@ -783,6 +834,35 @@ def start_scheduler() -> None:
         misfire_grace_time=120,
     )
     logger.info(f"Scheduled job '{SLA_SCAN_JOB_ID}' with trigger: interval[minutes=5]")
+
+    # Weekly self-report check-in prompt (opt-in; no-op unless JITAI_ENABLED).
+    scheduler.add_job(
+        _with_distributed_lock(WEEKLY_SELF_REPORT_JOB_ID)(send_weekly_self_report_checkins),
+        trigger='cron',
+        day_of_week='sun',
+        hour=10,
+        minute=0,
+        id=WEEKLY_SELF_REPORT_JOB_ID,
+        replace_existing=True,
+        misfire_grace_time=3600,
+    )
+    logger.info(
+        f"Scheduled job '{WEEKLY_SELF_REPORT_JOB_ID}' with trigger: cron[day_of_week=sun, hour=10, minute=0]"
+    )
+
+    # Daily sweep: expire intervention assignments with no post sample.
+    scheduler.add_job(
+        _with_distributed_lock(ASSIGNMENT_SWEEP_JOB_ID)(sweep_intervention_assignments),
+        trigger='cron',
+        hour=3,
+        minute=30,
+        id=ASSIGNMENT_SWEEP_JOB_ID,
+        replace_existing=True,
+        misfire_grace_time=3600,
+    )
+    logger.info(
+        f"Scheduled job '{ASSIGNMENT_SWEEP_JOB_ID}' with trigger: cron[hour=3, minute=30]"
+    )
 
     try:
         scheduler.start()

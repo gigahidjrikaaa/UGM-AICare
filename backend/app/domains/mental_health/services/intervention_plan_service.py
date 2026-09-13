@@ -60,6 +60,19 @@ class InterventionPlanService:
                 "Plan follow-up scheduling skipped: %s", followup_exc
             )
 
+        # JITAI Phase 2: record the assignment (baseline + target dimensions)
+        # so this plan's outcome can be measured later.
+        try:
+            from app.services.intervention_outcome_service import ensure_assignment_for_plan
+
+            await ensure_assignment_for_plan(db, db_plan, commit=True)
+        except Exception as assignment_exc:
+            import logging
+
+            logging.getLogger(__name__).warning(
+                "Intervention assignment creation skipped: %s", assignment_exc
+            )
+
         return db_plan
 
     @staticmethod

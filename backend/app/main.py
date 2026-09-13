@@ -41,6 +41,7 @@ from app.domains.mental_health.routes import (
     agents_command,
     agents_graph,
     surveys,
+    screening_samples,
     safety_triage,
     clinical_analytics_routes,
     intervention_plans,
@@ -401,6 +402,7 @@ app.include_router(user_sse.router, prefix="/api/v1")  # User-scoped SSE (proact
 app.include_router(appointments.router)
 app.include_router(surveys.router)
 app.include_router(surveys.user_router)
+app.include_router(screening_samples.router)  # JITAI: screening samples + self-report
 app.include_router(clinical_analytics_routes.router)  # New clinical analytics endpoints
 # logger.info(f"List of routers (/api/v1): {app.routes}")
 startup_log(f"Allowed origins: {origins}")

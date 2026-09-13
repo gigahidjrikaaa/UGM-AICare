@@ -294,6 +294,50 @@ QUERY_DP_PLANS: dict[str, QueryDPPlan] = {
             ColumnPlan(2, "sample_size", ColumnStrategy.COUNT),
         ),
     ),
+    # intervention_key, n, improved, worsened, unchanged, mcid_met,
+    # improvement_rate, worsening_rate, mcid_rate, mean_improvement_magnitude
+    "intervention_effectiveness": QueryDPPlan(
+        "intervention_effectiveness",
+        (
+            ColumnPlan(0, "intervention_key", ColumnStrategy.PASSTHROUGH),
+            ColumnPlan(1, "n", ColumnStrategy.COUNT),
+            ColumnPlan(2, "improved_count", ColumnStrategy.COUNT),
+            ColumnPlan(3, "worsened_count", ColumnStrategy.COUNT),
+            ColumnPlan(
+                4,
+                "unchanged_count",
+                ColumnStrategy.DERIVED,
+                derive=lambda v: max(0, round(v[1] - v[2] - v[3])),
+            ),
+            ColumnPlan(5, "mcid_met_count", ColumnStrategy.COUNT),
+            ColumnPlan(
+                6,
+                "improvement_rate",
+                ColumnStrategy.DERIVED,
+                derive=lambda v: _ratio_percent(v[2], v[1]),
+            ),
+            ColumnPlan(
+                7,
+                "worsening_rate",
+                ColumnStrategy.DERIVED,
+                derive=lambda v: _ratio_percent(v[3], v[1]),
+            ),
+            ColumnPlan(
+                8,
+                "mcid_rate",
+                ColumnStrategy.DERIVED,
+                derive=lambda v: _ratio_percent(v[5], v[1]),
+            ),
+            # Per-assignment mean improvement magnitude, clamped to [0, 1].
+            ColumnPlan(
+                9,
+                "mean_improvement_magnitude",
+                ColumnStrategy.BOUNDED_MEAN,
+                upper_bound=1.0,
+                cardinality_index=1,
+            ),
+        ),
+    ),
 }
 
 

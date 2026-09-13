@@ -82,6 +82,9 @@ class User(Base):
     # Aika speaking first requires explicit consent; history in ledger as
     # consent_type='proactive_chat').
     consent_proactive_chat: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
+    # Opt-in for the weekly PHQ-2/GAD-2 self-report prompt (JITAI Phase 1b;
+    # consent_type='self_report' in the ledger). Default OFF.
+    consent_self_report: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
 
     # Relationships - use string references to avoid circular imports
     conversations: Mapped[List["Conversation"]] = relationship("Conversation", back_populates="user")
