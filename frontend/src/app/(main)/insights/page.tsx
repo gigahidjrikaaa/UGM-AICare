@@ -16,6 +16,7 @@ import { motion } from 'framer-motion';
 import toast from 'react-hot-toast';
 import {
   fetchInsights,
+  setPersonalizationConsent,
   setSelfReportConsent,
   submitSelfReport,
   type InsightItem,
@@ -66,6 +67,7 @@ function QuestionRow({
 export default function InsightsPage() {
   const [insights, setInsights] = useState<InsightItem[]>([]);
   const [consent, setConsent] = useState(false);
+  const [personalization, setPersonalization] = useState(false);
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
   const [phq2, setPhq2] = useState([0, 0]);
@@ -76,6 +78,7 @@ export default function InsightsPage() {
       const data = await fetchInsights();
       setInsights(data.interventions);
       setConsent(data.self_report_consent);
+      setPersonalization(data.personalization_consent);
     } catch {
       // Non-blocking: the surface still shows the check-in form.
     } finally {
@@ -93,6 +96,17 @@ export default function InsightsPage() {
       const result = await setSelfReportConsent(next);
       setConsent(result.consent_self_report);
       toast.success(next ? 'Check-in mingguan diaktifkan' : 'Check-in mingguan dimatikan');
+    } catch {
+      toast.error('Gagal mengubah pengaturan. Coba lagi nanti.');
+    }
+  };
+
+  const togglePersonalization = async () => {
+    const next = !personalization;
+    try {
+      const result = await setPersonalizationConsent(next);
+      setPersonalization(result.consent_personalization);
+      toast.success(next ? 'Saran personalisasi diaktifkan' : 'Saran personalisasi dimatikan');
     } catch {
       toast.error('Gagal mengubah pengaturan. Coba lagi nanti.');
     }
@@ -213,6 +227,32 @@ export default function InsightsPage() {
           >
             {submitting ? 'Mengirim…' : 'Kirim check-in'}
           </button>
+        </section>
+
+        {/* Personalization consent */}
+        <section className="mt-8 rounded-2xl border border-border bg-card p-6">
+          <div className="flex items-start justify-between gap-4">
+            <div>
+              <h2 className="text-lg font-semibold text-foreground">
+                Personalized suggestions
+              </h2>
+              <p className="mt-1 text-sm text-muted-foreground">
+                Izinkan Aika menyesuaikan aktivitas yang disarankan berdasarkan apa yang
+                berhasil untukmu. Kamu bisa mematikannya kapan saja.
+              </p>
+            </div>
+            <button
+              type="button"
+              onClick={togglePersonalization}
+              className={`shrink-0 rounded-full px-4 py-2 text-xs font-semibold transition-colors ${
+                personalization
+                  ? 'bg-emerald-500/15 text-emerald-300'
+                  : 'bg-muted text-muted-foreground hover:text-foreground'
+              }`}
+            >
+              {personalization ? 'Aktif' : 'Aktifkan'}
+            </button>
+          </div>
         </section>
       </div>
     </div>

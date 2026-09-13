@@ -85,6 +85,10 @@ class User(Base):
     # Opt-in for the weekly PHQ-2/GAD-2 self-report prompt (JITAI Phase 1b;
     # consent_type='self_report' in the ledger). Default OFF.
     consent_self_report: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
+    # Opt-in for personalization/experimentation — the JITAI Phase 4 adaptive
+    # selector only runs when this is True (consent_type='personalization').
+    # Default OFF: no randomization without explicit consent.
+    consent_personalization: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
 
     # Relationships - use string references to avoid circular imports
     conversations: Mapped[List["Conversation"]] = relationship("Conversation", back_populates="user")

@@ -37,6 +37,13 @@ def activity_id_from_key(intervention_key: Optional[str]) -> Optional[str]:
     return None
 
 
+def experiment_eligible(
+    *, jitai_enabled: bool, experiment_enabled: bool, consent: bool
+) -> bool:
+    """The adaptive experiment runs only with flags ON *and* explicit consent."""
+    return bool(jitai_enabled and experiment_enabled and consent)
+
+
 async def _posteriors(
     db: AsyncSession, cutoff: datetime, *, user_id: Optional[int] = None
 ) -> Dict[str, Tuple[float, float]]:
@@ -101,6 +108,18 @@ async def recommend_activity(
 ) -> Optional[Selection]:
     """Return the selection for this user, or None when the experiment is off."""
     if not (settings.jitai_enabled and settings.jitai_experiment_enabled):
+        return None
+
+    # Explicit per-user opt-in: no personalization/randomization without consent.
+    from app.models import User
+
+    consent = (
+        await db.execute(select(User.consent_personalization).where(User.id == user_id))
+    ).scalar_one_or_none()
+    if not experiment_eligible(
+        jitai_enabled=True, experiment_enabled=True, consent=bool(consent)
+    ):
+        logger.info("Adaptive selection skipped: user %s has not consented", user_id)
         return None
 
     try:

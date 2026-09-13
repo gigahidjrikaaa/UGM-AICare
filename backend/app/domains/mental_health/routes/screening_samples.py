@@ -66,6 +66,15 @@ class InsightItem(BaseModel):
 class InsightsResponse(BaseModel):
     interventions: List[InsightItem]
     self_report_consent: bool
+    personalization_consent: bool
+
+
+class PersonalizationConsentRequest(BaseModel):
+    granted: bool
+
+
+class PersonalizationConsentResponse(BaseModel):
+    consent_personalization: bool
 
 
 @router.get("/samples", response_model=List[DimensionSampleOut])
@@ -192,4 +201,33 @@ async def get_my_insights(
     return InsightsResponse(
         interventions=enriched,
         self_report_consent=bool(getattr(current_user, "consent_self_report", False)),
+        personalization_consent=bool(getattr(current_user, "consent_personalization", False)),
     )
+
+
+@router.put("/personalization/consent", response_model=PersonalizationConsentResponse)
+async def set_personalization_consent(
+    payload: PersonalizationConsentRequest,
+    current_user: User = Depends(get_current_active_user),
+    db: AsyncSession = Depends(get_async_db),
+) -> PersonalizationConsentResponse:
+    """Grant/withdraw opt-in consent for personalized (adaptive) interventions."""
+    if not settings.jitai_enabled:
+        raise HTTPException(status_code=404, detail="Personalization is not enabled")
+
+    from app.models import UserConsentLedger
+
+    current_user.consent_personalization = payload.granted
+    db.add(
+        UserConsentLedger(
+            user_id=current_user.id,
+            consent_type="personalization",
+            granted=payload.granted,
+            consent_version="v1.0",
+            consent_language="id",
+            consent_method="screening_settings",
+            timestamp=datetime.utcnow(),
+        )
+    )
+    await db.commit()
+    return PersonalizationConsentResponse(consent_personalization=payload.granted)

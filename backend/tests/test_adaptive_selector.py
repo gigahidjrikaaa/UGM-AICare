@@ -5,10 +5,12 @@ import random
 
 import pytest
 
+from app.models import User
 from app.services.adaptive_selection_service import (
     _merge_priors,
     activity_id_from_key,
     candidate_activities,
+    experiment_eligible,
 )
 from app.services.adaptive_selector import bucketed_arm, select_activity
 
@@ -85,3 +87,16 @@ def test_candidate_activities_filters_by_dimension() -> None:
     assert "box-breathing" in all_ids
     sleep_ids = candidate_activities(["sleep"])
     assert sleep_ids == ["four-seven-eight"]
+
+
+@pytest.mark.unit
+def test_experiment_eligible_requires_flags_and_consent() -> None:
+    assert experiment_eligible(jitai_enabled=True, experiment_enabled=True, consent=True)
+    assert not experiment_eligible(jitai_enabled=True, experiment_enabled=True, consent=False)
+    assert not experiment_eligible(jitai_enabled=False, experiment_enabled=True, consent=True)
+    assert not experiment_eligible(jitai_enabled=True, experiment_enabled=False, consent=True)
+
+
+@pytest.mark.unit
+def test_user_has_personalization_consent_flag() -> None:
+    assert hasattr(User, "consent_personalization")

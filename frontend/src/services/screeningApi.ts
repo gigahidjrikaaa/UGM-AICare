@@ -18,6 +18,7 @@ export interface InsightItem {
 export interface InsightsResponse {
   interventions: InsightItem[];
   self_report_consent: boolean;
+  personalization_consent: boolean;
 }
 
 export interface DimensionSample {
@@ -69,6 +70,16 @@ export const setSelfReportConsent = async (
 ): Promise<{ consent_self_report: boolean }> => {
   const response = await apiClient.put<{ consent_self_report: boolean }>(
     '/screening/self-report/consent',
+    { granted }
+  );
+  return response.data;
+};
+
+export const setPersonalizationConsent = async (
+  granted: boolean
+): Promise<{ consent_personalization: boolean }> => {
+  const response = await apiClient.put<{ consent_personalization: boolean }>(
+    '/screening/personalization/consent',
     { granted }
   );
   return response.data;
