@@ -17,10 +17,10 @@ email-validator>=2.0.0  # Required for Pydantic EmailStr validation
 python-multipart>=0.0.18  # Updated to fix CVE-2024-24762 and CVE-2024-53981
 
 # HTTP Client
-requests==2.31.0
+requests==2.34.2
 httpx>=0.28.0,<1.0.0  # Updated for anyio>=4 compatibility
-minio==7.2.9
-beautifulsoup4==4.12.3
+minio==7.2.20
+beautifulsoup4==4.15.0
 
 # Database and ORM
 sqlalchemy[asyncio]>=2.0.36
@@ -50,10 +50,10 @@ google-genai>=1.33.0
 google-api-core>=2.19.0,<3.0.0  # Constrain to avoid excessive backtracking
 googleapis-common-protos>=1.70.0,<2.0.0  # Explicit pin prevents resolver backtracking
 protobuf>=5.0.0,<6.0.0  # Compatible with google-genai and Langfuse
-opentelemetry-sdk==1.35.0  # Align OpenTelemetry stack for Langfuse
-opentelemetry-proto==1.35.0
-opentelemetry-exporter-otlp-proto-http==1.35.0
-opentelemetry-exporter-otlp-proto-common==1.35.0
+opentelemetry-sdk==1.45.1  # Align OpenTelemetry stack for Langfuse
+opentelemetry-proto==1.45.1
+opentelemetry-exporter-otlp-proto-http==1.45.1
+opentelemetry-exporter-otlp-proto-common==1.45.1
 
 # LangGraph
 langgraph>=0.2.0,<0.3.0
@@ -83,15 +83,15 @@ numpy>=1.24.0
 reportlab>=4.0.0
 
 # Task Scheduling
-apscheduler==3.10.4
+apscheduler==3.11.3
 
 # Utils
 python-slugify==8.0.1
-pydantic-settings==2.0.3
+pydantic-settings==2.15.0
 typing-extensions
 
 # Monitoring
-prometheus-client==0.19.0
+prometheus-client==0.26.0
 prometheus-fastapi-instrumentator==7.1.0
 
 
