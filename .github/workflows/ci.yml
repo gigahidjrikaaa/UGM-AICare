@@ -17,7 +17,7 @@ permissions:
 jobs:
   backend-tests:
     name: Backend tests (pytest)
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 20
     defaults:
       run:
@@ -46,7 +46,7 @@ jobs:
 
   frontend-build:
     name: Frontend lint + build
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 25
     defaults:
       run:
