@@ -56,7 +56,7 @@ opentelemetry-exporter-otlp-proto-http==1.35.0
 opentelemetry-exporter-otlp-proto-common==1.35.0
 
 # LangGraph
-langgraph>=0.2.0,<0.3.0
+langgraph>=1.2.15,<1.3.0
 langgraph-checkpoint-postgres>=0.0.10
 langfuse>=2.0.0  # LLM observability and agent tracing
 
