@@ -31,7 +31,7 @@ permissions:
 jobs:
   backend-deps:
     name: Backend dependency scan (Trivy)
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 15
     steps:
       - name: Checkout repository
@@ -64,7 +64,7 @@ jobs:
 
   frontend-deps:
     name: Frontend dependency scan (Trivy)
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 15
     steps:
       - name: Checkout repository
