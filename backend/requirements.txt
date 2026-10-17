@@ -24,7 +24,7 @@ beautifulsoup4==4.15.0
 
 # Database and ORM
 sqlalchemy[asyncio]>=2.0.36
-alembic>=1.13.0,<2.0.0
+alembic>=1.20.0,<2.0.0
 redis==5.0.1
 asyncpg>=0.29.0  # Fast PostgreSQL Database Client Library for Python/asyncio
 psycopg[binary]>=3.2.0,<4.0.0  # Sync PostgreSQL driver (Alembic, LangGraph saver)
