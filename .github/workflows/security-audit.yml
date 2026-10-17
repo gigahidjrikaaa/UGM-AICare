@@ -35,7 +35,7 @@ jobs:
     timeout-minutes: 15
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
 
       - name: Scan backend dependencies
         uses: aquasecurity/trivy-action@v0.36.0
@@ -68,7 +68,7 @@ jobs:
     timeout-minutes: 15
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
 
       - name: Scan frontend dependencies
         uses: aquasecurity/trivy-action@v0.36.0
