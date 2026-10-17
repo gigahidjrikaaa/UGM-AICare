@@ -100,7 +100,7 @@ black==23.9.1
 isort==5.12.0
 flake8==6.1.0
 
-gunicorn>=20.1.0  # For production server
+gunicorn>=26.2.0  # For production server
 
 # spacy==3.7.5  # REMOVED: Optional NLP-based PII redaction (disabled by default)
 # The system uses regex-based PII redaction which doesn't require Spacy.
