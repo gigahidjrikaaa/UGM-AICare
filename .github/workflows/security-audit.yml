@@ -17,11 +17,13 @@ on:
       - backend/requirements.txt
       - frontend/package.json
       - frontend/package-lock.json
+      - .github/workflows/security-audit.yml
   pull_request:
     paths:
       - backend/requirements.txt
       - frontend/package.json
       - frontend/package-lock.json
+      - .github/workflows/security-audit.yml
 
 permissions:
   contents: read
