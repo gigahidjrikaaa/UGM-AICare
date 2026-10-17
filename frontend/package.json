@@ -61,7 +61,7 @@
     "eslint-config-next": "16.1.1",
     "postcss": "^8.5.4",
     "tailwindcss": "^4.1.8",
-    "typescript": "^5",
+    "typescript": "^7",
     "@types/leaflet": "^1.9.21"
   },
   "overrides": {
