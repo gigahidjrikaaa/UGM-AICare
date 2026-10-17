@@ -58,7 +58,7 @@ opentelemetry-exporter-otlp-proto-common==1.45.1
 # LangGraph
 langgraph>=1.2.15,<1.3.0
 langgraph-checkpoint-postgres>=0.0.10
-langfuse>=2.0.0  # LLM observability and agent tracing
+langfuse>=4.17.0  # LLM observability and agent tracing
 
 # Safety Triage Agent (STA) - Crisis Detection
 # Migrated from PyTorch/ONNX to pure Gemini-based classification (Nov 2025)
