@@ -92,7 +92,7 @@ typing-extensions
 
 # Monitoring
 prometheus-client==0.26.0
-prometheus-fastapi-instrumentator==7.1.0
+prometheus-fastapi-instrumentator==8.1.0
 
 
 # Development Tools
