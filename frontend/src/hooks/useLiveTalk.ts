@@ -158,18 +158,11 @@ export const useLiveTalk = ({
     dataArrayRef.current = null;
 
     if (micVadRef.current) {
-      try {
-        micVadRef.current.pause();
-        if (
-          micVadRef.current.audioContext &&
-          micVadRef.current.audioContext.state !== "closed"
-        ) {
-          void micVadRef.current.audioContext.close();
-        }
-      } catch (error) {
-        console.warn("Error shutting down VAD", error);
-      }
+      const vad = micVadRef.current;
       micVadRef.current = null;
+      void vad.destroy().catch((error) => {
+        console.warn("Error shutting down VAD", error);
+      });
     }
 
     if (mediaStreamRef.current) {
@@ -598,7 +591,7 @@ export const useLiveTalk = ({
         rafRef.current = requestAnimationFrame(renderSpectrogram);
 
         const vad = await MicVAD.new({
-          stream,
+          getStream: async () => stream,
           onSpeechStart: () => setUserSpeaking(true),
           onVADMisfire: () => setUserSpeaking(false),
           onSpeechEnd: (audio) => {
@@ -633,15 +626,13 @@ export const useLiveTalk = ({
         });
 
         if (cancelled) {
-          vad.pause();
-          if (vad.audioContext && vad.audioContext.state !== "closed") {
-            void vad.audioContext.close();
-          }
+          void vad.destroy().catch((error) => {
+            console.warn("Error shutting down VAD", error);
+          });
           return;
         }
 
         micVadRef.current = vad;
-        vad.start();
       } catch (error) {
         console.error("Error setting up Live Talk audio pipeline:", error);
         cleanupAudioPipeline();
