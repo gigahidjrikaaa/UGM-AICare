@@ -185,9 +185,20 @@ class CampaignExecutionService:
         # Filter by segment (e.g., first_year_students, sophomores, etc.)
         segment = target_criteria.get("segment")
         if segment:
-            # This would need to be customized based on your User model
-            # Example: filter by student year or program
-            pass  # TODO: Implement segment filtering
+            from app.models.user_profile import UserProfile
+
+            query = query.outerjoin(UserProfile, User.id == UserProfile.user_id)
+
+            if segment == "first_year_students":
+                query = query.where(or_(UserProfile.year_of_study == 1, User.year_of_study == "1"))
+            elif segment == "sophomores":
+                query = query.where(or_(UserProfile.year_of_study == 2, User.year_of_study == "2"))
+            elif segment == "juniors":
+                query = query.where(or_(UserProfile.year_of_study == 3, User.year_of_study == "3"))
+            elif segment == "seniors":
+                query = query.where(or_(UserProfile.year_of_study >= 4, User.year_of_study.in_(["4", "5", "6", "7"])))
+            else:
+                logger.warning(f"Unknown segment specified: {segment}")
         
         # Filter by risk level (requires checking active cases)
         risk_level = target_criteria.get("risk_level")
