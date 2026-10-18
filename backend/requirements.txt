@@ -18,7 +18,7 @@ python-multipart>=0.0.32  # Updated to fix CVE-2024-24762 and CVE-2024-53981
 
 # HTTP Client
 requests==2.34.2
-httpx>=0.28.0,<1.0.0  # Updated for anyio>=4 compatibility
+httpx>=0.28.1,<1.0.0  # Updated for anyio>=4 compatibility
 minio==7.2.20
 beautifulsoup4==4.15.0
 
