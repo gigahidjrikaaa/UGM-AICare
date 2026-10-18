@@ -98,7 +98,7 @@ async def list_reports(
     """
     try:
         insights_service = InsightsService(db)
-        reports = await insights_service.list_reports(
+        reports, total_count = await insights_service.list_reports(
             report_type=report_type,
             limit=limit,
             offset=offset
@@ -123,7 +123,7 @@ async def list_reports(
         
         return ReportsListResponse(
             reports=report_schemas,
-            total=len(report_schemas),  # TODO: Add count query for accurate total
+            total=total_count,
             limit=limit,
             offset=offset
         )
