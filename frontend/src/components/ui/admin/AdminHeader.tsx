@@ -1,10 +1,10 @@
 "use client";
 
 import { Fragment, useCallback, useEffect, useRef, useState } from 'react';
-import Image from 'next/image';
+import UserAvatar from '@/components/ui/profile/UserAvatar';
 import Link from 'next/link';
 import { useSession, signOut } from 'next-auth/react';
-import { FiSearch, FiBell, FiMenu, FiChevronDown, FiLogOut, FiUser, FiSettings, FiPieChart, FiCalendar, FiUsers } from 'react-icons/fi';
+import { FiSearch, FiBell, FiMenu, FiChevronDown, FiLogOut, FiUser, FiPieChart, FiCalendar, FiUsers, FiClipboard } from 'react-icons/fi';
 import { Popover, Transition } from '@headlessui/react';
 import { usePathname, useRouter } from 'next/navigation';
 import { formatDistanceToNow } from 'date-fns';
@@ -497,14 +497,12 @@ export default function AdminHeader({ onMenuToggle }: { onMenuToggle?: () => voi
             {({ open }) => (
               <>
                 <Popover.Button className="flex items-center rounded-full p-1 transition-all duration-500 ease-[cubic-bezier(0.32,0.72,0,1)] hover:bg-white/[0.07] focus:outline-none focus-visible:ring-2 focus-visible:ring-[#FFCA40]/50 active:scale-[0.97]">
-                  <div className="flex h-9 w-9 items-center justify-center rounded-full bg-[#FFCA40]/20 ring-1 ring-[#FFCA40]/45">
-                    {profilePictureSrc !== "/default-avatar.png" ? (
-                        <Image src={profilePictureSrc} alt="Admin" width={36} height={36} className="rounded-full" />
-                    ) : (
-                        <span className="text-sm font-semibold text-[#FFCA40]">
-                        {session?.user?.name?.charAt(0).toUpperCase() || 'A'}
-                        </span>
-                    )}
+                  <div className="relative flex h-9 w-9 items-center justify-center overflow-hidden rounded-full bg-[#FFCA40]/20 ring-1 ring-[#FFCA40]/45">
+                    <UserAvatar
+                      src={profilePictureSrc !== "/default-avatar.png" ? profilePictureSrc : null}
+                      name={session?.user?.name}
+                      initialsClassName="text-sm"
+                    />
                   </div>
                   <span className="ml-2.5 hidden text-sm text-white/85 md:inline-block">
                     {session?.user?.name || 'Administrator'}
@@ -528,9 +526,6 @@ export default function AdminHeader({ onMenuToggle }: { onMenuToggle?: () => voi
                     <Link href="/admin/profile" className="flex w-full items-center px-4 py-2.5 text-sm text-white/65 transition-colors duration-500 hover:bg-white/[0.05] hover:text-[#FFCA40]">
                         <FiUser className="mr-2.5" size={15}/> Profile
                     </Link>
-                    <Link href="/admin/settings" className="flex w-full items-center px-4 py-2.5 text-sm text-white/65 transition-colors duration-500 hover:bg-white/[0.05] hover:text-[#FFCA40]">
-                        <FiSettings className="mr-2.5" size={15}/> Settings
-                    </Link>
                     <button
                       onClick={() => signOut({ callbackUrl: '/admin' })}
                       className="flex w-full items-center px-4 py-2.5 text-left text-sm text-white/65 transition-colors duration-500 hover:bg-red-500/10 hover:text-red-300"
@@ -551,7 +546,7 @@ export default function AdminHeader({ onMenuToggle }: { onMenuToggle?: () => voi
           {[{ name: 'Dashboard', icon: <FiPieChart size={16}/>, href: '/admin/dashboard' },
             { name: 'Appointments', icon: <FiCalendar size={16}/>, href: '/admin/appointments' },
             { name: 'Users', icon: <FiUsers size={16}/>, href: '/admin/users' },
-            { name: 'Settings', icon: <FiSettings size={16}/>, href: '/admin/settings' }].map((item) => {
+            { name: 'Cases', icon: <FiClipboard size={16}/>, href: '/admin/cases' }].map((item) => {
             const isActive = pathname === item.href || (item.href !== '/admin/dashboard' && pathname.startsWith(item.href));
             return (
               <Link

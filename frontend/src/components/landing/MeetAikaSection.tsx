@@ -79,7 +79,7 @@ export default function MeetAikaSection() {
               {/* Avatar Image */}
               <div className="relative z-10 rounded-3xl overflow-hidden border-4 border-[#FFCA40]/30 shadow-2xl">
                 <Image
-                  src="/aika-human.jpeg"
+                  src="/aika-human.webp"
                   alt="Aika AI Companion"
                   width={500}
                   height={500}

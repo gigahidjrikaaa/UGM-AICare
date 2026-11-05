@@ -7,7 +7,7 @@ import {
   FiUsers,
   FiMessageSquare,
   FiCalendar,
-  FiSettings,
+  FiList,
   FiShield,
   FiLogOut,
   FiHelpCircle,
@@ -30,6 +30,7 @@ import {
   FiFlag,
   FiTerminal,
   FiLink,
+  FiMail,
 } from 'react-icons/fi';
 import SidebarLink from './SidebarLink';
 
@@ -52,6 +53,8 @@ const navGroups = [
       { name: 'Quick Triage', icon: <FiBriefcase size={17} />, href: '/admin/quick-triage' },
       { name: 'Appointments', icon: <FiCalendar size={17} />, href: '/admin/appointments' },
       { name: 'Flagged Chats', icon: <FiFlag size={17} />, href: '/admin/flags' },
+      { name: 'Patients', icon: <FiUser size={17} />, href: '/admin/patients' },
+      { name: 'Screening', icon: <FiList size={17} />, href: '/admin/screening' },
     ],
   },
   {
@@ -76,10 +79,12 @@ const navGroups = [
     label: 'Programs & Content',
     items: [
       { name: 'Intervention Plans', icon: <FiClipboard size={17} />, href: '/admin/interventions' },
-      { name: 'Outreach', icon: <FiSend size={17} />, href: '/admin/outreach' },
+      { name: 'Campaigns', icon: <FiSend size={17} />, href: '/admin/campaigns' },
+      { name: 'Outreach', icon: <FiTarget size={17} />, href: '/admin/outreach' },
       { name: 'CBT Modules', icon: <FiHeart size={17} />, href: '/admin/cbt-modules' },
       { name: 'Quest Templates', icon: <FiZap size={17} />, href: '/admin/quests' },
       { name: 'Content Resources', icon: <FiBookOpen size={17} />, href: '/admin/content-resources' },
+      { name: 'Email Templates', icon: <FiMail size={17} />, href: '/admin/email-templates' },
       { name: 'Surveys', icon: <FiHelpCircle size={17} />, href: '/admin/surveys' },
     ],
   },
@@ -96,7 +101,6 @@ const navGroups = [
 
 const secondaryNavItems = [
   { name: 'My Profile', icon: <FiUser size={17} />, href: '/admin/profile' },
-  { name: 'System Settings', icon: <FiSettings size={17} />, href: '/admin/settings' },
 ];
 
 export default function AdminSidebar({

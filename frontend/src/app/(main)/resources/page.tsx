@@ -69,7 +69,7 @@ const selfGuidedPractices: PracticeCardProps[] = [
       "Notice one thing you can see, hear, and feel to anchor yourself.",
       "Write a quick reflection in your journal about what shifted.",
     ],
-    cta: { label: "Start breathing timer", href: "https://www.calm.com/breathe" },
+    cta: { label: "Start breathing timer", href: "/activities?play=box-breathing" },
   },
   {
     title: "Two-Line Journal Check-In",
@@ -81,7 +81,7 @@ const selfGuidedPractices: PracticeCardProps[] = [
       "Optional: jot a next-step intention for tomorrow.",
       "Revisit in a week to notice recurring themes and improvements.",
     ],
-    cta: { label: "Open journal", href: "/(main)/journaling" },
+    cta: { label: "Open journal", href: "/journaling" },
   },
   {
     title: "Night-Time Wind Down",
@@ -93,7 +93,7 @@ const selfGuidedPractices: PracticeCardProps[] = [
       "Write down worries for tomorrow, then schedule when you'll handle them.",
       "Try progressive muscle relaxation: tense and release each muscle group from toes to head.",
     ],
-    cta: { label: "Download sleep checklist", href: "https://drive.google.com" },
+    cta: { label: "Try a body-scan wind-down", href: "/activities?play=body-scan" },
   },
 ];
 
@@ -178,39 +178,6 @@ const nationalResources: ResourceCardProps[] = [
   },
 ];
 
-const digitalTools = [
-  {
-    title: "Grounding Audio Pack",
-    description: "Short audio guides for panic, overthinking, and sleep support.",
-    href: "https://drive.google.com",
-  },
-  {
-    title: "Weekly Planner Template",
-    description: "Printable planner to balance study, rest, and wellbeing goals.",
-    href: "https://notion.so",
-  },
-  {
-    title: "Mood Tracker (Google Sheet)",
-    description: "Track emotions and triggers; share with a counselor if needed.",
-    href: "https://docs.google.com",
-  },
-];
-
-const upcomingEvents = [
-  {
-    title: "Stress Reset: Mini Workshop",
-    date: "Wed, 16 Oct • 16:00 WIB",
-    location: "HPU Studio, Sekip Utara",
-    href: "https://hpu.ugm.ac.id/events",
-  },
-  {
-    title: "Peer Circle: Homesickness Edition",
-    date: "Fri, 18 Oct • 18:30 WIB",
-    location: "Zoom (link shared after RSVP)",
-    href: "https://bit.ly/peer-circle-ugm",
-  },
-];
-
 export default function SupportHubPage() {
   const { data, isLoading, error, refetch } = useInterventionPlans(true);
 
@@ -227,7 +194,7 @@ export default function SupportHubPage() {
           </div>
           <h1 className="text-3xl sm:text-4xl lg:text-5xl font-bold text-white">UGM Mental Health Resources</h1>
           <p className="text-base sm:text-lg text-gray-300 max-w-2xl mx-auto">
-            Find trusted campus contacts, national hotlines, self-care practices, and upcoming events to support your wellbeing journey.
+            Find trusted campus contacts, national hotlines, and self-guided practices to support your wellbeing journey.
           </p>
           <div className="max-w-xl mx-auto">
             <label className="relative block">
@@ -453,66 +420,33 @@ export default function SupportHubPage() {
           </div>
         </section>
 
-        {/* Digital Tools */}
-        <section className="space-y-6">
-          <div className="flex items-center gap-3">
-            <div className="p-2 rounded-lg bg-[#FFCA40]/10 text-[#FFCA40]">
-              <FiMonitor />
-            </div>
-            <div>
-              <h2 className="text-2xl font-semibold text-white">Digital tools & worksheets</h2>
-              <p className="text-sm text-gray-300">Download templates and audio guides to support your wellbeing practice.</p>
-            </div>
-          </div>
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            {digitalTools.map((tool) => (
-              <a
-                key={tool.title}
-                href={tool.href}
-                className="p-5 bg-white/5 border border-white/10 rounded-xl hover:bg-white/10 transition-colors space-y-2"
-                target="_blank"
-                rel="noopener noreferrer"
-              >
-                <h3 className="text-lg font-semibold text-white">{tool.title}</h3>
-                <p className="text-sm text-gray-300 leading-relaxed">{tool.description}</p>
-                <span className="inline-flex items-center text-xs text-[#FFCA40] uppercase tracking-widest font-semibold">
-                  Open resource <FiArrowRight className="ml-1" />
-                </span>
-              </a>
-            ))}
-          </div>
-        </section>
-
-        {/* Upcoming Workshops */}
+        {/* Live Sessions */}
         <section className="space-y-6">
           <div className="flex items-center gap-3">
             <div className="p-2 rounded-lg bg-[#FFCA40]/10 text-[#FFCA40]">
               <FiBookOpen />
             </div>
             <div>
-              <h2 className="text-2xl font-semibold text-white">Upcoming workshops & circles</h2>
+              <h2 className="text-2xl font-semibold text-white">Workshops & peer circles</h2>
               <p className="text-sm text-gray-300">Join a live session to learn coping strategies and connect with others.</p>
             </div>
           </div>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            {upcomingEvents.map((event) => (
-              <a
-                key={event.title}
-                href={event.href}
-                className="p-5 bg-white/5 border border-white/10 rounded-xl hover:bg-white/10 transition-colors flex flex-col gap-2"
-                target="_blank"
-                rel="noopener noreferrer"
-              >
-                <span className="text-xs uppercase tracking-[0.3em] text-[#FFCA40]">Upcoming</span>
-                <h3 className="text-lg font-semibold text-white">{event.title}</h3>
-                <p className="text-sm text-gray-300">{event.date}</p>
-                <p className="text-sm text-gray-400">{event.location}</p>
-                <span className="text-xs text-[#FFCA40] inline-flex items-center mt-2">
-                  RSVP <FiArrowRight className="ml-1" />
-                </span>
-              </a>
-            ))}
-          </div>
+          <a
+            href="https://hpu.ugm.ac.id"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="block p-5 bg-white/5 border border-white/10 rounded-xl hover:bg-white/10 transition-colors"
+          >
+            <h3 className="text-lg font-semibold text-white">HPU UGM — Health Promoting University</h3>
+            <p className="text-sm text-gray-300 leading-relaxed mt-1">
+              HPU UGM runs mental-health workshops and peer programmes throughout the semester.
+              Check their site for the current schedule — we don&apos;t list dated events here so
+              you always get the real, up-to-date calendar.
+            </p>
+            <span className="text-xs text-[#FFCA40] inline-flex items-center mt-3">
+              Open HPU UGM <FiArrowRight className="ml-1" />
+            </span>
+          </a>
         </section>
       </main>
     </div>

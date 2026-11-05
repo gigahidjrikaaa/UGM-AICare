@@ -2,7 +2,7 @@
 
 import { useEffect } from "react";
 import { AnimatePresence, motion } from "framer-motion";
-import Image from "next/image";
+import UserAvatar from "@/components/ui/profile/UserAvatar";
 import Link from "next/link";
 import type { Session } from "next-auth";
 import { FiUser, FiLogOut, FiSettings, FiHelpCircle, FiZap } from "react-icons/fi";
@@ -38,11 +38,11 @@ export default function ProfileDropdown({ isOpen, user, onClose, onSignOut, well
 
   const role = user.role ?? "user";
   const isAdmin = role === "admin";
-  const isCounselor = role === "counselor";
+  const isCounselor = role === "counselor" || role === "peer_supporter";
 
   const profileHref = isAdmin ? "/admin/profile" : isCounselor ? "/counselor/profile" : "/profile";
   const dashboardHref = isAdmin ? "/admin/dashboard" : isCounselor ? "/counselor/dashboard" : "/dashboard";
-  const settingsHref = isAdmin ? "/admin/settings" : isCounselor ? "/counselor/settings" : null;
+  const settingsHref = isAdmin ? "/admin/api-keys" : null;
 
   const menuItems = [
     {
@@ -64,7 +64,7 @@ export default function ProfileDropdown({ isOpen, user, onClose, onSignOut, well
       ? [
           {
             href: settingsHref,
-            label: "Settings",
+            label: "API Keys & Models",
             icon: <FiSettings className="w-4 h-4" />,
           },
         ]
@@ -107,11 +107,11 @@ export default function ProfileDropdown({ isOpen, user, onClose, onSignOut, well
             <div className="p-4 border-b border-white/10 bg-white/5">
               <div className="flex items-center gap-3">
                 <div className="relative w-10 h-10 rounded-full overflow-hidden border border-white/20">
-                  <Image
-                    src={profilePictureSrc || user.image || "/default-avatar.png"}
-                    alt={user.name || "User"}
-                    fill
-                    className="object-cover"
+                  <UserAvatar
+                    src={profilePictureSrc || user.image}
+                    name={user.name}
+                    email={user.email}
+                    initialsClassName="text-sm"
                   />
                 </div>
                 <div className="flex-1 min-w-0">

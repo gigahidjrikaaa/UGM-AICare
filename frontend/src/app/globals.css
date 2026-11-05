@@ -26,23 +26,12 @@ body {
   font-family: var(--font-jakarta), "Geist", "Plus Jakarta Sans", ui-sans-serif, system-ui, sans-serif;
 }
 
-/* Custom Scrollbar */
-::-webkit-scrollbar {
-  width: 8px;
-  height: 8px;
-}
-
-::-webkit-scrollbar-track {
-  background: #00112e; 
-}
-
-::-webkit-scrollbar-thumb {
-  background: rgba(255, 255, 255, 0.2); 
-  border-radius: 4px;
-}
-
-::-webkit-scrollbar-thumb:hover {
-  background: rgba(255, 202, 64, 0.5); /* UGM Gold with opacity */
+/* Dark form controls (datetime-local pickers inside dark chat widgets) */
+input[type="datetime-local"],
+input[type="date"],
+input[type="time"],
+select {
+  color-scheme: dark;
 }
 
 /* Accessibility: Reduce motion for users who prefer it */
@@ -163,51 +152,6 @@ body {
   /* opacity: 1; */ /* Make it more opaque */
 }
 
-/* Markdown content */
-.markdown-content ul {
-  list-style-type: disc;
-  padding-left: 1.5rem;
-  margin: 0.75rem 0;
-}
-
-.markdown-content ol {
-  list-style-type: decimal;
-  padding-left: 1.5rem;
-  margin: 0.75rem 0;
-}
-
-.markdown-content li {
-  margin-bottom: 0.25rem;
-}
-
-.markdown-content p {
-  margin-bottom: 0.5rem;
-}
-
-.markdown-content h1, 
-.markdown-content h2, 
-.markdown-content h3 {
-  font-weight: bold;
-  margin-top: 1rem;
-  margin-bottom: 0.5rem;
-}
-
-.markdown-content h1 {
-  font-size: 1.5rem;
-}
-
-.markdown-content h2 {
-  font-size: 1.25rem;
-}
-
-.markdown-content h3 {
-  font-size: 1.125rem;
-}
-
-.markdown-content a {
-  text-decoration: underline;
-}
-
 /* Extra small screens */
 @media (min-width: 480px) {
   .xs\:block {
@@ -270,4 +214,24 @@ body {
   background-image: linear-gradient(rgba(255, 255, 255, 0.1) 1px, transparent 1px),
                     linear-gradient(90deg, rgba(255, 255, 255, 0.1) 1px, transparent 1px);
   background-size: 50px 50px;
+}
+
+.custom-scrollbar::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+.custom-scrollbar::-webkit-scrollbar-track {
+  background: rgba(10, 42, 110, 0.15);
+  border-radius: 8px;
+}
+.custom-scrollbar::-webkit-scrollbar-thumb {
+  background: rgba(255, 202, 64, 0.45);
+  border-radius: 8px;
+}
+.custom-scrollbar::-webkit-scrollbar-thumb:hover {
+  background: rgba(255, 202, 64, 0.65);
+}
+.custom-scrollbar {
+  scrollbar-width: thin;
+  scrollbar-color: rgba(255, 202, 64, 0.45) rgba(10, 42, 110, 0.15);
 }

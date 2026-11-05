@@ -74,7 +74,7 @@ export default function AboutAikaPage() {
                 className="relative h-[300px] w-[300px] mx-auto"
               >
                 <Image 
-                  src="/aika-human.jpeg"
+                  src="/aika-human.webp"
                   alt="Aika Character" 
                   fill
                   className="object-contain drop-shadow-2xl rounded-full"

@@ -3,7 +3,7 @@
 import Image from 'next/image';
 import Link from 'next/link';
 import { signOut } from 'next-auth/react';
-import {FiHome, FiClipboard, FiCalendar, FiUsers, FiUser, FiSettings, FiLogOut, FiHeart, FiAlertTriangle, FiMessageSquare, FiFileText, FiBookOpen, FiEye, FiActivity, FiMessageCircle} from 'react-icons/fi';
+import {FiHome, FiClipboard, FiCalendar, FiUsers, FiUser, FiLogOut, FiHeart, FiAlertTriangle, FiMessageSquare, FiFileText, FiBookOpen, FiEye, FiActivity} from 'react-icons/fi';
 import SidebarLink from '../admin/SidebarLink';
 
 import MobileNavDrawer from '../MobileNavDrawer';
@@ -23,6 +23,8 @@ const navGroups = [
   {
     label: 'Care Intelligence',
     items: [
+      { name: 'Peer Support', icon: <FiHeart size={18}/>, href: '/counselor/peer-support' },
+      { name: 'Supervision', icon: <FiUsers size={18}/>, href: '/counselor/supervision' },
       { name: 'Conversations', icon: <FiMessageSquare size={18}/>, href: '/counselor/conversations' },
       { name: 'Progress Tracking', icon: <FiActivity size={18}/>, href: '/counselor/progress' },
       { name: 'Treatment Plans', icon: <FiBookOpen size={18}/>, href: '/counselor/treatment-plans' },
@@ -32,9 +34,7 @@ const navGroups = [
 ];
 
 const secondaryNavItems = [
-  { name: 'Ask Aika', icon: <FiMessageCircle size={18}/>, href: '/aika' },
   { name: 'My Profile', icon: <FiUser size={18}/>, href: '/counselor/profile' },
-  { name: 'Settings', icon: <FiSettings size={18}/>, href: '/counselor/settings' },
 ];
 
 export default function CounselorSidebar({

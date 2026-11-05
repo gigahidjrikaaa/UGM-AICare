@@ -17,7 +17,7 @@ export default function QuestDialogueWindow({
   tone,
   className,
   title = "Aika",
-  avatarSrc = "/aika-human.jpeg",
+  avatarSrc = "/aika-human.webp",
 }: QuestDialogueWindowProps) {
   if (!lines.length) return null;
 

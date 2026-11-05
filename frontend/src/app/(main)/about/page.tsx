@@ -77,7 +77,7 @@ export default function AboutPage() {
                 <div className="relative p-5">
                   <div className="relative aspect-4/5 w-full overflow-hidden rounded-xl border border-white/15">
                     <Image
-                      src="/aika-human.jpeg"
+                      src="/aika-human.webp"
                       alt="Aika companion illustration"
                       fill
                       className="object-cover"

@@ -8,7 +8,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { useGameStore } from '@/store/gameStore';
 import { useWellnessState } from '@/hooks/useQuests';
 import { useProfilePicture } from '@/hooks/useProfilePicture';
-import { Home, Sword, Users, ShoppingBag, Activity, Sparkles, Crown, Shield, Menu, X, ChevronDown } from 'lucide-react';
+import { Home, Sword, Sparkles, Crown, Shield, Menu, X, ChevronDown } from 'lucide-react';
 import ParticleBackground from '@/components/ui/ParticleBackground';
 import ProfileDropdown from '@/components/ui/ProfileDropdown';
 import { useState, useEffect } from 'react';
@@ -32,7 +32,7 @@ export default function CareQuestLayout({
   const { data: session, status } = useSession();
   const { data: wellness } = useWellnessState();
   const { src: profilePictureSrc } = useProfilePicture();
-  const { joy, care, harmony, setWellnessState } = useGameStore();
+  const { joy, harmony, setWellnessState } = useGameStore();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [isProfileOpen, setIsProfileOpen] = useState(false);
 
@@ -55,9 +55,6 @@ export default function CareQuestLayout({
   const navItems = [
     { href: '/carequest', label: 'Hub', icon: Home, color: '#001D58', glow: '#00308F' },
     { href: '/carequest/game', label: 'Game', icon: Sword, color: '#FFCA40', glow: '#FFD700' },
-    { href: '/carequest/guild', label: 'Guild', icon: Users, color: '#B8A4FF', glow: '#9F7AEA' },
-    { href: '/carequest/market', label: 'Market', icon: ShoppingBag, color: '#50E3C2', glow: '#2DD4BF' },
-    { href: '/carequest/activities', label: 'Quests', icon: Activity, color: '#FF6B9D', glow: '#EC4899' },
   ];
 
   const isActive = (href: string) => pathname === href;
@@ -175,24 +172,6 @@ export default function CareQuestLayout({
                       <div className="font-bold text-[#FFCA40] mb-1">JOY Points</div>
                       <div className="text-[10px] text-gray-300">Earned from positive interactions</div>
                       <div className="text-[10px] text-gray-300">and completing activities</div>
-                      {/* Arrow */}
-                      <div className="absolute top-full left-1/2 -translate-x-1/2 -mt-px">
-                        <div className="border-4 border-transparent border-t-gray-900"></div>
-                      </div>
-                    </div>
-                  </div>
-
-                  <div className="w-px h-3 bg-white/20" />
-
-                  {/* CARE with tooltip */}
-                  <div className="group relative flex items-center gap-1">
-                    <span className="text-xs">💎</span>
-                    <span className="font-black text-white">{care.toFixed(0)}</span>
-                    {/* Tooltip */}
-                    <div className="absolute bottom-full mb-2 left-1/2 -translate-x-1/2 px-3 py-2 bg-gray-900 text-white text-xs rounded-lg opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap pointer-events-none z-50 shadow-xl border border-[#50E3C2]/30">
-                      <div className="font-bold text-[#50E3C2] mb-1">CARE Tokens</div>
-                      <div className="text-[10px] text-gray-300">Premium currency for special items</div>
-                      <div className="text-[10px] text-gray-300">and exclusive activities</div>
                       {/* Arrow */}
                       <div className="absolute top-full left-1/2 -translate-x-1/2 -mt-px">
                         <div className="border-4 border-transparent border-t-gray-900"></div>
@@ -323,10 +302,6 @@ export default function CareQuestLayout({
                     <div className="flex items-center gap-1.5 bg-linear-to-br from-[#FF6B9D]/20 to-[#FFCA40]/20 backdrop-blur-md px-3 py-2 rounded-lg border border-[#FFCA40]/50">
                       <Sparkles className="w-4 h-4 text-[#FFCA40]" />
                       <span className="text-sm font-bold text-white">{joy.toFixed(0)}</span>
-                    </div>
-                    <div className="flex items-center gap-1.5 bg-linear-to-br from-[#50E3C2]/20 to-[#2DD4BF]/20 backdrop-blur-md px-3 py-2 rounded-lg border border-[#50E3C2]/50">
-                      <span className="text-base">💎</span>
-                      <span className="text-sm font-bold text-white">{care.toFixed(0)}</span>
                     </div>
                     <div className="flex items-center gap-1.5 bg-linear-to-br from-[#B8A4FF]/20 to-[#9F7AEA]/20 backdrop-blur-md px-3 py-2 rounded-lg border border-[#B8A4FF]/50">
                       <Shield className="w-4 h-4 text-[#B8A4FF]" />

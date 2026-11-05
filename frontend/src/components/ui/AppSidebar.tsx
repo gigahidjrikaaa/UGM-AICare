@@ -14,14 +14,13 @@ import {
   FiActivity, 
   FiUsers, 
   FiPieChart, 
-  FiSettings, 
   FiBookOpen, 
   FiUser,
   FiGrid,
   FiZap,
   HiX
 } from '@/icons';
-import { FiLink, FiCheckCircle } from 'react-icons/fi';
+import { FiLink, FiCheckCircle, FiTrendingUp } from 'react-icons/fi';
 
 // Compact Wallet Section Component for Sidebar
 function CompactWalletSection() {
@@ -91,6 +90,7 @@ const sidebarNavGroups: NavGroup[] = [
     items: [
       { href: "/aika", label: "Talk to Aika", icon: <BsChatDots size={18} />, featured: true },
       { href: "/journaling", label: "Journaling", icon: <FiActivity size={18} />, featured: true },
+      { href: "/peer-support", label: "Peer Support", icon: <FiUsers size={18} />, featured: true },
       { href: "/appointments", label: "Appointments", icon: <BsCalendar size={18} />, featured: true },
       { href: "/quests", label: "Quest Board", icon: <FiZap size={18} />, featured: true },
     ],
@@ -99,6 +99,7 @@ const sidebarNavGroups: NavGroup[] = [
     title: "My Space",
     items: [
       { href: "/dashboard", label: "Dashboard", icon: <FiGrid size={18} /> },
+      { href: "/insights", label: "Insights", icon: <FiTrendingUp size={18} /> },
       { href: "/proof", label: "Proof Timeline", icon: <FiCheckCircle size={18} /> },
       { href: "/profile", label: "Profile", icon: <FiUser size={18} /> },
       { href: "/resources", label: "Resources", icon: <FiBookOpen size={18} /> },
@@ -109,13 +110,6 @@ const sidebarNavGroups: NavGroup[] = [
     items: [
       { href: "/admin/dashboard", label: "Admin Dashboard", icon: <FiPieChart size={18} />, adminOnly: true },
       { href: "/admin/users", label: "Manage Users", icon: <FiUsers size={18} />, adminOnly: true },
-      { href: "/admin/settings", label: "Admin Settings", icon: <FiSettings size={18} />, adminOnly: true },
-    ],
-  },
-  {
-    title: "Help",
-    items: [
-      { href: "/help", label: "Help & Support", icon: <BsQuestionCircle size={18} /> },
     ],
   },
 ];

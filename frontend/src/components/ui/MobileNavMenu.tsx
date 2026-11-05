@@ -42,10 +42,10 @@ const mobileNavGroups: MobileNavGroup[] = [
     items: [
       { href: "/dashboard", label: "Home", icon: <FiBookOpen size={18} /> },
       { href: "/insights", label: "Your Insights", icon: <FiActivity size={18} /> },
-      { href: "/carequest", label: "CareQuest", icon: <FiMapPin size={18} /> },
+      { href: "/carequest/game", label: "CareQuest", icon: <FiMapPin size={18} /> },
       { href: "/proof", label: "Proof Timeline", icon: <FiShield size={18} /> },
       { href: "/about", label: "About", icon: <FiInfo size={18} /> },
-      { href: "/help", label: "Help & Support", icon: <BsQuestionCircle size={18} /> },
+      { href: "/resources", label: "Resources & Crisis Help", icon: <BsQuestionCircle size={18} /> },
     ],
   },
 ];

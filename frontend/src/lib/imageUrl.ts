@@ -11,7 +11,9 @@ export function sanitizeRenderableImageUrl(value: string | null | undefined, fal
 
   try {
     const parsed = new URL(trimmed);
-    if (parsed.protocol === "https:" || parsed.protocol === "http:") {
+    // https only: the app is served over https, so an http: src would be
+    // blocked as mixed content and could never render anyway.
+    if (parsed.protocol === "https:") {
       return trimmed;
     }
   } catch {

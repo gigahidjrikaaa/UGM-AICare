@@ -3,7 +3,7 @@
 import Link from 'next/link';
 import { useCounselorAlerts } from '@/contexts/CounselorAlertsContext';
 import { signOut, useSession } from 'next-auth/react';
-import { FiBell, FiMenu, FiSearch, FiChevronDown, FiUser, FiSettings, FiLogOut, FiAlertTriangle, FiClipboard } from 'react-icons/fi';
+import { FiBell, FiMenu, FiSearch, FiChevronDown, FiUser, FiLogOut, FiAlertTriangle, FiClipboard } from 'react-icons/fi';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { usePathname, useRouter } from 'next/navigation';
 
@@ -198,8 +198,7 @@ export default function CounselorHeader({ onMenuToggle }: { onMenuToggle?: () =>
     router.push(addSourceToCasesHref(alert.href, 'header'));
   }, [addSourceToCasesHref, closeMenus, markAlertSeen, router]);
 
-  useEffect(() => {
-    void   // SSE push: refetch instantly when a counselor_alert event arrives
+  // SSE push: refetch instantly when a counselor_alert event arrives.
   useEffect(() => {
     if (refetchSignal > 0) {
       fetchUnreadStats();
@@ -210,7 +209,8 @@ export default function CounselorHeader({ onMenuToggle }: { onMenuToggle?: () =>
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [refetchSignal]);
 
-fetchUnreadStats();
+  useEffect(() => {
+    fetchUnreadStats();
 
     const interval = setInterval(() => {
       if (document.visibilityState !== 'visible') {
@@ -413,14 +413,6 @@ fetchUnreadStats();
             >
               <FiUser size={14} />
               Profile
-            </Link>
-            <Link
-              href="/counselor/settings"
-              onClick={closeMenus}
-              className="flex items-center gap-2 px-3 py-2 rounded-md text-sm text-white/85 hover:bg-white/10"
-            >
-              <FiSettings size={14} />
-              Settings
             </Link>
             <Link
               href="/counselor/cases"
