@@ -1,0 +1,40 @@
+{
+  "freeze_version": "1.0.0-draft",
+  "frozen_at": "2026-10-17T07:41:09.086230+00:00",
+  "spec": "docs/evaluation/CHANGE_CONTROL_SAFETY_ENVELOPE.md",
+  "files": {
+    "corpus": {
+      "path": "backend/research_evaluation/rq1_crisis_detection/conversation_scenarios.json",
+      "sha256": "7a9df7f185a03d6db829473766cf233f8554e1e846f6ff21ea36686624e048df",
+      "bytes": 81785
+    },
+    "labels": {
+      "path": "backend/research_evaluation/ccse/corpus_labels.json",
+      "sha256": "c2b15fe833fc9c9ae7988a4f528a2bb992fcc85e41c2b4f906fecc463c7858eb",
+      "bytes": 13897
+    },
+    "gate_config": {
+      "path": "backend/research_evaluation/ccse/gate_config.json",
+      "sha256": "2ecfefe11015b828d23dad316ea168a9ab8632aaf699e861757a56d0a6839780",
+      "bytes": 3432
+    }
+  },
+  "counts": {
+    "scenarios": 50,
+    "crisis": 25,
+    "severity": {
+      "none": 0,
+      "low": 25,
+      "moderate": 4,
+      "high": 6,
+      "imminent": 15
+    },
+    "language": {
+      "en": 21,
+      "id": 17,
+      "mixed": 12
+    }
+  },
+  "review_status": "draft \u2014 pending licensed counselor review before gate enforcement",
+  "validation": "passed"
+}
