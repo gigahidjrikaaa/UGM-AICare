@@ -38,8 +38,8 @@ export function useCounselorSessionGuard(options: SessionGuardOptions = {}) {
     if (status === 'authenticated') {
       const userRole = session?.user?.role;
       
-      // Allow both counselor and admin roles
-      if (userRole === 'counselor' || userRole === 'admin') {
+      // Allow counselor, admin, and peer_supporter roles
+      if (userRole === 'counselor' || userRole === 'admin' || userRole === 'peer_supporter') {
         setIsValid(true);
         setIsLoading(false);
       } else {

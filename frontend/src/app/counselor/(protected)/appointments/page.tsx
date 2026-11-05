@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useMemo } from 'react';
 import { FiCalendar, FiClock, FiUser, FiVideo, FiMapPin, FiCheckCircle, FiXCircle, FiEdit, FiAlertTriangle, FiX, FiUserX } from 'react-icons/fi';
 import apiClient from '@/services/api';
 import toast from 'react-hot-toast';
@@ -102,6 +102,11 @@ export default function CounselorAppointmentsPage() {
   const [rescheduleDate, setRescheduleDate] = useState('');
   const [rescheduleTime, setRescheduleTime] = useState('');
   const [actionNote, setActionNote] = useState('');
+  const [calendarMonth, setCalendarMonth] = useState(() => {
+    const now = new Date();
+    return new Date(now.getFullYear(), now.getMonth(), 1);
+  });
+  const [selectedCalendarDate, setSelectedCalendarDate] = useState(() => toYmd(new Date()));
 
   const loadAppointments = useCallback(async () => {
     try {
@@ -235,6 +240,10 @@ export default function CounselorAppointmentsPage() {
         console.error('Failed to cancel appointment:', err);
         toast.error('Failed to cancel appointment');
       }
+      if (mode === 'no_show') {
+        console.error('Failed to mark no-show:', err);
+        toast.error('Failed to mark appointment as no-show');
+      }
     } finally {
       setActionLoading(null);
     }
@@ -244,6 +253,33 @@ export default function CounselorAppointmentsPage() {
     const statusMatch = filterStatus === 'all' || apt.status === filterStatus;
     return statusMatch;
   });
+
+  const appointmentsByDate = useMemo(() => {
+    const byDate = new Map<string, Appointment[]>();
+    for (const apt of appointments) {
+      const list = byDate.get(apt.date) ?? [];
+      list.push(apt);
+      byDate.set(apt.date, list);
+    }
+    return byDate;
+  }, [appointments]);
+
+  const calendarCells = useMemo(() => {
+    const year = calendarMonth.getFullYear();
+    const month = calendarMonth.getMonth();
+    const firstWeekday = new Date(year, month, 1).getDay();
+    const daysInMonth = new Date(year, month + 1, 0).getDate();
+    const cells: Array<{ day: number; ymd: string } | null> = [];
+    for (let i = 0; i < firstWeekday; i += 1) cells.push(null);
+    for (let day = 1; day <= daysInMonth; day += 1) {
+      cells.push({ day, ymd: toYmd(new Date(year, month, day)) });
+    }
+    return cells;
+  }, [calendarMonth]);
+
+  const selectedDayAppointments = (appointmentsByDate.get(selectedCalendarDate) ?? [])
+    .slice()
+    .sort((a, b) => a.time.localeCompare(b.time));
 
   const todayStr = toYmd(new Date());
   const todayAppointments = filteredAppointments.filter(
@@ -474,18 +510,130 @@ export default function CounselorAppointmentsPage() {
         </div>
       )}
 
-      {/* Calendar View (Placeholder) */}
+      {/* Calendar View */}
       {viewMode === 'calendar' && (
-        <div className="bg-white/5 backdrop-blur border border-white/10 rounded-2xl p-12 text-center">
-          <FiCalendar className="w-16 h-16 text-white/20 mx-auto mb-4" />
-          <h3 className="text-xl font-semibold text-white mb-2">Calendar View</h3>
-          <p className="text-white/60 mb-4">Full calendar integration coming soon</p>
-          <button
-            onClick={() => setViewMode('list')}
-            className="px-4 py-2 bg-[#FFCA40]/20 border border-[#FFCA40]/30 rounded-lg text-sm font-medium text-[#FFCA40]"
-          >
-            Switch to List View
-          </button>
+        <div className="grid gap-4 lg:grid-cols-5">
+          <div className="lg:col-span-3 bg-white/5 backdrop-blur border border-white/10 rounded-2xl p-5">
+            <div className="flex items-center justify-between mb-4">
+              <button
+                onClick={() => setCalendarMonth(new Date(calendarMonth.getFullYear(), calendarMonth.getMonth() - 1, 1))}
+                className="rounded-lg border border-white/20 px-3 py-1.5 text-sm text-white/70 transition hover:text-white hover:bg-white/10"
+                aria-label="Previous month"
+              >
+                ←
+              </button>
+              <div className="text-center">
+                <h3 className="text-lg font-semibold text-white">
+                  {calendarMonth.toLocaleDateString('en-US', { month: 'long', year: 'numeric' })}
+                </h3>
+                <button
+                  onClick={() => {
+                    const now = new Date();
+                    setCalendarMonth(new Date(now.getFullYear(), now.getMonth(), 1));
+                    setSelectedCalendarDate(toYmd(now));
+                  }}
+                  className="text-xs text-white/50 transition hover:text-[#FFCA40]"
+                >
+                  Jump to today
+                </button>
+              </div>
+              <button
+                onClick={() => setCalendarMonth(new Date(calendarMonth.getFullYear(), calendarMonth.getMonth() + 1, 1))}
+                className="rounded-lg border border-white/20 px-3 py-1.5 text-sm text-white/70 transition hover:text-white hover:bg-white/10"
+                aria-label="Next month"
+              >
+                →
+              </button>
+            </div>
+
+            <div className="grid grid-cols-7 gap-1 text-center text-[10px] font-semibold uppercase tracking-wide text-white/40 mb-1">
+              {['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].map((label) => (
+                <div key={label} className="py-1">{label}</div>
+              ))}
+            </div>
+            <div className="grid grid-cols-7 gap-1">
+              {calendarCells.map((cell, index) => {
+                if (!cell) return <div key={`blank-${index}`} className="min-h-16 rounded-lg bg-white/[0.02]" />;
+                const dayAppointments = appointmentsByDate.get(cell.ymd) ?? [];
+                const scheduledCount = dayAppointments.filter((a) => a.status === 'scheduled').length;
+                const doneCount = dayAppointments.filter((a) => a.status === 'completed').length;
+                const missedCount = dayAppointments.filter((a) => a.status === 'cancelled' || a.status === 'no_show').length;
+                const isSelected = selectedCalendarDate === cell.ymd;
+                const isToday = cell.ymd === todayStr;
+                return (
+                  <button
+                    key={cell.ymd}
+                    onClick={() => setSelectedCalendarDate(cell.ymd)}
+                    className={`min-h-16 rounded-lg border p-1.5 text-left transition-colors ${
+                      isSelected
+                        ? 'border-[#FFCA40] bg-[#FFCA40]/15'
+                        : 'border-white/10 bg-white/5 hover:border-white/30 hover:bg-white/10'
+                    }`}
+                  >
+                    <span
+                      className={`inline-flex h-5 w-5 items-center justify-center rounded-full text-xs font-semibold ${
+                        isToday ? 'bg-[#FFCA40] text-[#001D58]' : 'text-white/80'
+                      }`}
+                    >
+                      {cell.day}
+                    </span>
+                    {(scheduledCount > 0 || doneCount > 0 || missedCount > 0) && (
+                      <span className="mt-1 flex flex-wrap gap-0.5">
+                        {scheduledCount > 0 && (
+                          <span className="rounded bg-[#FFCA40]/25 px-1 text-[9px] font-semibold text-[#FFCA40]">
+                            {scheduledCount}
+                          </span>
+                        )}
+                        {doneCount > 0 && (
+                          <span className="rounded bg-green-500/25 px-1 text-[9px] font-semibold text-green-300">
+                            {doneCount}
+                          </span>
+                        )}
+                        {missedCount > 0 && (
+                          <span className="rounded bg-white/15 px-1 text-[9px] font-semibold text-white/60">
+                            {missedCount}
+                          </span>
+                        )}
+                      </span>
+                    )}
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+
+          <div className="lg:col-span-2 bg-white/5 backdrop-blur border border-white/10 rounded-2xl p-5">
+            <h3 className="text-sm font-semibold text-white">
+              {new Date(selectedCalendarDate + 'T00:00:00').toLocaleDateString('en-US', {
+                weekday: 'long',
+                month: 'long',
+                day: 'numeric',
+              })}
+            </h3>
+            {selectedDayAppointments.length === 0 ? (
+              <p className="mt-4 text-sm text-white/50">No appointments on this day.</p>
+            ) : (
+              <ul className="mt-4 space-y-2">
+                {selectedDayAppointments.map((appointment) => (
+                  <li
+                    key={appointment.appointment_id}
+                    className="rounded-xl border border-white/10 bg-white/5 p-3"
+                  >
+                    <div className="flex items-center justify-between gap-2">
+                      <span className="text-sm font-semibold text-white">{appointment.time}</span>
+                      <span className={`px-2 py-0.5 rounded text-[10px] font-medium border ${statusColors[appointment.status]}`}>
+                        {appointment.status.replace('_', ' ')}
+                      </span>
+                    </div>
+                    <p className="mt-1 truncate text-xs text-white/70">
+                      {appointment.patient_name || appointment.patient_id_hash}
+                    </p>
+                    <p className="text-[11px] text-white/40">{appointment.type.replace('_', ' ')} · {appointment.duration_minutes}m</p>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </div>
         </div>
       )}
 
@@ -498,6 +646,7 @@ export default function CounselorAppointmentsPage() {
                   {actionModal.mode === 'complete' && 'Complete Appointment'}
                   {actionModal.mode === 'reschedule' && 'Reschedule Appointment'}
                   {actionModal.mode === 'cancel' && 'Cancel Appointment'}
+                  {actionModal.mode === 'no_show' && 'Mark as No-Show'}
                 </h2>
                 <p className="mt-1 text-sm text-white/60">Appointment #{actionModal.appointment.appointment_id}</p>
               </div>
@@ -559,6 +708,13 @@ export default function CounselorAppointmentsPage() {
                   This action will remove the appointment from the schedule.
                 </p>
               )}
+
+              {actionModal.mode === 'no_show' && (
+                <p className="text-sm text-orange-200/90 bg-orange-500/10 border border-orange-500/30 rounded-lg p-3">
+                  Records that the patient did not attend. The slot counts as missed — consider
+                  reaching out before rescheduling.
+                </p>
+              )}
             </div>
 
             <div className="flex items-center justify-end gap-2 border-t border-white/10 p-5">
@@ -583,7 +739,9 @@ export default function CounselorAppointmentsPage() {
                     ? 'Confirm Complete'
                     : actionModal.mode === 'reschedule'
                       ? 'Confirm Reschedule'
-                      : 'Confirm Cancel'}
+                      : actionModal.mode === 'no_show'
+                        ? 'Confirm No-Show'
+                        : 'Confirm Cancel'}
               </button>
             </div>
           </div>

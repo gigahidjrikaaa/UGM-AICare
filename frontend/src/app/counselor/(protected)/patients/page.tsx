@@ -22,7 +22,7 @@ interface CaseItem {
   id: string;
   user_hash: string;
   severity: 'low' | 'med' | 'high' | 'critical';
-  status: 'new' | 'in_progress' | 'waiting' | 'closed';
+  status: 'new' | 'in_progress' | 'waiting' | 'resolved' | 'closed';
   created_at: string;
   updated_at: string;
   assigned_to?: string;
@@ -83,7 +83,8 @@ function derivePatients(cases: CaseItem[]): Patient[] {
     const activeCases = userCases.filter(
       (c) => c.status === 'new' || c.status === 'in_progress' || c.status === 'waiting'
     );
-    const closedCases = userCases.filter((c) => c.status === 'closed');
+    // Resolved cases count as completed care (patient discharged), not active.
+    const closedCases = userCases.filter((c) => c.status === 'closed' || c.status === 'resolved');
 
     // Use the most recent case for contact info
     const latestCase = userCases.reduce((latest, c) =>

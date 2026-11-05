@@ -35,7 +35,7 @@ export default function CounselorLoginPage() {
     }
 
     if (status === "authenticated") {
-      if (session?.user?.role === "counselor" || session?.user?.role === "admin") {
+      if (["counselor", "admin", "peer_supporter"].includes(session?.user?.role ?? "")) {
         const urlParams = new URLSearchParams(window.location.search);
         const returnUrl = urlParams.get('returnUrl');
         router.push(returnUrl || "/counselor/dashboard");
@@ -74,7 +74,7 @@ export default function CounselorLoginPage() {
     }
   };
 
-  if (status === "loading" || (status === "authenticated" && (session?.user?.role === "counselor" || session?.user?.role === "admin"))) {
+  if (status === "loading" || (status === "authenticated" && ["counselor", "admin", "peer_supporter"].includes(session?.user?.role ?? ""))) {
     return (
       <div className="min-h-screen bg-linear-to-br from-[#001d58] via-[#0a2a6e] to-[#173a7a] flex items-center justify-center">
         <div className="animate-pulse text-white text-lg">Loading Counselor Portal...</div>

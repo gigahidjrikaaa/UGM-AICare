@@ -35,6 +35,7 @@ export interface ConsentAndPrivacySettings {
   consent_marketing: boolean;
   consent_ai_memory: boolean;
     consent_proactive_chat: boolean;
+  consent_peer_support: boolean;
 }
 
 export interface AIMemoryFact {
@@ -98,6 +99,8 @@ export interface UserProfileOverviewResponse {
 
 
 export interface UserProfileOverviewUpdate {
+  // NOTE: no risk_level / clinical_summary / primary_concerns — care-team
+  // fields are read-only for students (rejected by the backend update schema).
   preferred_name?: string | null;
   pronouns?: string | null;
   profile_photo_url?: string | null;
@@ -107,9 +110,6 @@ export interface UserProfileOverviewUpdate {
   emergency_contact_relationship?: string | null;
   emergency_contact_phone?: string | null;
   emergency_contact_email?: string | null;
-  risk_level?: string | null;
-  clinical_summary?: string | null;
-  primary_concerns?: string | null;
   safety_plan_notes?: string | null;
   current_therapist_name?: string | null;
   current_therapist_contact?: string | null;
@@ -123,6 +123,7 @@ export interface UserProfileOverviewUpdate {
   consent_marketing?: boolean;
   consent_ai_memory?: boolean;
   consent_proactive_chat?: boolean;
+  consent_peer_support?: boolean;
   preferred_language?: string | null;
   preferred_timezone?: string | null;
   accessibility_needs?: string | null;

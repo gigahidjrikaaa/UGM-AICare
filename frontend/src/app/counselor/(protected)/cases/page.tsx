@@ -33,6 +33,8 @@ interface Case {
   user_email?: string;
   user_phone?: string;
   telegram_username?: string;
+  resolution_notes?: string | null;
+  resolved_at?: string | null;
 }
 
 interface CaseAssessmentsResponse {
@@ -124,6 +126,8 @@ const SOURCE_LABELS: Record<string, string> = {
   'patient-detail': 'Patient Detail',
   escalations: 'Escalations Queue',
   dashboard: 'Dashboard quick action',
+  conversations: 'Conversation Review',
+  progress: 'Progress Tracking',
 };
 
 const VALID_STATUS_FILTERS = new Set(['all', 'new', 'in_progress', 'waiting', 'closed', 'resolved']);
@@ -162,6 +166,7 @@ export default function CounselorCasesPage() {
   const [selectedCaseId, setSelectedCaseId] = useState<string | null>(null);
   const [actingCaseId, setActingCaseId] = useState<string | null>(null);
   const [rejectNote, setRejectNote] = useState('');
+  const [decisionMode, setDecisionMode] = useState<'resolve' | 'close'>('resolve');
   const [lastAttestationMessage, setLastAttestationMessage] = useState<string | null>(null);
   const [latestAttestationByCaseId, setLatestAttestationByCaseId] = useState<Record<string, CaseLatestAttestationResponse | null>>({});
   const [loadingLatestAttestation, setLoadingLatestAttestation] = useState<string | null>(null);
@@ -234,6 +239,7 @@ export default function CounselorCasesPage() {
     const searchableText = [
       c.id,
       c.user_hash,
+      c.session_id,
       c.summary_redacted,
       c.user_email,
       c.user_phone,
@@ -253,7 +259,8 @@ export default function CounselorCasesPage() {
       intake: cases.filter((caseItem) => caseItem.status === 'new').length,
       active: cases.filter((caseItem) => caseItem.status === 'in_progress').length,
       waiting: cases.filter((caseItem) => caseItem.status === 'waiting').length,
-      closed: cases.filter((caseItem) => caseItem.status === 'closed' || caseItem.status === 'resolved').length,
+      resolved: cases.filter((caseItem) => caseItem.status === 'resolved').length,
+      closed: cases.filter((caseItem) => caseItem.status === 'closed').length,
       highRiskActive: cases.filter(
         (caseItem) =>
           ['new', 'in_progress', 'waiting'].includes(caseItem.status) &&
@@ -288,6 +295,7 @@ export default function CounselorCasesPage() {
   const openCaseDetails = async (caseId: string) => {
     setSelectedCaseId(caseId);
     setRejectNote('');
+    setDecisionMode('resolve');
     setLastAttestationMessage(null);
     if (assessmentsByCaseId[caseId] !== undefined) return;
 
@@ -319,23 +327,38 @@ export default function CounselorCasesPage() {
   const closeCaseDetails = () => {
     setSelectedCaseId(null);
     setRejectNote('');
+    setDecisionMode('resolve');
     setLastAttestationMessage(null);
   };
 
   const isReceivable = (caseItem: Case) => ['new', 'waiting'].includes(caseItem.status);
-  const isClosable = (caseItem: Case) => ['new', 'waiting', 'in_progress'].includes(caseItem.status);
+  const isResolvable = (caseItem: Case) => caseItem.status === 'in_progress';
+  const isClosable = (caseItem: Case) => ['new', 'waiting', 'in_progress', 'resolved'].includes(caseItem.status);
 
-  const updateCaseStatus = async (caseItem: Case, status: 'in_progress' | 'closed', note?: string) => {
+  const updateCaseStatus = async (
+    caseItem: Case,
+    status: 'in_progress' | 'resolved' | 'closed',
+    note?: string,
+    resolutionNotes?: string,
+  ) => {
     try {
       setActingCaseId(caseItem.id);
       const response = await apiClient.put<CaseStatusUpdateResponse>(`/counselor/cases/${caseItem.id}/status`, {
         status,
         note,
+        ...(status === 'resolved' && resolutionNotes ? { resolution_notes: resolutionNotes } : {}),
       });
 
       setCases((prev) => prev.map((existing) => (
         existing.id === caseItem.id
-          ? { ...existing, status: response.data.status as Case['status'], updated_at: new Date().toISOString() }
+          ? {
+              ...existing,
+              status: response.data.status as Case['status'],
+              updated_at: new Date().toISOString(),
+              ...(status === 'resolved'
+                ? { resolved_at: new Date().toISOString(), resolution_notes: resolutionNotes ?? existing.resolution_notes }
+                : {}),
+            }
           : existing
       )));
 
@@ -362,14 +385,24 @@ export default function CounselorCasesPage() {
     await updateCaseStatus(selectedCase, 'in_progress', 'Accepted by counselor');
   };
 
+  const onResolveCase = async () => {
+    if (!selectedCase) return;
+    await updateCaseStatus(
+      selectedCase,
+      'resolved',
+      undefined,
+      rejectNote.trim() || undefined,
+    );
+  };
+
   const onCloseCase = async () => {
     if (!selectedCase) return;
     const note = rejectNote.trim();
-    if (!note) {
+    if (!note && isReceivable(selectedCase)) {
       toast.error('Closing a case requires justification');
       return;
     }
-    await updateCaseStatus(selectedCase, 'closed', note);
+    await updateCaseStatus(selectedCase, 'closed', note || undefined);
   };
 
   const clearContext = () => {
@@ -538,7 +571,7 @@ export default function CounselorCasesPage() {
       )}
 
       {/* Stats Summary */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+      <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
         <div className="bg-white/5 backdrop-blur border border-white/10 rounded-xl p-4">
           <div className="text-2xl font-bold text-white">{queueCounts.active}</div>
           <div className="text-xs text-white/60 mt-1">Active Handling</div>
@@ -552,8 +585,12 @@ export default function CounselorCasesPage() {
           <div className="text-xs text-white/60 mt-1">High Risk Active</div>
         </div>
         <div className="bg-white/5 backdrop-blur border border-white/10 rounded-xl p-4">
+          <div className="text-2xl font-bold text-emerald-400">{queueCounts.resolved}</div>
+          <div className="text-xs text-white/60 mt-1">Resolved</div>
+        </div>
+        <div className="bg-white/5 backdrop-blur border border-white/10 rounded-xl p-4">
           <div className="text-2xl font-bold text-white">{queueCounts.closed}</div>
-          <div className="text-xs text-white/60 mt-1">Closed Cases</div>
+          <div className="text-xs text-white/60 mt-1">Closed</div>
         </div>
       </div>
 
@@ -687,6 +724,15 @@ export default function CounselorCasesPage() {
                             className="px-3 py-1 bg-emerald-500/20 hover:bg-emerald-500/30 border border-emerald-500/30 rounded text-xs font-medium text-emerald-300 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
                           >
                             Accept
+                          </button>
+                        )}
+                        {isResolvable(caseItem) && (
+                          <button
+                            onClick={() => openCaseDetails(caseItem.id)}
+                            className="px-3 py-1 bg-emerald-500/20 hover:bg-emerald-500/30 border border-emerald-500/30 rounded text-xs font-medium text-emerald-300 transition-all"
+                            title="Open case to record the resolution"
+                          >
+                            Resolve
                           </button>
                         )}
                         <button
@@ -870,19 +916,74 @@ export default function CounselorCasesPage() {
                 })()}
               </div>
 
+              {selectedCase.status === 'resolved' && (
+                <div className="rounded-xl border border-emerald-500/30 bg-emerald-500/10 p-4">
+                  <h3 className="text-sm font-semibold text-emerald-200">Resolution</h3>
+                  <p className="mt-1 text-xs text-emerald-100/70">
+                    {selectedCase.resolved_at ? `Resolved ${formatDate(selectedCase.resolved_at)}` : 'Resolved'}
+                  </p>
+                  <p className="mt-2 text-sm text-emerald-50/90 whitespace-pre-wrap">
+                    {selectedCase.resolution_notes || 'No resolution notes recorded.'}
+                  </p>
+                </div>
+              )}
+
               {isClosable(selectedCase) && (
                 <div className="rounded-xl border border-white/10 bg-white/5 p-4 space-y-3">
                   <h3 className="text-sm font-semibold text-white">Decision</h3>
-                  <p className="text-xs text-white/60">
-                    {isReceivable(selectedCase)
-                      ? 'Accept receives this case into active handling. Close requires justification and ends counselor ownership.'
-                      : 'Close requires justification and ends active counselor ownership for this case.'}
-                  </p>
+                  {isReceivable(selectedCase) ? (
+                    <p className="text-xs text-white/60">
+                      Accept receives this case into active handling. Close requires justification and ends counselor ownership.
+                    </p>
+                  ) : isResolvable(selectedCase) ? (
+                    <p className="text-xs text-white/60">
+                      Mark this case resolved once the concern is addressed — resolution notes become part of the case
+                      record. Closing without resolving is an emergency exit and ends ownership.
+                    </p>
+                  ) : (
+                    <p className="text-xs text-white/60">
+                      Closing formally archives this resolved case.
+                    </p>
+                  )}
+
+                  {!isReceivable(selectedCase) && (
+                    <div className="flex gap-2">
+                      {isResolvable(selectedCase) && (
+                        <button
+                          type="button"
+                          onClick={() => setDecisionMode('resolve')}
+                          className={`rounded-lg px-3 py-1.5 text-xs font-semibold transition ${
+                            decisionMode === 'resolve'
+                              ? 'bg-emerald-500/25 text-emerald-200 border border-emerald-400/40'
+                              : 'bg-white/5 text-white/60 border border-white/10 hover:text-white'
+                          }`}
+                        >
+                          Resolve
+                        </button>
+                      )}
+                      <button
+                        type="button"
+                        onClick={() => setDecisionMode('close')}
+                        className={`rounded-lg px-3 py-1.5 text-xs font-semibold transition ${
+                          decisionMode === 'close'
+                            ? 'bg-red-500/25 text-red-200 border border-red-400/40'
+                            : 'bg-white/5 text-white/60 border border-white/10 hover:text-white'
+                        }`}
+                      >
+                        Close
+                      </button>
+                    </div>
+                  )}
+
                   <textarea
                     value={rejectNote}
                     onChange={(event) => setRejectNote(event.target.value)}
                     rows={3}
-                    placeholder="Required if rejecting this case"
+                    placeholder={
+                      decisionMode === 'resolve' || selectedCase.status === 'resolved'
+                        ? 'Resolution notes (recommended): what was the outcome?'
+                        : 'Required if rejecting this case'
+                    }
                     className="w-full rounded-lg border border-white/20 bg-[#001D58] px-3 py-2 text-sm text-white"
                   />
                   <div className="flex flex-wrap gap-2">
@@ -895,13 +996,24 @@ export default function CounselorCasesPage() {
                         <FiCheckCircle className="h-4 w-4" /> Accept Case
                       </button>
                     )}
-                    <button
-                      onClick={onCloseCase}
-                      disabled={actingCaseId === selectedCase.id}
-                      className="inline-flex items-center gap-2 rounded-lg bg-red-500/20 px-3 py-2 text-sm text-red-300 border border-red-500/30 disabled:opacity-50 disabled:cursor-not-allowed"
-                    >
-                      <FiXCircle className="h-4 w-4" /> Close Case
-                    </button>
+                    {isResolvable(selectedCase) && decisionMode === 'resolve' && (
+                      <button
+                        onClick={onResolveCase}
+                        disabled={actingCaseId === selectedCase.id}
+                        className="inline-flex items-center gap-2 rounded-lg bg-emerald-500/25 px-3 py-2 text-sm font-semibold text-emerald-200 border border-emerald-400/40 disabled:opacity-50 disabled:cursor-not-allowed"
+                      >
+                        <FiCheckCircle className="h-4 w-4" /> Mark Resolved
+                      </button>
+                    )}
+                    {(decisionMode === 'close' || selectedCase.status === 'resolved') && (
+                      <button
+                        onClick={onCloseCase}
+                        disabled={actingCaseId === selectedCase.id}
+                        className="inline-flex items-center gap-2 rounded-lg bg-red-500/20 px-3 py-2 text-sm text-red-300 border border-red-500/30 disabled:opacity-50 disabled:cursor-not-allowed"
+                      >
+                        <FiXCircle className="h-4 w-4" /> Close Case
+                      </button>
+                    )}
                   </div>
                 </div>
               )}

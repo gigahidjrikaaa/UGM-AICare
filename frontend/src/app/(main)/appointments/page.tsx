@@ -7,11 +7,12 @@ import Link from 'next/link';
 import { motion, AnimatePresence } from 'framer-motion';
 import { format } from 'date-fns';
 import { id } from 'date-fns/locale';
-import { 
-  FiCalendar, 
-  FiClock, 
-  FiUser, 
-  FiMapPin, 
+import UserAvatar from '@/components/ui/profile/UserAvatar';
+import {
+  FiCalendar,
+  FiClock,
+  FiUser,
+  FiMapPin,
   FiPlus,
   FiSearch,
   FiDownload,
@@ -444,14 +445,19 @@ export default function AppointmentsPage() {
                   className="bg-white/10 backdrop-blur-md rounded-xl border border-white/20 p-6 hover:bg-white/15 transition"
                 >
                   <div className="flex flex-col items-center text-center">
-                    <div className="w-24 h-24 rounded-full overflow-hidden bg-white/20 mb-4">
-                      <div className="w-full h-full bg-gradient-to-br from-[#173a7a] to-[#0a2a6e] flex items-center justify-center">
-                        <FiUser className="text-3xl text-white/70" />
-                      </div>
+                    <div className="relative h-24 w-24 rounded-full overflow-hidden border border-white/20 bg-white/10 mb-4">
+                      <UserAvatar
+                        src={counselor.image_url}
+                        name={counselor.name}
+                        initialsClassName="text-2xl"
+                      />
                     </div>
-                    <h3 className="text-lg font-semibold text-white mb-1">
+                    <Link
+                      href={`/counselors/${counselor.id}`}
+                      className="text-lg font-semibold text-white mb-1 hover:text-[#FFCA40] transition-colors"
+                    >
                       {counselor.name}
-                    </h3>
+                    </Link>
                     <p className="text-sm text-gray-300 mb-4">
                       {counselor.specialization}
                     </p>
@@ -467,6 +473,12 @@ export default function AppointmentsPage() {
                         </span>
                       )}
                     </div>
+                    <Link
+                      href={`/counselors/${counselor.id}`}
+                      className="mb-3 text-xs font-semibold uppercase tracking-wide text-white/50 transition hover:text-[#FFCA40]"
+                    >
+                      View profile →
+                    </Link>
                     <Link href={`/appointments/book?counselor=${counselor.id}`} className="w-full">
                       <button
                         disabled={!counselor.is_available}

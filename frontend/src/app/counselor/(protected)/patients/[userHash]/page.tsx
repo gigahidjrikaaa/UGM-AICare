@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import {
   FiArrowLeft,
@@ -20,11 +20,16 @@ import {
   FiEye,
 } from 'react-icons/fi';
 import apiClient from '@/services/api';
+import {
+  CounselorEmailComposeModal,
+  CounselorEmailHistory,
+} from '@/components/counselor/CounselorEmailCompose';
 
 // Interfaces based on actual pages
 interface CaseItem {
   id: string;
   user_hash: string;
+  user_id?: number | null;
   severity: 'low' | 'med' | 'high' | 'critical';
   status: 'new' | 'in_progress' | 'waiting' | 'closed' | 'resolved';
   created_at: string;
@@ -210,7 +215,7 @@ export default function PatientDetailPage() {
   const patientHash = rawHash ? decodeURIComponent(rawHash) : '';
 
   const [activeTab, setActiveTab] = useState<TabId>('cases');
-
+  const [emailModalOpen, setEmailModalOpen] = useState(false);
   const [casesState, setCasesState] = useState<{ loading: boolean; error: string | null; data: CaseItem[] }>({ loading: true, error: null, data: [] });
   const [notesState, setNotesState] = useState<{ loading: boolean; error: string | null; data: CaseNote[] }>({ loading: true, error: null, data: [] });
   const [plansState, setPlansState] = useState<{ loading: boolean; error: string | null; data: TreatmentPlan[] }>({ loading: true, error: null, data: [] });
@@ -218,6 +223,14 @@ export default function PatientDetailPage() {
   const [identityScope, setIdentityScope] = useState<PatientIdentityScope>({ trustedEmails: [] });
 
   const [patientProfile, setPatientProfile] = useState<PatientProfile | null>(null);
+  // Numeric student id (from the counselor cases payload) — needed by the
+  // counselor email API; null for legacy cases without a linked user.
+  const studentUserId = useMemo<number | null>(() => {
+    for (const c of casesState.data) {
+      if (c.user_id != null) return c.user_id;
+    }
+    return null;
+  }, [casesState.data]);
 
   useEffect(() => {
     if (!patientHash) return;
@@ -444,6 +457,16 @@ export default function PatientDetailPage() {
                 <div className="h-6 w-px bg-white/10 hidden md:block"></div>
 
                 <div className="flex items-center gap-2">
+                  {studentUserId != null && (
+                    <button
+                      type="button"
+                      onClick={() => setEmailModalOpen(true)}
+                      className="inline-flex items-center gap-1.5 rounded-lg border border-[#FFCA40]/40 bg-[#FFCA40]/10 px-3 py-2 text-xs font-semibold text-[#FFCA40] transition hover:bg-[#FFCA40]/20"
+                      title="Kirim email ke mahasiswa"
+                    >
+                      <FiMail className="w-4 h-4" /> Email
+                    </button>
+                  )}
                   {patientProfile?.user_email && (
                     <a href={`mailto:${patientProfile.user_email}`} className="p-2 bg-white/5 hover:bg-white/10 border border-white/10 rounded-lg text-white/70 hover:text-white transition-all" title="Email">
                       <FiMail className="w-4 h-4" />
@@ -748,6 +771,15 @@ export default function PatientDetailPage() {
           </div>
         )}
       </div>
+
+      {emailModalOpen && studentUserId != null && (
+        <CounselorEmailComposeModal
+          studentUserId={studentUserId}
+          studentName={patientProfile?.user_email ?? 'Student'}
+          onClose={() => setEmailModalOpen(false)}
+          onSent={() => setEmailModalOpen(false)}
+        />
+      )}
     </div>
   );
 }

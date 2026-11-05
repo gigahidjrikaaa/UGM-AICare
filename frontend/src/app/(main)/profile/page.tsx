@@ -36,7 +36,6 @@ import GlobalSkeleton from "@/components/ui/GlobalSkeleton";
 import ParticleBackground from "@/components/ui/ParticleBackground";
 import EarnedBadgesDisplay from "@/components/ui/EarnedBadgesDisplay";
 import WalletLinkButton from "@/components/ui/WalletLinkButton";
-import ProfileQuickSummary from "@/components/ui/profile/ProfileQuickSummary";
 import SafeAvatar from "@/components/ui/profile/SafeAvatar";
 import { useWellnessState } from "@/hooks/useQuests";
 import { sanitizeProfilePhotoInput } from "@/lib/imageUrl";
@@ -48,7 +47,22 @@ import apiClient, {
 } from "@/services/api";
 import type { AIMemoryFact, TimelineEntry, UserProfileOverviewResponse, UserProfileOverviewUpdate } from "@/types/profile";
 
+type ProfileTab = "activity" | "care" | "privacy";
 
+const PROFILE_TABS: Array<{ value: ProfileTab; label: string }> = [
+  { value: "activity", label: "Activity" },
+  { value: "care", label: "Care & safety" },
+  { value: "privacy", label: "Privacy & consent" },
+];
+
+type ConsentField =
+  | "consent_ai_memory"
+  | "consent_proactive_chat"
+  | "consent_data_sharing"
+  | "consent_research"
+  | "consent_peer_support"
+  | "consent_emergency_contact"
+  | "consent_marketing";
 
 type TimelineFilter = "all" | "journal" | "conversation" | "appointment" | "badge";
 
@@ -66,9 +80,6 @@ type ProfileFormState = {
   emergency_contact_relationship: string;
   emergency_contact_phone: string;
   emergency_contact_email: string;
-  risk_level: string;
-  clinical_summary: string;
-  primary_concerns: string;
   safety_plan_notes: string;
   current_therapist_name: string;
   current_therapist_contact: string;
@@ -87,6 +98,7 @@ type ProfileFormState = {
   consent_marketing: boolean;
   consent_ai_memory: boolean;
   consent_proactive_chat: boolean;
+  consent_peer_support: boolean;
 };
 
 const timelineIcons: Record<string, React.JSX.Element> = {
@@ -109,6 +121,7 @@ const TIMELINE_FILTER_OPTIONS: Array<{ value: TimelineFilter; label: string }> =
   { value: "appointment", label: "Appointments" },
   { value: "badge", label: "Badges" },
 ];
+
 const inputBaseClass =
   "w-full rounded-lg border border-white/15 bg-white/10 px-3 py-2 text-sm text-white placeholder-white/40 focus:border-[#FFCA40] focus:outline-none focus:ring-2 focus:ring-[#FFCA40]/40";
 const textareaBaseClass =
@@ -197,9 +210,6 @@ function mapProfileToForm(profile: UserProfileOverviewResponse): ProfileFormStat
     emergency_contact_relationship: profile.contact.emergency_contact?.relationship ?? "",
     emergency_contact_phone: profile.contact.emergency_contact?.phone ?? "",
     emergency_contact_email: profile.contact.emergency_contact?.email ?? "",
-    risk_level: profile.safety.risk_level ?? "",
-    clinical_summary: profile.safety.clinical_summary ?? "",
-    primary_concerns: profile.safety.primary_concerns ?? "",
     safety_plan_notes: profile.safety.safety_plan_notes ?? "",
     current_therapist_name: profile.therapy.current_therapist_name ?? "",
     current_therapist_contact: profile.therapy.current_therapist_contact ?? "",
@@ -218,6 +228,7 @@ function mapProfileToForm(profile: UserProfileOverviewResponse): ProfileFormStat
     consent_marketing: profile.consent.consent_marketing,
     consent_ai_memory: profile.consent.consent_ai_memory,
     consent_proactive_chat: profile.consent.consent_proactive_chat,
+    consent_peer_support: profile.consent.consent_peer_support,
   };
 }
 
@@ -236,9 +247,6 @@ const buildUpdatePayload = (state: ProfileFormState): UserProfileOverviewUpdate 
   emergency_contact_relationship: toNullableString(state.emergency_contact_relationship),
   emergency_contact_phone: toNullableString(state.emergency_contact_phone),
   emergency_contact_email: toNullableString(state.emergency_contact_email),
-  risk_level: toNullableString(state.risk_level),
-  clinical_summary: toNullableString(state.clinical_summary),
-  primary_concerns: toNullableString(state.primary_concerns),
   safety_plan_notes: toNullableString(state.safety_plan_notes),
   current_therapist_name: toNullableString(state.current_therapist_name),
   current_therapist_contact: toNullableString(state.current_therapist_contact),
@@ -261,8 +269,51 @@ const buildUpdatePayload = (state: ProfileFormState): UserProfileOverviewUpdate 
   consent_marketing: state.consent_marketing,
   consent_ai_memory: state.consent_ai_memory,
   consent_proactive_chat: state.consent_proactive_chat,
+  consent_peer_support: state.consent_peer_support,
 });
 
+function ConsentSwitch({
+  checked,
+  onChange,
+  label,
+  description,
+  disabled,
+}: {
+  checked: boolean;
+  onChange: (enabled: boolean) => void;
+  label: string;
+  description?: string;
+  disabled?: boolean;
+}) {
+  return (
+    <div className="flex items-start justify-between gap-4">
+      <span className="text-xs text-white/70">
+        {label}
+        {description && (
+          <span className="mt-0.5 block text-[10px] leading-relaxed text-white/40">{description}</span>
+        )}
+      </span>
+      <Switch
+        checked={checked}
+        onChange={onChange}
+        disabled={disabled}
+        className={clsx(
+          "relative inline-flex h-6 w-11 shrink-0 items-center rounded-full transition focus:outline-none focus:ring-2 focus:ring-[#FFCA40]/80 focus:ring-offset-2 focus:ring-offset-gray-900",
+          checked ? "bg-[#FFCA40]" : "bg-gray-600",
+          disabled && "opacity-70",
+        )}
+      >
+        <span className="sr-only">{label}</span>
+        <span
+          className={clsx(
+            "inline-block h-4 w-4 transform rounded-full bg-white transition",
+            checked ? "translate-x-6" : "translate-x-1",
+          )}
+        />
+      </Switch>
+    </div>
+  );
+}
 
 export default function ProfilePage() {
   const { data: session, status } = useSession();
@@ -280,7 +331,7 @@ export default function ProfilePage() {
 
   const [showQr, setShowQr] = useState(false);
   const [timelineFilter, setTimelineFilter] = useState<TimelineFilter>("all");
-  const [showProfileDetails, setShowProfileDetails] = useState(false);
+  const [activeTab, setActiveTab] = useState<ProfileTab>("activity");
   const filteredTimeline = useMemo(() => {
     const entries = profile?.timeline ?? [];
     return timelineFilter === "all"
@@ -326,7 +377,7 @@ export default function ProfilePage() {
         console.warn("Failed to refresh user stats (non-critical)", error);
         // Continue even if stats refresh fails
       }
-      
+
       const data = await fetchUserProfileOverview();
       setProfile(data);
       setAllowCheckins(data.consent.allow_email_checkins);
@@ -377,42 +428,23 @@ export default function ProfilePage() {
     }
   };
 
-  const handleAIMemoryConsentToggle = async (enabled: boolean) => {
+  const handleConsentToggle = async (field: ConsentField, enabled: boolean) => {
     if (!profile || !form) {
       return;
     }
 
-    setForm((prev) => (prev ? { ...prev, consent_ai_memory: enabled } : prev));
+    const previous = form[field];
+    setForm((prev) => (prev ? { ...prev, [field]: enabled } : prev));
     try {
-      const updated = await updateUserProfileOverview({ consent_ai_memory: enabled });
+      const updated = await updateUserProfileOverview({ [field]: enabled });
       setProfile(updated);
-      toast.success(enabled ? "AI memory enabled" : "AI memory disabled");
+      setForm((prev) => (prev ? { ...prev, [field]: enabled } : prev));
+      toast.success(enabled ? "Preference saved" : "Preference updated");
     } catch (error) {
-      console.error("Failed to update AI memory consent", error);
-      toast.error("Failed to update AI memory consent");
-      // Revert local state
-      setForm(mapProfileToForm(profile));
-    }
-  };
-
-  const handleProactiveChatConsentToggle = async (enabled: boolean) => {
-    if (!profile || !form) {
-      return;
-    }
-
-    setForm((prev) => (prev ? { ...prev, consent_proactive_chat: enabled } : prev));
-    try {
-      const updated = await updateUserProfileOverview({ consent_proactive_chat: enabled });
-      setProfile(updated);
-      toast.success(
-        enabled
-          ? "Aika boleh mengobrol duluan (proaktif)"
-          : "Aika tidak akan mengobrol duluan"
-      );
-    } catch (error) {
-      console.error("Failed to update proactive chat consent", error);
-      toast.error("Failed to update proactive chat consent");
-      setForm(mapProfileToForm(profile));
+      console.error(`Failed to update ${field}`, error);
+      toast.error("Could not save that change. Please try again.");
+      // Revert to the previous value on failure
+      setForm((prev) => (prev ? { ...prev, [field]: previous } : prev));
     }
   };
 
@@ -462,6 +494,8 @@ export default function ProfilePage() {
     }
     setForm(mapProfileToForm(profile));
     setIsEditing(true);
+    // Land on the tab that holds the editable fields.
+    setActiveTab("care");
   };
 
   const handleCancelEdit = () => {
@@ -514,6 +548,20 @@ export default function ProfilePage() {
     return JSON.stringify(form) !== JSON.stringify(mapProfileToForm(profile));
   }, [form, profile]);
 
+  // Warn before losing unsaved edits (refresh / close). In-app navigation is
+  // covered by the sticky save bar that stays visible while editing.
+  useEffect(() => {
+    if (!isEditing || !hasFormChanges) {
+      return;
+    }
+    const handler = (event: BeforeUnloadEvent) => {
+      event.preventDefault();
+      event.returnValue = "";
+    };
+    window.addEventListener("beforeunload", handler);
+    return () => window.removeEventListener("beforeunload", handler);
+  }, [isEditing, hasFormChanges]);
+
   const headerImageSrc = useMemo(() => {
     if (!profile) {
       return "/default-avatar.png";
@@ -552,11 +600,6 @@ export default function ProfilePage() {
         label: "JOY",
         value: wellness ? `${wellness.joy_balance}` : "—",
         icon: <FiAward className="h-4 w-4" />,
-      },
-      {
-        label: "CARE",
-        value: wellness ? `${wellness.care_balance}` : "—",
-        icon: <FiUsers className="h-4 w-4" />,
       },
       {
         label: "Harmony",
@@ -622,6 +665,7 @@ export default function ProfilePage() {
     <div className="relative min-h-screen">
       <ParticleBackground />
       <div className="relative z-10 mx-auto max-w-6xl px-4 pb-16 pt-24">
+        {/* ============ Header: identity, metrics, check-in, wallet ============ */}
         <header className="rounded-3xl border border-white/10 bg-linear-to-br from-white/10 to-white/5 p-8 shadow-2xl backdrop-blur">
           <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
             <div>
@@ -637,18 +681,6 @@ export default function ProfilePage() {
                 </span>
               )}
               <div className="flex flex-wrap items-center justify-end gap-2">
-                <button
-                  type="button"
-                  onClick={() => setShowProfileDetails((prev) => !prev)}
-                  className={clsx(
-                    "inline-flex items-center gap-2 rounded-lg border px-4 py-2 text-sm font-semibold transition",
-                    showProfileDetails
-                      ? "border-[#FFCA40] text-[#FFCA40]"
-                      : "border-white/20 text-white hover:border-[#FFCA40] hover:text-[#FFCA40]"
-                  )}
-                >
-                  {showProfileDetails ? "Hide advanced details" : "Show advanced details"}
-                </button>
                 {isEditing ? (
                   <>
                     <button
@@ -680,28 +712,28 @@ export default function ProfilePage() {
                     </button>
                   </>
                 ) : (
-                  <button
-                    type="button"
-                    onClick={handleEnterEditMode}
-                    className="inline-flex items-center gap-2 rounded-lg border border-white/20 bg-transparent px-4 py-2 text-sm font-semibold text-white transition hover:border-[#FFCA40] hover:text-[#FFCA40]"
-                  >
-                    <FiEdit3 className="h-4 w-4" />
-                    Edit profile
-                  </button>
-                )}
-                {!isEditing && (
-                  <Link
-                    href="/profile/simaster-import"
-                    className="inline-flex items-center gap-2 rounded-lg border border-white/20 bg-transparent px-4 py-2 text-sm font-semibold text-white transition hover:border-[#FFCA40] hover:text-[#FFCA40]"
-                  >
-                    <FiDownload className="h-4 w-4" />
-                    Import from SIMASTER
-                  </Link>
+                  <>
+                    <button
+                      type="button"
+                      onClick={handleEnterEditMode}
+                      className="inline-flex items-center gap-2 rounded-lg border border-white/20 bg-transparent px-4 py-2 text-sm font-semibold text-white transition hover:border-[#FFCA40] hover:text-[#FFCA40]"
+                    >
+                      <FiEdit3 className="h-4 w-4" />
+                      Edit profile
+                    </button>
+                    <Link
+                      href="/profile/simaster-import"
+                      className="inline-flex items-center gap-2 rounded-lg border border-white/20 bg-transparent px-4 py-2 text-sm font-semibold text-white transition hover:border-[#FFCA40] hover:text-[#FFCA40]"
+                    >
+                      <FiDownload className="h-4 w-4" />
+                      Import from SIMASTER
+                    </Link>
+                  </>
                 )}
               </div>
               <p className="text-xs text-white/50">
                 {isEditing
-                  ? "Review your updates and save when you're ready."
+                  ? "Editable fields live on the Care & safety tab — save when you're done."
                   : "Keep your personal details current to tailor AICare to you."}
               </p>
             </div>
@@ -711,9 +743,9 @@ export default function ProfilePage() {
               <SafeAvatar src={headerImageSrc} alt={profile.header.full_name || "Profile"} className="h-24 w-24" />
               <div>
                 <div className="flex flex-wrap items-center gap-3">
-                  <h1 className="text-3xl font-bold text-white">
+                  <h2 className="text-3xl font-bold text-white">
                     {profile.header.full_name || firstName}
-                  </h1>
+                  </h2>
                   {(profile.header.pronouns || form.pronouns.trim()) && (
                     <span className="rounded-full border border-white/20 bg-white/10 px-3 py-1 text-xs font-medium uppercase tracking-wide text-white/80">
                       {isEditing ? form.pronouns || profile.header.pronouns : profile.header.pronouns}
@@ -836,12 +868,16 @@ export default function ProfilePage() {
                   <QRCode value={profile.header.check_in_code} className="h-28 w-28" />
                 </div>
               )}
+              <p className="mt-3 text-[11px] leading-relaxed text-white/40">
+                Show this code (or QR) at the clinic front desk when you arrive for an
+                appointment, so staff can find your booking.
+              </p>
             </div>
           </div>
           <div className="mt-6 flex flex-wrap items-center justify-between gap-4">
             <div className="text-white">
-              <p className="text-xs uppercase tracking-wide text-white/50">Digital Identity</p>
-              <p className="mt-1 text-sm text-white/70">Connect your wallet to secure your decentralized identity</p>
+              <p className="text-xs uppercase tracking-wide text-white/50">Open Campus ID</p>
+              <p className="mt-1 text-sm text-white/70">Link your wallet to mint achievement badges on-chain</p>
             </div>
             <WalletLinkButton />
           </div>
@@ -861,9 +897,86 @@ export default function ProfilePage() {
               </div>
             ))}
           </div>
-          {showProfileDetails && (
-            <div className="mt-8 grid gap-6 md:grid-cols-2 lg:grid-cols-3">
-            <div className="rounded-2xl border border-white/10 bg-white/5 p-6 text-sm text-white/80 backdrop-blur md:col-span-2">
+        </header>
+
+        {/* ============ Tabs ============ */}
+        <div className="mt-8 flex flex-wrap gap-2" role="tablist" aria-label="Profile sections">
+          {PROFILE_TABS.map((tab) => {
+            const isActive = activeTab === tab.value;
+            return (
+              <button
+                key={tab.value}
+                type="button"
+                role="tab"
+                aria-selected={isActive}
+                onClick={() => setActiveTab(tab.value)}
+                className={clsx(
+                  "rounded-full border px-5 py-2 text-sm font-semibold transition",
+                  isActive
+                    ? "border-[#FFCA40] bg-[#FFCA40] text-[#001D58]"
+                    : "border-white/15 bg-white/5 text-white/70 hover:border-[#FFCA40] hover:text-[#FFCA40]",
+                )}
+              >
+                {tab.label}
+              </button>
+            );
+          })}
+        </div>
+
+        {/* ============ Tab: Activity ============ */}
+        {activeTab === "activity" && (
+          <>
+            <section className="mt-6 rounded-3xl border border-white/10 bg-white/5 p-6 shadow-2xl backdrop-blur">
+              <EarnedBadgesDisplay />
+            </section>
+
+            <section className="mt-6 rounded-3xl border border-white/10 bg-white/5 p-6 shadow-2xl backdrop-blur">
+              <div className="mb-6 flex flex-wrap items-center justify-between gap-4">
+                <div>
+                  <h2 className="flex items-center gap-2 text-xl font-semibold text-white">
+                    <FiActivity className="h-5 w-5 text-[#FFCA40]" />
+                    Activity timeline
+                  </h2>
+                  <p className="text-sm text-white/60">Review your latest appointments, conversations, and wellbeing milestones.</p>
+                </div>
+                <div className="flex flex-wrap items-center gap-2 text-xs">
+                  {TIMELINE_FILTER_OPTIONS.map((option) => {
+                    const isActive = timelineFilter === option.value;
+                    const ariaCurrent = isActive ? 'true' : undefined;
+                    return (
+                      <button
+                        key={option.value}
+                        type="button"
+                        aria-current={ariaCurrent}
+                        onClick={() => setTimelineFilter(option.value)}
+                        className={clsx(
+                          "inline-flex items-center gap-2 rounded-full border px-3 py-1 font-semibold uppercase tracking-wide transition",
+                          isActive
+                            ? "border-[#FFCA40] bg-[#FFCA40] text-[#001D58]"
+                            : "border-white/15 text-white/60 hover:border-[#FFCA40] hover:text-[#FFCA40]"
+                        )}
+                      >
+                        {option.label}
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+              <TimelineList
+                entries={filteredTimeline}
+                isExpanded={showAllTimelineEntries}
+                onToggle={handleTimelineToggle}
+                emptyMessage={timelineEmptyMessage}
+              />
+            </section>
+          </>
+        )}
+
+        {/* ============ Tab: Care & safety ============ */}
+        {activeTab === "care" && (
+          <div className="mt-6 grid gap-6 lg:grid-cols-2">
+            {/* Contact information */}
+            <div className="rounded-3xl border border-white/10 bg-white/5 p-6 text-sm text-white/80 shadow-2xl backdrop-blur">
               <div className="flex items-center gap-2 text-white">
                 <FiPhone className="h-5 w-5 text-[#FFCA40]" />
                 <h3 className="text-base font-semibold">Contact information</h3>
@@ -907,12 +1020,12 @@ export default function ProfilePage() {
                       : "Not linked"}
                   </p>
                 </div>
-                <div className="space-y-1">
-                  <p className="text-xs uppercase tracking-wide text-white/50">Digital ID</p>
-                  <p>{profile.header.google_sub ?? "Not linked"}</p>
-                </div>
                 <div className="space-y-3 md:col-span-2">
                   <p className="text-xs uppercase tracking-wide text-white/50">Emergency contact</p>
+                  <p className="text-xs leading-relaxed text-white/40">
+                    Reached only with your permission (Privacy & consent tab) and when your
+                    safety requires it.
+                  </p>
                   {isEditing ? (
                     <div className="grid gap-3 md:grid-cols-2">
                       <div className="space-y-2">
@@ -970,311 +1083,67 @@ export default function ProfilePage() {
                 </div>
               </div>
             </div>
-            <div className="rounded-2xl border border-white/10 bg-white/5 p-6 text-sm text-white/80 backdrop-blur">
+
+            {/* Care-team wellbeing notes — READ-ONLY for students */}
+            <div className="rounded-3xl border border-white/10 bg-white/5 p-6 text-sm text-white/80 shadow-2xl backdrop-blur">
               <div className="flex items-center gap-2 text-white">
                 <FiShield className="h-5 w-5 text-[#FFCA40]" />
-                <h3 className="text-base font-semibold">Safety & clinical basics</h3>
+                <h3 className="text-base font-semibold">Care team notes on your wellbeing</h3>
               </div>
+              <p className="mt-2 text-xs leading-relaxed text-white/40">
+                Maintained by your counselors and the AICare care team. If something here looks
+                wrong, contact your counselor rather than trying to change it.
+              </p>
               <div className="mt-4 grid gap-4 md:grid-cols-2">
                 <div>
                   <p className="text-xs uppercase tracking-wide text-white/50">Risk level</p>
-                  {isEditing ? (
-                    <input
-                      value={form.risk_level}
-                      onChange={(event) => updateFormField("risk_level", event.target.value)}
-                      className={inputBaseClass}
-                      placeholder="e.g. Moderate"
-                    />
-                  ) : (
-                    <p>{profile.safety.risk_level ?? "Not assessed"}</p>
-                  )}
+                  <p>{profile.safety.risk_level ?? "Not assessed"}</p>
                 </div>
                 <div>
-                  <p className="text-xs uppercase tracking-wide text-white/50">Primary concerns</p>
-                  {isEditing ? (
-                    <textarea
-                      value={form.primary_concerns}
-                      onChange={(event) => updateFormField("primary_concerns", event.target.value)}
-                      className={textareaBaseClass}
-                      rows={3}
-                      placeholder="Key focus areas"
-                    />
-                  ) : (
-                    <p>{profile.safety.primary_concerns ?? "Add the areas you want to focus on"}</p>
-                  )}
+                  <p className="text-xs uppercase tracking-wide text-white/50">Focus areas</p>
+                  <p>{profile.safety.primary_concerns ?? "Not yet recorded"}</p>
                 </div>
                 <div className="md:col-span-2 space-y-2">
                   <p className="text-xs uppercase tracking-wide text-white/50">Clinical summary</p>
-                  {isEditing ? (
-                    <textarea
-                      value={form.clinical_summary}
-                      onChange={(event) => updateFormField("clinical_summary", event.target.value)}
-                      className={textareaBaseClass}
-                      rows={4}
-                      placeholder="Summary of clinical notes"
-                    />
-                  ) : (
-                    <p>
-                      {profile.safety.clinical_summary ??
-                        "We will summarise key clinical notes here once available."}
-                    </p>
-                  )}
+                  <p>
+                    {profile.safety.clinical_summary ??
+                      "Your care team's summary will appear here once available."}
+                  </p>
                 </div>
                 <div className="md:col-span-2 space-y-2">
-                  <p className="text-xs uppercase tracking-wide text-white/50">Safety plan notes</p>
+                  <p className="text-xs uppercase tracking-wide text-white/50">My safety plan</p>
+                  <p className="text-xs leading-relaxed text-white/40">
+                    Yours to write and keep — steps you plan to take when things feel heavy.
+                    Sharing it with your counselor makes it more useful.
+                  </p>
                   {isEditing ? (
                     <textarea
                       value={form.safety_plan_notes}
                       onChange={(event) => updateFormField("safety_plan_notes", event.target.value)}
                       className={textareaBaseClass}
                       rows={4}
-                      placeholder="Capture any safety plans agreed with your support team"
+                      placeholder="Example: call my sister, use the box-breathing activity, keep a regular sleep time, book a counseling session if it lasts more than a week."
                     />
                   ) : (
                     <p>
                       {profile.safety.safety_plan_notes ??
-                        "Use this space to capture any safety plans agreed with your therapist or support team."}
+                        "No safety plan written yet. Use Edit profile to add one."}
                     </p>
                   )}
                 </div>
               </div>
             </div>
-            <div className="rounded-2xl border border-white/10 bg-white/5 p-6 text-sm text-white/80 backdrop-blur">
-              <div className="flex items-center gap-2 text-white">
-                <FiCheckCircle className="h-5 w-5 text-[#FFCA40]" />
-                <h3 className="text-base font-semibold">Consent & privacy</h3>
-              </div>
-              <div className="mt-4 space-y-4">
-                <div className="flex items-center justify-between text-xs text-white/60">
-                  <span>Email check-ins</span>
-                  <Switch
-                    checked={allowCheckins}
-                    onChange={handleCheckinToggle}
-                    disabled={isSavingCheckinSetting}
-                    className={clsx(
-                      "relative inline-flex h-6 w-11 items-center rounded-full transition focus:outline-none focus:ring-2 focus:ring-[#FFCA40]/80 focus:ring-offset-2 focus:ring-offset-gray-900",
-                      allowCheckins ? "bg-[#FFCA40]" : "bg-gray-600",
-                      isSavingCheckinSetting && "opacity-70",
-                    )}
-                  >
-                    <span className="sr-only">Toggle email check-ins</span>
-                    <span
-                      className={clsx(
-                        "inline-block h-4 w-4 transform rounded-full bg-white transition",
-                        allowCheckins ? "translate-x-6" : "translate-x-1",
-                      )}
-                    />
-                  </Switch>
-                </div>
-                {checkinSettingError && (
-                  <p className="text-xs text-red-400">{checkinSettingError}</p>
-                )}
 
-                <div className="flex items-center justify-between text-xs text-white/60">
-                  <span>Allow Aika to remember facts about you</span>
-                  <Switch
-                    checked={form?.consent_ai_memory ?? profile.consent.consent_ai_memory}
-                    onChange={handleAIMemoryConsentToggle}
-                    className={clsx(
-                      "relative inline-flex h-6 w-11 items-center rounded-full transition focus:outline-none focus:ring-2 focus:ring-[#FFCA40]/80 focus:ring-offset-2 focus:ring-offset-gray-900",
-                      (form?.consent_ai_memory ?? profile.consent.consent_ai_memory) ? "bg-[#FFCA40]" : "bg-gray-600",
-                    )}
-                  >
-                    <span className="sr-only">Toggle AI memory</span>
-                    <span
-                      className={clsx(
-                        "inline-block h-4 w-4 transform rounded-full bg-white transition",
-                        (form?.consent_ai_memory ?? profile.consent.consent_ai_memory) ? "translate-x-6" : "translate-x-1",
-                      )}
-                    />
-                  </Switch>
-                </div>
-
-                <div className="flex items-center justify-between text-xs text-white/60">
-                  <span>
-                    Izinkan Aika mengobrol duluan
-                    <span className="block text-[10px] text-white/40">
-                      Aika bisa mengirim pesan follow-up rencana intervensi kamu (opt-in)
-                    </span>
-                  </span>
-                  <Switch
-                    checked={(form?.consent_proactive_chat ?? profile.consent.consent_proactive_chat)}
-                    onChange={handleProactiveChatConsentToggle}
-                    className={clsx(
-                      "relative inline-flex h-6 w-11 items-center rounded-full transition focus:outline-none focus:ring-2 focus:ring-[#FFCA40]/80 focus:ring-offset-2 focus:ring-offset-gray-900",
-                      (form?.consent_proactive_chat ?? profile.consent.consent_proactive_chat) ? "bg-[#FFCA40]" : "bg-gray-600",
-                    )}
-                  >
-                    <span className="sr-only">Toggle proactive chat</span>
-                    <span
-                      className={clsx(
-                        "inline-block h-4 w-4 transform rounded-full bg-white transition",
-                        (form?.consent_proactive_chat ?? profile.consent.consent_proactive_chat) ? "translate-x-6" : "translate-x-1",
-                      )}
-                    />
-                  </Switch>
-                </div>
-
-                <div className="rounded-xl border border-white/10 bg-white/5 p-4">
-                  <p className="text-xs uppercase tracking-wide text-white/50">Remembered facts</p>
-                  {aiMemoryFactsLoading ? (
-                    <p className="mt-2 text-sm text-white/60">Loading…</p>
-                  ) : aiMemoryFactsError ? (
-                    <p className="mt-2 text-sm text-red-400">{aiMemoryFactsError}</p>
-                  ) : !aiMemoryFacts.length ? (
-                    <p className="mt-2 text-sm text-white/60">No facts saved yet.</p>
-                  ) : (
-                    <div className="mt-3 overflow-x-auto">
-                      <table className="min-w-full text-left text-sm">
-                        <thead className="text-xs uppercase tracking-wide text-white/40">
-                          <tr>
-                            <th className="py-2 pr-4">Fact</th>
-                            <th className="py-2 pr-4">Learned</th>
-                            <th className="py-2">Action</th>
-                          </tr>
-                        </thead>
-                        <tbody className="divide-y divide-white/10">
-                          {aiMemoryFacts.map((fact) => (
-                            <tr key={fact.id}>
-                              <td className="py-3 pr-4 text-white/80">{fact.fact}</td>
-                              <td className="py-3 pr-4 text-white/60">{format(new Date(fact.created_at), "PP")}</td>
-                              <td className="py-3">
-                                <button
-                                  type="button"
-                                  onClick={() => handleForgetAIMemoryFact(fact.id)}
-                                  className="inline-flex items-center gap-2 rounded-full border border-white/20 px-3 py-1 text-xs font-medium uppercase tracking-wide text-white transition hover:border-[#FFCA40] hover:text-[#FFCA40]"
-                                >
-                                  Forget
-                                </button>
-                              </td>
-                            </tr>
-                          ))}
-                        </tbody>
-                      </table>
-                    </div>
-                  )}
-                </div>
-
-                <ul className="space-y-2 text-sm text-white/80">
-                  <li className="flex items-center gap-2">
-                    {profile.consent.consent_data_sharing ? (
-                      <FiCheckCircle className="text-emerald-400" />
-                    ) : (
-                      <FiXCircle className="text-red-400" />
-                    )}
-                    <span>Share anonymised insights to improve AICare</span>
-                  </li>
-                  <li className="flex items-center gap-2">
-                    {profile.consent.consent_research ? (
-                      <FiCheckCircle className="text-emerald-400" />
-                    ) : (
-                      <FiXCircle className="text-red-400" />
-                    )}
-                    <span>Participate in wellbeing research studies</span>
-                  </li>
-                  <li className="flex items-center gap-2">
-                    {profile.consent.consent_emergency_contact ? (
-                      <FiCheckCircle className="text-emerald-400" />
-                    ) : (
-                      <FiXCircle className="text-red-400" />
-                    )}
-                    <span>Allow AICare to reach your emergency contact when needed</span>
-                  </li>
-                  <li className="flex items-center gap-2">
-                    {profile.consent.consent_marketing ? (
-                      <FiCheckCircle className="text-emerald-400" />
-                    ) : (
-                      <FiXCircle className="text-red-400" />
-                    )}
-                    <span>Receive wellbeing updates and programme invitations</span>
-                  </li>
-                </ul>
-              </div>
-            </div>
-            <div className="rounded-2xl border border-white/10 bg-white/5 p-6 text-sm text-white/80 backdrop-blur">
-              <div className="flex items-center gap-2 text-white">
-                <FiGlobe className="h-5 w-5 text-[#FFCA40]" />
-                <h3 className="text-base font-semibold">Personal preferences</h3>
-              </div>
-              <div className="mt-4 space-y-3">
-                <div>
-                  <p className="text-xs uppercase tracking-wide text-white/50">Preferred language</p>
-                  {isEditing ? (
-                    <input
-                      value={form.preferred_language}
-                      onChange={(event) => updateFormField("preferred_language", event.target.value)}
-                      className={inputBaseClass}
-                      placeholder="Preferred language"
-                    />
-                  ) : (
-                    <p>{profile.localization.preferred_language ?? "English"}</p>
-                  )}
-                </div>
-                <div>
-                  <p className="text-xs uppercase tracking-wide text-white/50">Timezone</p>
-                  {isEditing ? (
-                    <input
-                      value={form.preferred_timezone}
-                      onChange={(event) => updateFormField("preferred_timezone", event.target.value)}
-                      className={inputBaseClass}
-                      placeholder="Timezone (e.g. Asia/Jakarta)"
-                    />
-                  ) : (
-                    <p>{profile.localization.preferred_timezone ?? "Asia/Jakarta"}</p>
-                  )}
-                </div>
-                <div>
-                  <p className="text-xs uppercase tracking-wide text-white/50">Accessibility notes</p>
-                  {isEditing ? (
-                    <textarea
-                      value={form.accessibility_needs}
-                      onChange={(event) => updateFormField("accessibility_needs", event.target.value)}
-                      className={textareaBaseClass}
-                      rows={3}
-                      placeholder="Tell us what helps you engage comfortably"
-                    />
-                  ) : (
-                    <p>
-                      {profile.localization.accessibility_needs ??
-                        "Let us know what helps you engage comfortably."}
-                    </p>
-                  )}
-                </div>
-                <div>
-                  <p className="text-xs uppercase tracking-wide text-white/50">Preferred communication</p>
-                  {isEditing ? (
-                    <textarea
-                      value={form.communication_preferences}
-                      onChange={(event) => updateFormField("communication_preferences", event.target.value)}
-                      className={textareaBaseClass}
-                      rows={3}
-                      placeholder="How should we reach you?"
-                    />
-                  ) : (
-                    <p>{profile.localization.communication_preferences ?? "Email & in-app messages"}</p>
-                  )}
-                </div>
-                <div>
-                  <p className="text-xs uppercase tracking-wide text-white/50">Interface preferences</p>
-                  {isEditing ? (
-                    <textarea
-                      value={form.interface_preferences}
-                      onChange={(event) => updateFormField("interface_preferences", event.target.value)}
-                      className={textareaBaseClass}
-                      rows={3}
-                      placeholder="UI adjustments that work best for you"
-                    />
-                  ) : (
-                    <p>{profile.localization.interface_preferences ?? "Standard experience"}</p>
-                  )}
-                </div>
-              </div>
-            </div>
-            <div className="rounded-2xl border border-white/10 bg-white/5 p-6 text-sm text-white/80 backdrop-blur md:col-span-2">
+            {/* Therapy overview */}
+            <div className="rounded-3xl border border-white/10 bg-white/5 p-6 text-sm text-white/80 shadow-2xl backdrop-blur">
               <div className="flex items-center gap-2 text-white">
                 <FiUsers className="h-5 w-5 text-[#FFCA40]" />
                 <h3 className="text-base font-semibold">Therapy overview</h3>
               </div>
+              <p className="mt-2 text-xs leading-relaxed text-white/40">
+                Record any therapist or counseling you see outside AICare so our team can
+                coordinate support.
+              </p>
               <div className="mt-4 grid gap-4 md:grid-cols-2">
                 <div>
                   <p className="text-xs uppercase tracking-wide text-white/50">Therapist</p>
@@ -1339,105 +1208,286 @@ export default function ProfilePage() {
                       placeholder="Additional therapy notes"
                     />
                   ) : (
-                    <p>
-                      {profile.therapy.therapy_notes ??
-                        "AICare will highlight helpful therapy notes here once available."}
-                    </p>
+                    <p>{profile.therapy.therapy_notes ?? "No therapy notes yet."}</p>
                   )}
                 </div>
               </div>
             </div>
-            </div>
-          )}
-        </header>
 
-        <ProfileQuickSummary
-          fullName={profile.header.full_name || firstName}
-          primaryEmail={profile.contact.primary_email}
-          phone={isEditing ? form.phone : profile.contact.phone}
-          city={isEditing ? form.city : profile.header.city}
-          university={isEditing ? form.university : profile.header.university}
-          major={isEditing ? form.major : profile.header.major}
-        />
-
-        <section className="mt-8 rounded-3xl border border-white/10 bg-white/5 p-6 shadow-2xl backdrop-blur">
-          <EarnedBadgesDisplay />
-        </section>
-
-        <section className="mt-6 rounded-3xl border border-white/10 bg-white/5 p-6 shadow-2xl backdrop-blur">
-          <div className="mb-6 flex flex-wrap items-center justify-between gap-4">
-            <div>
-              <h2 className="flex items-center gap-2 text-xl font-semibold text-white">
-                <FiActivity className="h-5 w-5 text-[#FFCA40]" />
-                Activity timeline
+            {/* Team notes */}
+            <section className="rounded-3xl border border-white/10 bg-white/5 p-6 text-sm text-white/80 shadow-2xl backdrop-blur">
+              <h2 className="flex items-center gap-2 text-base font-semibold text-white">
+                <FiSliders className="h-5 w-5 text-[#FFCA40]" />
+                Notes for the AICare team
               </h2>
-              <p className="text-sm text-white/60">Review your latest appointments, conversations, and wellbeing milestones.</p>
-            </div>
-            <div className="flex flex-wrap items-center gap-2 text-xs">
-              {TIMELINE_FILTER_OPTIONS.map((option) => {
-                const isActive = timelineFilter === option.value;
-                const ariaCurrent = isActive ? 'true' : undefined;
-                return (
-                  <button
-                    key={option.value}
-                    type="button"
-                    aria-current={ariaCurrent}
-                    onClick={() => setTimelineFilter(option.value)}
-                    className={clsx(
-                      "inline-flex items-center gap-2 rounded-full border px-3 py-1 font-semibold uppercase tracking-wide transition",
-                      isActive
-                        ? "border-[#FFCA40] bg-[#FFCA40] text-[#001D58]"
-                        : "border-white/15 text-white/60 hover:border-[#FFCA40] hover:text-[#FFCA40]"
-                    )}
-                  >
-                    {option.label}
-                  </button>
-                );
-              })}
-            </div>
+              <p className="mt-2 text-xs leading-relaxed text-white/40">
+                Share context that helps support staff prepare for your next interaction:
+                current stressors, preferred support style, scheduling constraints.
+              </p>
+              {isEditing ? (
+                <div className="mt-4 space-y-2">
+                  <label className="text-xs uppercase tracking-wide text-white/50">Team notes</label>
+                  <textarea
+                    value={form.aicare_team_notes}
+                    onChange={(event) => updateFormField("aicare_team_notes", event.target.value)}
+                    className={textareaBaseClass}
+                    rows={5}
+                    maxLength={AICARE_TEAM_NOTES_MAX_LENGTH}
+                    placeholder="Example: I feel overwhelmed near exam weeks, prefer short check-ins by chat, and need reminders two days before appointments."
+                  />
+                  <div className="flex items-center justify-between text-xs text-white/50">
+                    <span>Keep this practical and specific for your next support session.</span>
+                    <span>
+                      {form.aicare_team_notes.length}/{AICARE_TEAM_NOTES_MAX_LENGTH}
+                    </span>
+                  </div>
+                </div>
+              ) : (
+                <p className="mt-3 leading-relaxed text-white/80">
+                  {profile.aicare_team_notes ??
+                    "No notes added yet. Use Edit profile to share context with the AICare team."}
+                </p>
+              )}
+            </section>
           </div>
-          <TimelineList
-            entries={filteredTimeline}
-            isExpanded={showAllTimelineEntries}
-            onToggle={handleTimelineToggle}
-            emptyMessage={timelineEmptyMessage}
-          />
-        </section>
+        )}
 
-        <section className="mt-6 rounded-3xl border border-white/10 bg-white/5 p-6 shadow-2xl backdrop-blur">
-          <h2 className="flex items-center gap-2 text-xl font-semibold text-white">
-            <FiSliders className="h-5 w-5 text-[#FFCA40]" />
-            Notes for the AICare team
-          </h2>
-          <p className="mt-2 text-sm text-white/60">
-            Share context that helps support staff prepare for your next interaction. Useful examples include current stressors, preferred support style, scheduling constraints, and what kind of follow-up you want.
-          </p>
-          {isEditing ? (
-            <div className="mt-4 space-y-2">
-              <label className="text-xs uppercase tracking-wide text-white/50">Team notes</label>
-              <textarea
-                value={form.aicare_team_notes}
-                onChange={(event) => updateFormField("aicare_team_notes", event.target.value)}
-                className={textareaBaseClass}
-                rows={5}
-                maxLength={AICARE_TEAM_NOTES_MAX_LENGTH}
-                placeholder="Example: I feel overwhelmed near exam weeks, prefer short check-ins by chat, and need reminders two days before appointments."
-              />
-              <div className="flex items-center justify-between text-xs text-white/50">
-                <span>Keep this practical and specific for your next support session.</span>
-                <span>
-                  {form.aicare_team_notes.length}/{AICARE_TEAM_NOTES_MAX_LENGTH}
-                </span>
+        {/* ============ Tab: Privacy & consent ============ */}
+        {activeTab === "privacy" && (
+          <div className="mt-6 grid gap-6 lg:grid-cols-2">
+            <div className="rounded-3xl border border-white/10 bg-white/5 p-6 text-sm text-white/80 shadow-2xl backdrop-blur">
+              <div className="flex items-center gap-2 text-white">
+                <FiCheckCircle className="h-5 w-5 text-[#FFCA40]" />
+                <h3 className="text-base font-semibold">Consent & privacy</h3>
+              </div>
+              <p className="mt-2 text-xs leading-relaxed text-white/40">
+                Everything here applies immediately, and each change is recorded with a
+                timestamp in your consent history.
+              </p>
+              <div className="mt-4 space-y-4">
+                <ConsentSwitch
+                  label="Email check-ins"
+                  checked={allowCheckins}
+                  onChange={handleCheckinToggle}
+                  disabled={isSavingCheckinSetting}
+                />
+                {checkinSettingError && (
+                  <p className="text-xs text-red-400">{checkinSettingError}</p>
+                )}
+
+                <ConsentSwitch
+                  label="Allow Aika to remember facts about you"
+                  description="Facts Aika learns (like your name or preferences) are encrypted, and you can delete each one below."
+                  checked={form.consent_ai_memory}
+                  onChange={(enabled) => handleConsentToggle("consent_ai_memory", enabled)}
+                />
+
+                <ConsentSwitch
+                  label="Izinkan Aika mengobrol duluan"
+                  description="Aika bisa mengirim pesan follow-up rencana intervensi kamu (opt-in)."
+                  checked={form.consent_proactive_chat}
+                  onChange={(enabled) => handleConsentToggle("consent_proactive_chat", enabled)}
+                />
+
+                <ConsentSwitch
+                  label="Share anonymised insights to improve AICare"
+                  description="Aggregated, de-identified data only — never your identity or journal contents."
+                  checked={form.consent_data_sharing}
+                  onChange={(enabled) => handleConsentToggle("consent_data_sharing", enabled)}
+                />
+
+                <ConsentSwitch
+                  label="Participate in wellbeing research studies"
+                  description="Only anonymised data is used, per UGM research ethics rules."
+                  checked={form.consent_research}
+                  onChange={(enabled) => handleConsentToggle("consent_research", enabled)}
+                />
+
+                <ConsentSwitch
+                  label="Allow AICare to reach your emergency contact when needed"
+                  description="Used only when your safety is at risk and counselors cannot reach you."
+                  checked={form.consent_emergency_contact}
+                  onChange={(enabled) => handleConsentToggle("consent_emergency_contact", enabled)}
+                />
+
+                <ConsentSwitch
+                  label="Receive wellbeing updates and programme invitations"
+                  checked={form.consent_marketing}
+                  onChange={(enabled) => handleConsentToggle("consent_marketing", enabled)}
+                />
+
+                <ConsentSwitch
+                  label="Ikut program peer support"
+                  description="Wajib aktif sebelum kamu bisa dipasangkan dengan peer supporter atau bergabung ke peer circle."
+                  checked={form.consent_peer_support}
+                  onChange={(enabled) => handleConsentToggle("consent_peer_support", enabled)}
+                />
               </div>
             </div>
-          ) : (
-            <p className="mt-3 leading-relaxed text-white/80">
-              {profile.aicare_team_notes ??
-                "No notes added yet. Use Edit profile to share context with the AICare team."}
-            </p>
-          )}
-        </section>
+
+            <div className="space-y-6">
+              <div className="rounded-3xl border border-white/10 bg-white/5 p-6 text-sm text-white/80 shadow-2xl backdrop-blur">
+                <p className="text-xs uppercase tracking-wide text-white/50">Remembered facts</p>
+                <p className="mt-1 text-xs leading-relaxed text-white/40">
+                  What Aika currently remembers about you. Deleting a fact applies to future
+                  conversations immediately.
+                </p>
+                {aiMemoryFactsLoading ? (
+                  <p className="mt-3 text-sm text-white/60">Loading…</p>
+                ) : aiMemoryFactsError ? (
+                  <p className="mt-3 text-sm text-red-400">{aiMemoryFactsError}</p>
+                ) : !aiMemoryFacts.length ? (
+                  <p className="mt-3 text-sm text-white/60">No facts saved yet.</p>
+                ) : (
+                  <div className="mt-3 overflow-x-auto">
+                    <table className="min-w-full text-left text-sm">
+                      <thead className="text-xs uppercase tracking-wide text-white/40">
+                        <tr>
+                          <th className="py-2 pr-4">Fact</th>
+                          <th className="py-2 pr-4">Learned</th>
+                          <th className="py-2">Action</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-white/10">
+                        {aiMemoryFacts.map((fact) => (
+                          <tr key={fact.id}>
+                            <td className="py-3 pr-4 text-white/80">{fact.fact}</td>
+                            <td className="py-3 pr-4 text-white/60">{format(new Date(fact.created_at), "PP")}</td>
+                            <td className="py-3">
+                              <button
+                                type="button"
+                                onClick={() => handleForgetAIMemoryFact(fact.id)}
+                                className="inline-flex items-center gap-2 rounded-full border border-white/20 px-3 py-1 text-xs font-medium uppercase tracking-wide text-white transition hover:border-[#FFCA40] hover:text-[#FFCA40]"
+                              >
+                                Forget
+                              </button>
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                )}
+              </div>
+
+              <div className="rounded-3xl border border-white/10 bg-white/5 p-6 text-sm text-white/80 shadow-2xl backdrop-blur">
+                <div className="flex items-center gap-2 text-white">
+                  <FiGlobe className="h-5 w-5 text-[#FFCA40]" />
+                  <h3 className="text-base font-semibold">Personal preferences</h3>
+                </div>
+                <div className="mt-4 space-y-3">
+                  <div>
+                    <p className="text-xs uppercase tracking-wide text-white/50">Preferred language</p>
+                    {isEditing ? (
+                      <input
+                        value={form.preferred_language}
+                        onChange={(event) => updateFormField("preferred_language", event.target.value)}
+                        className={inputBaseClass}
+                        placeholder="Preferred language"
+                      />
+                    ) : (
+                      <p>{profile.localization.preferred_language ?? "English"}</p>
+                    )}
+                  </div>
+                  <div>
+                    <p className="text-xs uppercase tracking-wide text-white/50">Timezone</p>
+                    {isEditing ? (
+                      <input
+                        value={form.preferred_timezone}
+                        onChange={(event) => updateFormField("preferred_timezone", event.target.value)}
+                        className={inputBaseClass}
+                        placeholder="Timezone (e.g. Asia/Jakarta)"
+                      />
+                    ) : (
+                      <p>{profile.localization.preferred_timezone ?? "Asia/Jakarta"}</p>
+                    )}
+                  </div>
+                  <div>
+                    <p className="text-xs uppercase tracking-wide text-white/50">Accessibility notes</p>
+                    {isEditing ? (
+                      <textarea
+                        value={form.accessibility_needs}
+                        onChange={(event) => updateFormField("accessibility_needs", event.target.value)}
+                        className={textareaBaseClass}
+                        rows={3}
+                        placeholder="Tell us what helps you engage comfortably"
+                      />
+                    ) : (
+                      <p>
+                        {profile.localization.accessibility_needs ??
+                          "Let us know what helps you engage comfortably."}
+                      </p>
+                    )}
+                  </div>
+                  <div>
+                    <p className="text-xs uppercase tracking-wide text-white/50">Preferred communication</p>
+                    {isEditing ? (
+                      <textarea
+                        value={form.communication_preferences}
+                        onChange={(event) => updateFormField("communication_preferences", event.target.value)}
+                        className={textareaBaseClass}
+                        rows={3}
+                        placeholder="How should we reach you?"
+                      />
+                    ) : (
+                      <p>{profile.localization.communication_preferences ?? "Email & in-app messages"}</p>
+                    )}
+                  </div>
+                  <div>
+                    <p className="text-xs uppercase tracking-wide text-white/50">Interface preferences</p>
+                    {isEditing ? (
+                      <textarea
+                        value={form.interface_preferences}
+                        onChange={(event) => updateFormField("interface_preferences", event.target.value)}
+                        className={textareaBaseClass}
+                        rows={3}
+                        placeholder="UI adjustments that work best for you"
+                      />
+                    ) : (
+                      <p>{profile.localization.interface_preferences ?? "Standard experience"}</p>
+                    )}
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
       </div>
+
+      {/* Sticky edit bar: keeps Save/Cancel reachable on this long form and
+          doubles as the in-app unsaved-changes indicator. */}
+      {isEditing && (
+        <div className="sticky bottom-4 z-30 mx-auto mt-6 w-fit">
+          <div
+            className={clsx(
+              "flex items-center gap-3 rounded-full border px-5 py-2.5 shadow-2xl backdrop-blur-xl transition-colors",
+              hasFormChanges
+                ? "border-[#FFCA40]/50 bg-[#001D58]/95"
+                : "border-white/15 bg-[#001D58]/80",
+            )}
+          >
+            <span className="text-xs text-white/70">
+              {hasFormChanges ? "You have unsaved changes" : "No changes yet"}
+            </span>
+            <button
+              type="button"
+              onClick={handleCancelEdit}
+              disabled={isSavingProfile}
+              className="rounded-full border border-white/20 px-4 py-1.5 text-xs font-semibold text-white transition hover:border-[#FFCA40] hover:text-[#FFCA40] disabled:opacity-70"
+            >
+              Cancel
+            </button>
+            <button
+              type="button"
+              onClick={handleSaveProfile}
+              disabled={isSavingProfile || !hasFormChanges}
+              className="rounded-full bg-[#FFCA40] px-5 py-1.5 text-xs font-bold text-[#001D58] transition hover:bg-[#ffd45c] disabled:cursor-not-allowed disabled:opacity-70"
+            >
+              {isSavingProfile ? "Saving…" : "Save changes"}
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

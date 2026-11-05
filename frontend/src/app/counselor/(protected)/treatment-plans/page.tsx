@@ -314,17 +314,29 @@ export default function CounselorTreatmentPlansPage() {
                       Resources:
                     </p>
                     <div className="flex flex-wrap gap-2">
-                      {plan.resource_cards.map((resource, index) => (
-                        <span
-                          key={index}
-                          className="px-3 py-1 bg-white/5 border border-white/10 rounded-lg text-xs text-white/70 flex items-center gap-1.5"
-                        >
-                          {resource.title}
-                          {resource.url && (
-                            <FiExternalLink className="w-3 h-3 text-white/40" />
-                          )}
-                        </span>
-                      ))}
+                      {plan.resource_cards.map((resource, index) => {
+                        const href = typeof resource.url === 'string' ? resource.url.trim() : '';
+                        const isSafeHref = /^https:\/\//i.test(href);
+                        return isSafeHref ? (
+                          <a
+                            key={index}
+                            href={href}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="px-3 py-1 bg-white/5 border border-white/10 rounded-lg text-xs text-white/70 hover:text-[#FFCA40] hover:border-[#FFCA40]/40 flex items-center gap-1.5 transition-colors"
+                          >
+                            {resource.title}
+                            <FiExternalLink className="w-3 h-3" />
+                          </a>
+                        ) : (
+                          <span
+                            key={index}
+                            className="px-3 py-1 bg-white/5 border border-white/10 rounded-lg text-xs text-white/70 flex items-center gap-1.5"
+                          >
+                            {resource.title}
+                          </span>
+                        );
+                      })}
                     </div>
                   </div>
                 )}

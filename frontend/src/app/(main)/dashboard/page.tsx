@@ -14,6 +14,7 @@ import {
   FiAward,
   FiCalendar,
   FiClock,
+  FiMessageSquare,
   FiHeart,
   FiRefreshCw,
   FiShield,
@@ -66,6 +67,12 @@ const quickActions: QuickAction[] = [
     label: "Journal check-in",
     description: "Capture thoughts and affective state in a private space.",
     icon: <FiActivity className="h-5 w-5" />,
+  },
+  {
+    href: "/peer-support",
+    label: "Messages & peer support",
+    description: "Chat with a peer supporter or your counselor.",
+    icon: <FiMessageSquare className="h-5 w-5" />,
   },
   {
     href: "/resources",
@@ -618,7 +625,7 @@ export default function DashboardPage() {
             <div className="mt-4 flex items-center gap-4 rounded-2xl border border-white/10 bg-white/2 p-4">
               <div className="flex-1">
                 <p className="text-sm font-medium text-white">Open Campus ID</p>
-                <p className="mt-1 text-xs text-white/60">Connect your Web3 identity to earn CARE tokens</p>
+                <p className="mt-1 text-xs text-white/60">Link your wallet to mint achievement badges on-chain</p>
               </div>
               <WalletLinkButton />
             </div>

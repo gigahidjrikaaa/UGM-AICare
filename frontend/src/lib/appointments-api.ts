@@ -57,12 +57,33 @@ async function handleResponse<T>(response: Response): Promise<T> {
 // Types
 // ========================================
 
+export interface CounselorEducation {
+  degree?: string;
+  institution?: string;
+  year?: number;
+  field_of_study?: string;
+}
+
+export interface CounselorCertification {
+  name?: string;
+  issuing_organization?: string;
+  year?: number;
+}
+
 export interface Counselor {
   id: number;
   name: string;
   specialization: string | null;
   image_url: string | null;
   is_available: boolean;
+  bio?: string | null;
+  years_of_experience?: number | null;
+  languages?: string[] | null;
+  consultation_fee?: number | null;
+  rating?: number;
+  total_reviews?: number;
+  education?: CounselorEducation[] | null;
+  certifications?: CounselorCertification[] | null;
 }
 
 export interface AppointmentType {
@@ -128,14 +149,27 @@ export async function getCounselorOptions(availableOnly: boolean = false): Promi
   const url = `${API_BASE}/api/v1/appointments/counselors${
     availableOnly ? '?available_only=true' : ''
   }`;
-  
+
   const response = await fetch(url, {
     headers: {
       'Content-Type': 'application/json'
     }
   });
-  
+
   return handleResponse<Counselor[]>(response);
+}
+
+/**
+ * Get a single counselor's public profile by ID.
+ */
+export async function getCounselorById(id: number): Promise<Counselor> {
+  const response = await fetch(`${API_BASE}/api/v1/appointments/counselors/${id}`, {
+    headers: {
+      'Content-Type': 'application/json'
+    }
+  });
+
+  return handleResponse<Counselor>(response);
 }
 
 /**

@@ -9,6 +9,8 @@ import {
   FiCheckCircle,
   FiClipboard,
   FiClock,
+  FiEye,
+  FiHeart,
   FiMessageSquare,
   FiTrendingDown,
   FiTrendingUp,
@@ -515,6 +517,27 @@ export default function CounselorDashboard() {
               >
                 <FiCalendar className="h-4 w-4 text-[#FFCA40]" />
                 Manage Appointments
+              </Link>
+              <Link
+                href="/counselor/messages"
+                className="flex items-center gap-3 rounded-lg border border-white/10 bg-white/5 p-3 text-sm text-white/80 transition-colors hover:bg-white/10"
+              >
+                <FiMessageSquare className="h-4 w-4 text-[#FFCA40]" />
+                Student Messages
+              </Link>
+              <Link
+                href="/counselor/peer-support"
+                className="flex items-center gap-3 rounded-lg border border-white/10 bg-white/5 p-3 text-sm text-white/80 transition-colors hover:bg-white/10"
+              >
+                <FiHeart className="h-4 w-4 text-[#FFCA40]" />
+                Peer Support Inbox
+              </Link>
+              <Link
+                href="/counselor/supervision"
+                className="flex items-center gap-3 rounded-lg border border-white/10 bg-white/5 p-3 text-sm text-white/80 transition-colors hover:bg-white/10"
+              >
+                <FiEye className="h-4 w-4 text-[#FFCA40]" />
+                Supervision Review
               </Link>
             </div>
           </div>

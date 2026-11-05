@@ -21,6 +21,7 @@ import {
   submitSelfReport,
   type InsightItem,
 } from '@/services/screeningApi';
+import FormalScreeningPanel from '@/components/features/insights/FormalScreeningPanel';
 
 const PHQ2_ITEMS = [
   'Sedikit minat atau kesenangan dalam melakukan sesuatu',
@@ -228,6 +229,9 @@ export default function InsightsPage() {
             {submitting ? 'Mengirim…' : 'Kirim check-in'}
           </button>
         </section>
+
+        {/* Formal instruments (PHQ-9 / GAD-7), server-scored */}
+        <FormalScreeningPanel />
 
         {/* Personalization consent */}
         <section className="mt-8 rounded-2xl border border-border bg-card p-6">

@@ -22,6 +22,7 @@ export interface User {
     date_of_birth?: string; // Added for counselor/admin
     specialization?: string; // Added for counselor
     avatar_url?: string | null;
+    user_hash?: string | null; // Hashed id for cases deep links (cases search covers it)
 }
 
 export interface UserLog {
