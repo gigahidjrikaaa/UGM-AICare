@@ -915,13 +915,11 @@ stop_servers() {
 # Docker Compose Helpers
 # ─────────────────────────────────────────────────────────────────────────────
 
-# The repository ships per-service compose files (backend/, frontend/).
-# A root .env is optional and only used for variable interpolation.
+# Docker Compose support was removed: the app deploys via Vercel (frontend)
+# and Render (backend). Run services directly — ./run_dev.sh dev/up etc.
 dc() {
-  local env_args=()
-  [ -f "$PROJECT_DIR/.env" ] && env_args=(--env-file "$PROJECT_DIR/.env")
-  (cd "$PROJECT_DIR" && docker compose "${env_args[@]+"${env_args[@]}"}" \
-    -f backend/docker-compose.yml -f frontend/docker-compose.yml "$@")
+  log_error "Docker Compose support removed. Deploy via Vercel + Render."
+  return 1
 }
 
 # dev/prod aliases retained for CLI compatibility; the app stack is the same.

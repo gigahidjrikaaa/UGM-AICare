@@ -70,3 +70,7 @@ pip-delete-this-directory.txt
 pip-log.txt
 yarn-debug.log
 yarn-error.log
+
+# Local browser captures and video-agent workspace pointers
+/.playwright-mcp/
+/.video_agent/
