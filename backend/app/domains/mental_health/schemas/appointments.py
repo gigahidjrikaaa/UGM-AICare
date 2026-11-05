@@ -1,6 +1,6 @@
 # backend/app/schemas/appointments.py
 from pydantic import BaseModel, ConfigDict, Field, field_validator
-from typing import Optional, List
+from typing import Any, Optional, List
 from datetime import datetime
 from enum import Enum
 
@@ -35,6 +35,45 @@ class Counselor(CounselorBase):
     id: int
 
     model_config = ConfigDict(from_attributes=True)
+
+
+class CounselorPublicProfile(BaseModel):
+    """Student-facing counselor profile for the directory + detail page.
+
+    Everything a student needs to choose (and trust) a counselor before
+    booking. Deliberately excludes internal/admin fields: user linkage and
+    availability_schedule internals.
+    """
+    id: int
+    name: str
+    specialization: Optional[str] = None
+    image_url: Optional[str] = None
+    is_available: bool = True
+    bio: Optional[str] = None
+    years_of_experience: Optional[int] = None
+    languages: List[Any] = []
+    consultation_fee: Optional[float] = None
+    rating: float = 0.0
+    total_reviews: int = 0
+    education: List[Any] = []
+    certifications: List[Any] = []
+
+    model_config = ConfigDict(from_attributes=True)
+
+    @field_validator("languages", "education", "certifications", mode="before")
+    @classmethod
+    def _empty_list_on_none(cls, value):
+        return value if value is not None else []
+
+    @field_validator("rating", mode="before")
+    @classmethod
+    def _default_rating(cls, value):
+        return 0.0 if value is None else value
+
+    @field_validator("total_reviews", mode="before")
+    @classmethod
+    def _default_total_reviews(cls, value):
+        return 0 if value is None else value
 
 # --- AppointmentType Schemas ---
 class AppointmentTypeBase(BaseModel):

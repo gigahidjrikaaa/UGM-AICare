@@ -56,8 +56,8 @@ async def process_chat_message(
     if hasattr(current_user, "role"):
         if current_user.role == "admin":
             user_role = "admin"
-        elif current_user.role == "counselor":
-            user_role = "counselor"
+        elif current_user.role in ("counselor", "peer_supporter"):
+            user_role = current_user.role
 
     conversation_history: List[Dict[str, str]] = []
     if request.history:

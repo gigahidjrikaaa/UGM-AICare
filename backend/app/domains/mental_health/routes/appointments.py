@@ -16,39 +16,40 @@ router = APIRouter(prefix="/api/v1/appointments", tags=["Appointments"])
 # PUBLIC ENDPOINTS (No Auth Required)
 # ========================================
 
-@router.get("/counselors", response_model=List[schemas.Counselor])
+@router.get("/counselors", response_model=List[schemas.CounselorPublicProfile])
 async def get_counselors(
     available_only: bool = Query(False, description="Filter only available counselors"),
     db: AsyncSession = Depends(get_async_db)
 ):
     """
-    Get all counselors, optionally filtered by availability.
-    
+    Get all counselors with their public profiles, optionally filtered by
+    availability.
+
     Public endpoint - no authentication required.
     """
     query = select(models.Counselor)
-    
+
     if available_only:
         query = query.where(models.Counselor.is_available == True)
-    
+
     result = await db.execute(query)
     counselors = result.scalars().all()
     return counselors
 
-@router.get("/counselors/{counselor_id}", response_model=schemas.Counselor)
+@router.get("/counselors/{counselor_id}", response_model=schemas.CounselorPublicProfile)
 async def get_counselor(
     counselor_id: int,
     db: AsyncSession = Depends(get_async_db)
 ):
-    """Get a single counselor by ID."""
+    """Get a single counselor's public profile by ID."""
     result = await db.execute(
         select(models.Counselor).where(models.Counselor.id == counselor_id)
     )
     counselor = result.scalar_one_or_none()
-    
+
     if not counselor:
         raise HTTPException(status_code=404, detail="Counselor not found")
-    
+
     return counselor
 
 @router.get("/appointment-types", response_model=List[schemas.AppointmentType])

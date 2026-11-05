@@ -377,3 +377,58 @@ async def test_counselor_cannot_modify_completed_appointment(
             current_user=SimpleNamespace(id=9, role="counselor"),
         )
     assert exc_info.value.status_code == 400
+
+
+# ============================================================================
+# Content embedding via autopilot queue (Celery replacement)
+# ============================================================================
+@pytest.mark.asyncio
+async def test_enqueue_embedding_creates_durable_action(monkeypatch: pytest.MonkeyPatch) -> None:
+    from app.services import content_resource_service as svc
+
+    captured = {}
+    resource = SimpleNamespace(
+        id=11, embedding_status="pending", updated_at=None,
+        resource_metadata={}, title="Guide",
+    )
+
+    def fake_session():
+        class CM:
+            async def __aenter__(self):
+                return db
+
+            async def __aexit__(self, *a):
+                return False
+
+        return CM()
+
+    monkeypatch.setattr(svc, "AsyncSessionLocal", fake_session)
+
+    async def fake_enqueue(db, **kwargs):
+        captured.update(kwargs)
+        return SimpleNamespace(id=77)
+
+    monkeypatch.setattr(
+        "app.domains.mental_health.services.autopilot_action_service.enqueue_action",
+        fake_enqueue,
+    )
+
+    db = MagicMock()
+
+    async def execute(stmt, *_a, **_k):
+        return SimpleNamespace(scalar_one_or_none=lambda: None)  # no existing action
+
+    async def get(model, rid):
+        return resource if rid == 11 else None
+
+    db.execute = execute
+    db.get = get
+    db.add = MagicMock()
+    db.commit = AsyncMock()
+    db.refresh = AsyncMock()
+
+    await svc.enqueue_embedding_job(11)
+
+    assert captured["action_type"].value == "content_embedding"
+    assert captured["payload_json"]["resource_id"] == 11
+    assert resource.embedding_status == "queued"

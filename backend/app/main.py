@@ -399,6 +399,12 @@ app.include_router(aika_stream.router, prefix="/api/v1")  # Aika Streaming Endpo
 app.include_router(intervention_plans.router)  # Intervention plan records
 app.include_router(proactive_messages.router, prefix="/api/v1")  # Aika-initiated proactive messages
 app.include_router(user_sse.router, prefix="/api/v1")  # User-scoped SSE (proactive channel)
+from app.domains.mental_health.routes import peer as peer_support_routes
+app.include_router(peer_support_routes.router, prefix="/api/v1")  # Peer support (pairings, circles)
+from app.domains.mental_health.routes import peer_messaging
+app.include_router(peer_messaging.router, prefix="/api/v1")  # Counselor-student messaging
+from app.domains.mental_health.routes.email_inbound import router as email_inbound_router
+app.include_router(email_inbound_router, prefix="/api/v1")  # Inbound email webhook (two-way replies)
 app.include_router(appointments.router)
 app.include_router(surveys.router)
 app.include_router(surveys.user_router)

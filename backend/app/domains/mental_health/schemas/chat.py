@@ -148,9 +148,9 @@ class AikaRequest(BaseModel):
     and matches the frontend's expected request format.
     """
     user_id: int = Field(..., description="User ID from session")
-    role: Literal['user', 'counselor', 'admin'] = Field(
+    role: Literal['user', 'counselor', 'admin', 'peer_supporter'] = Field(
         default='user',
-        description="User's role for routing (user=student/counselor/admin)"
+        description="User's role for routing (user/counselor/admin/peer_supporter)"
     )
     message: str = Field(..., min_length=1, description="User's message")
     conversation_history: List[Dict[str, str]] = Field(

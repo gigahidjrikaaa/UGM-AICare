@@ -111,10 +111,13 @@ async def create_case_node(state: CMAState, config: RunnableConfig) -> CMAState:
             f"Severity: {severity}"
         )
         
-        # Create case
+        # Create case — the CMA graph handles high/critical escalations only
+        # (see ingest_escalation_node), so these always route to the
+        # professional counselor pool.
         case = Case(
             status=CaseStatusEnum.new,
             severity=case_severity,
+            routed_pool='counselor',
             user_hash=state.get("user_hash", ""),
             session_id=state.get("session_id", ""),
             conversation_id=state.get("conversation_id"),

@@ -41,6 +41,11 @@ __all__ = [
     "campaign_execution_service",
     "campaign_service",
     "campaign_trigger_evaluator",
+    # Counselor tools
+    "peer_support_service",
+    "counselor_email_service",
+    "counselor_scope",
+    "screening_trajectory_service",
 ]
 
 

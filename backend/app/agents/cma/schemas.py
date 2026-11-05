@@ -5,7 +5,7 @@ from typing import Literal, Optional
 
 from pydantic import BaseModel, Field
 
-CaseStatus = Literal['new', 'in_progress', 'waiting', 'closed']
+CaseStatus = Literal['new', 'in_progress', 'waiting', 'resolved', 'closed']
 CaseSeverity = Literal['low', 'med', 'high', 'critical']
 
 
@@ -23,6 +23,9 @@ class CMACase(BaseModel):
     user_email: Optional[str] = None
     user_phone: Optional[str] = None
     telegram_username: Optional[str] = None
+    user_id: Optional[int] = None
+    resolution_notes: Optional[str] = None
+    resolved_at: Optional[datetime] = None
 
 
 class CMAListCasesResponse(BaseModel):

@@ -300,15 +300,23 @@ async def test_worker_handler_runs_analysis_and_commits(mocks, monkeypatch) -> N
     mocks["assessment"] = _assessment(risk="high", cma=True)
 
     captured_state = {}
+    summary_calls = []
 
     async def fake_trigger(state, db):
         captured_state.update(state)
         state["sta_analysis_completed"] = True
         state["conversation_assessment"] = _assessment().model_dump()
 
+    async def fake_summarize(user_id, session_id_to_summarize):
+        summary_calls.append((user_id, session_id_to_summarize))
+
     monkeypatch.setattr(
         "app.agents.aika.background_tasks.trigger_sta_conversation_analysis_background",
         fake_trigger,
+    )
+    monkeypatch.setattr(
+        "app.domains.mental_health.services.summarization_service.summarize_and_save",
+        fake_summarize
     )
 
     db_handle = AsyncMock()
@@ -334,6 +342,8 @@ async def test_worker_handler_runs_analysis_and_commits(mocks, monkeypatch) -> N
     assert captured_state["conversation_id"] == "conv-9"
     assert result["risk_level"] == "critical"
     assert result["cma_recommended"] is True
+    # Cross-session memory: the review also refreshes the conversation summary.
+    assert summary_calls == [(7, "sess-9")]
 
 
 # ============================================================================

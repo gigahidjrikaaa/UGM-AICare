@@ -89,13 +89,14 @@ class SafetyTriageService:
 
         try:
             self._session.add(assessment)
-            # Use orchestrator for case creation if high/critical severity
-            if self._orchestrator and severity in ('high', 'critical'):
+            # Orchestrator case creation: high/critical → counselor pool,
+            # moderate → peer-supporter pool (task shifting). Low → no case.
+            if self._orchestrator and severity in ('high', 'critical', 'moderate'):
                 await self._session.flush()  # Ensure assessment has an ID
                 # Ensure user_hash is not None before passing
                 if user_hash is None:
                     logger.error("❌ user_hash is None, cannot proceed with orchestrator")
-                    raise ValueError("user_hash cannot be None for high/critical severity")
+                    raise ValueError("user_hash cannot be None for case-eligible severity")
                 await self._orchestrator.handle_sta_classification(
                     triage_assessment=assessment,
                     user_hash=user_hash,
@@ -159,6 +160,7 @@ class SafetyTriageService:
         case = Case(
             status=CaseStatusEnum.new,
             severity=self._map_case_severity(severity),
+            routed_pool='peer' if severity in ('low', 'moderate') else 'counselor',
             assigned_to=None,
             user_hash=user_hash,
             session_id=session_id,

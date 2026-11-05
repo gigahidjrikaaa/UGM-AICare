@@ -347,6 +347,7 @@ async def get_profile_overview(
         consent_marketing=user.consent_marketing,
         consent_ai_memory=getattr(user, "consent_ai_memory", False),
         consent_proactive_chat=getattr(user, "consent_proactive_chat", False),
+        consent_peer_support=getattr(user, "consent_peer_support", False),
     )
 
     preferred_language = (user.preferences.preferred_language if user.preferences else None) or "id"
@@ -434,11 +435,12 @@ async def update_profile_overview(
         "consent_data_sharing", "consent_research",
         "consent_emergency_contact", "consent_marketing",
         "consent_ai_memory", "consent_proactive_chat",
+        "consent_peer_support",
     }
     clinical_fields = {
-        "risk_level",
-        "clinical_summary",
-        "primary_concerns",
+        # risk_level / clinical_summary / primary_concerns are care-team-owned
+        # and are NOT accepted from the student's own update (the update schema
+        # rejects them); they are returned read-only in the overview.
         "safety_plan_notes",
         "current_therapist_name",
         "current_therapist_contact",
@@ -553,23 +555,6 @@ async def update_profile_overview(
             if not user.clinical_record:
                 user.clinical_record = UserClinicalRecord(user_id=user.id)
                 db.add(user.clinical_record)
-                updated = True
-
-            if "risk_level" in clinical_data:
-                user.clinical_record.current_risk_level = _normalize_optional_string(clinical_data.get("risk_level"))
-                updated = True
-
-            if "clinical_summary" in clinical_data:
-                user.clinical_record.clinical_summary = _normalize_optional_string(clinical_data.get("clinical_summary"))
-                updated = True
-
-            if "primary_concerns" in clinical_data:
-                raw = _normalize_optional_string(clinical_data.get("primary_concerns"))
-                if raw is None:
-                    user.clinical_record.primary_concerns = None
-                else:
-                    parts = [p.strip() for p in raw.replace("\n", ",").split(",")]
-                    user.clinical_record.primary_concerns = [p for p in parts if p]
                 updated = True
 
             if "safety_plan_notes" in clinical_data:

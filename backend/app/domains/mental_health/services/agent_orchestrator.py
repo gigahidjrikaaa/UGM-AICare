@@ -50,26 +50,34 @@ class AgentOrchestrator:
         conversation_id: int | None = None
     ) -> Case | None:
         """Handle STA classification result and auto-create case if needed.
-        
+
+        Case-creation policy:
+        - high/critical → counselor pool (routed_pool='counselor')
+        - moderate      → peer-supporter pool (routed_pool='peer') — task
+          shifting: trained volunteers absorb moderate distress so scarce
+          professional counselors keep high/critical caseloads
+        - low           → no case (TCA self-help only)
+
         Args:
             triage_assessment: The completed triage assessment
             user_hash: Anonymized user identifier
             session_id: Session identifier
             conversation_id: Optional conversation ID to link
-            
+
         Returns:
-            Created Case object if severity is high/critical, None otherwise
+            Created Case object if severity is moderate+ (or high/critical),
+            None otherwise
         """
         severity_level = triage_assessment.severity_level.lower()
         risk_score = triage_assessment.risk_score
-        
+
         logger.info(
             f"Processing STA classification: severity={severity_level}, "
             f"risk_score={risk_score}, user_hash={user_hash}"
         )
-        
-        # Auto-create case for high/critical severity
-        if severity_level in ('high', 'critical'):
+
+        # Auto-create case for moderate+ severity
+        if severity_level in ('high', 'critical', 'moderate'):
             try:
                 case = await self._create_case_from_triage(
                     triage_assessment=triage_assessment,
@@ -77,32 +85,34 @@ class AgentOrchestrator:
                     session_id=session_id,
                     conversation_id=conversation_id
                 )
-                
-                # Emit event
-                event_type = (
-                    EventType.CRITICAL_RISK_DETECTED if severity_level == 'critical'
-                    else EventType.HIGH_RISK_DETECTED
-                )
-                await publish_event(
-                    event_type=event_type,
-                    source_agent='sta',
-                    data={
-                        'case_id': str(case.id),
-                        'severity': severity_level,
-                        'risk_score': risk_score,
-                        'user_hash': user_hash,
-                        'triage_assessment_id': triage_assessment.id
-                    }
-                )
-                
-                logger.info(f"Created case {case.id} from STA classification")
+
+                # Emit event — moderate peer-routed cases are informational
+                # (CMA assigns them quietly); high/critical keep the alarm path
+                if severity_level in ('high', 'critical'):
+                    event_type = (
+                        EventType.CRITICAL_RISK_DETECTED if severity_level == 'critical'
+                        else EventType.HIGH_RISK_DETECTED
+                    )
+                    await publish_event(
+                        event_type=event_type,
+                        source_agent='sta',
+                        data={
+                            'case_id': str(case.id),
+                            'severity': severity_level,
+                            'risk_score': risk_score,
+                            'user_hash': user_hash,
+                            'triage_assessment_id': triage_assessment.id
+                        }
+                    )
+
+                logger.info(f"Created case {case.id} from STA classification (pool={case.routed_pool})")
                 return case
-                
+
             except Exception as e:
                 logger.error(f"Failed to create case from STA classification: {e}", exc_info=True)
                 await self._log_agent_error('sta', str(e))
                 raise
-        
+
         logger.debug(f"No case created for severity={severity_level}")
         return None
     
@@ -137,14 +147,19 @@ class AgentOrchestrator:
             triage_assessment.severity_level.lower(),
             CaseSeverityEnum.med
         )
-        
-        # Calculate SLA breach time based on severity
+
+        # Pool routing: moderate distress goes to the peer-supporter pool;
+        # high/critical go to professional counselors.
+        routed_pool = 'peer' if severity in (CaseSeverityEnum.low, CaseSeverityEnum.med) else 'counselor'
+
+        # Calculate SLA breach time based on severity — every pool gets a
+        # deadline; peers respond within the standard 1-hour window.
         sla_minutes = (
             settings.sda_sla_minutes if severity == CaseSeverityEnum.critical
-            else 60  # Default to 1 hour for high severity
+            else 60  # Default to 1 hour for all other severities
         )
         sla_breach_at = datetime.utcnow() + timedelta(minutes=sla_minutes)
-        
+
         # Generate redacted summary
         risk_factors = triage_assessment.risk_factors or []
         risk_factors_str = ', '.join(risk_factors) if isinstance(risk_factors, list) else 'unknown'
@@ -153,11 +168,12 @@ class AgentOrchestrator:
             f"Confidence: {triage_assessment.confidence_score:.2f}, "
             f"Risk factors: {risk_factors_str}"
         )
-        
+
         # Create case
         case = Case(
             status=CaseStatusEnum.new,
             severity=severity,
+            routed_pool=routed_pool,
             user_hash=user_hash,
             session_id=session_id,
             conversation_id=conversation_id,

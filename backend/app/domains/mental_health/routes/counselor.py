@@ -69,10 +69,15 @@ from app.schemas.counselor import (
 
 router = APIRouter(prefix="/counselor", tags=["Counselor"])
 
+from app.domains.mental_health.routes.counselor_emails import email_router as _counselor_email_router
+
+router.include_router(_counselor_email_router)
+
 
 class CounselorAgentDecisionItem(BaseModel):
     id: int
     action_type: str
+    policy_decision: Optional[str] = None
     risk_level: str
     status: str
     created_at: datetime
@@ -190,8 +195,12 @@ def _build_explorer_url(chain_id: Optional[int], tx_hash: Optional[str]) -> Opti
 
 
 async def require_counselor(current_user: User = Depends(get_current_active_user)) -> User:
-    """Ensure the current user has counselor access."""
-    if current_user.role not in {"counselor", "admin"}:
+    """Ensure the current user has counselor-portal access.
+
+    peer_supporter is included: supporters see the same portal, scoped
+    server-side to their own caseload (their Counselor row + assignments).
+    """
+    if current_user.role not in {"counselor", "admin", "peer_supporter"}:
         raise HTTPException(status_code=403, detail="Counselor access required")
     return current_user
 
@@ -401,14 +410,14 @@ async def list_counselor_agent_decisions(
         user_id_texts = [str(user_id) for user_id in sorted(assigned_user_ids)]
         stmt = stmt.where(AutopilotAction.payload_json.op("->>")("user_id").in_(user_id_texts))
 
-    count_stmt = stmt
+    count_stmt = select(func.count()).select_from(stmt.subquery())
 
     rows = (
         await db.execute(
             stmt.order_by(AutopilotAction.created_at.desc()).offset(skip).limit(limit)
         )
     ).scalars().all()
-    total = len((await db.execute(count_stmt)).scalars().all())
+    total = int(await db.scalar(count_stmt) or 0)
 
     attestation_ids: set[int] = set()
     for row in rows:
@@ -446,7 +455,7 @@ async def list_counselor_agent_decisions(
             CounselorAgentDecisionItem(
                 id=int(row.id),
                 action_type=row.action_type.value,
-                policy_decision=row.policy_decision.value,
+                policy_decision=(row.policy_decision.value if row.policy_decision is not None else None),
                 risk_level=row.risk_level,
                 status=row.status.value,
                 created_at=row.created_at,
@@ -1563,7 +1572,7 @@ async def get_my_dashboard_stats(
 @router.get("/cases", response_model=SDAListCasesResponse)
 async def get_my_cases(
     status: Optional[str] = Query(
-        None, description="Filter by status: new, in_progress, waiting, closed"
+        None, description="Filter by status: new, in_progress, waiting, resolved, closed"
     ),
     db: AsyncSession = Depends(get_async_db),
     current_user: User = Depends(require_counselor),
@@ -1638,9 +1647,6 @@ async def get_my_cases(
         created_at = cast(datetime, case.created_at)
         updated_at = cast(datetime, case.updated_at)
         status_val = case.status.value if isinstance(case.status, CaseStatusEnum) else "new"
-        # Counselor UI currently models resolved cases as closed.
-        if status_val == "resolved":
-            status_val = "closed"
         severity_val = case.severity.value if isinstance(case.severity, CaseSeverityEnum) else "low"
         
         linked_user_id: int | None = None
@@ -1671,6 +1677,9 @@ async def get_my_cases(
             user_email=user_obj.email if user_obj else None,
             user_phone=user_phone,
             telegram_username=(user_obj.profile.telegram_username if (user_obj and user_obj.profile) else None),
+            user_id=linked_user_id,
+            resolution_notes=case.resolution_notes,
+            resolved_at=cast(datetime | None, case.resolved_at),
         ))
     
     return SDAListCasesResponse(cases=payload)
@@ -1692,6 +1701,7 @@ async def get_my_case_stats(
             "total_cases": 0,
             "open_cases": 0,
             "in_progress_cases": 0,
+            "resolved_cases": 0,
             "closed_cases": 0,
             "critical_cases": 0,
             "high_priority_cases": 0,
@@ -1718,27 +1728,34 @@ async def get_my_case_stats(
     )
     in_progress = await db.scalar(in_progress_query) or 0
     
+    # Resolved cases (in_progress -> resolved; distinct from closed)
+    resolved_query = select(func.count(Case.id)).where(
+        Case.assigned_to == counselor_id_str,
+        Case.status == CaseStatusEnum.resolved
+    )
+    resolved = await db.scalar(resolved_query) or 0
+
     # Closed cases
     closed_query = select(func.count(Case.id)).where(
         Case.assigned_to == counselor_id_str,
-        Case.status.in_([CaseStatusEnum.closed, CaseStatusEnum.resolved])
+        Case.status == CaseStatusEnum.closed
     )
     closed = await db.scalar(closed_query) or 0
     
-    # Critical severity
+    # Critical severity (open cases only — resolved/closed no longer need attention)
     from app.domains.mental_health.models import CaseSeverityEnum
     critical_query = select(func.count(Case.id)).where(
         Case.assigned_to == counselor_id_str,
         Case.severity == CaseSeverityEnum.critical,
-        Case.status != CaseStatusEnum.closed
+        Case.status.notin_([CaseStatusEnum.closed, CaseStatusEnum.resolved])
     )
     critical = await db.scalar(critical_query) or 0
-    
+
     # High priority (high severity)
     high_query = select(func.count(Case.id)).where(
         Case.assigned_to == counselor_id_str,
         Case.severity == CaseSeverityEnum.high,
-        Case.status != CaseStatusEnum.closed
+        Case.status.notin_([CaseStatusEnum.closed, CaseStatusEnum.resolved])
     )
     high = await db.scalar(high_query) or 0
     
@@ -1746,6 +1763,7 @@ async def get_my_case_stats(
         "total_cases": total,
         "open_cases": open_cases,
         "in_progress_cases": in_progress,
+        "resolved_cases": resolved,
         "closed_cases": closed,
         "critical_cases": critical,
         "high_priority_cases": high,
@@ -1756,6 +1774,10 @@ class CounselorCaseStatusUpdate(BaseModel):
     """Request body for counselor case status update."""
     status: str = Field(..., description="New status: in_progress, resolved, closed")
     note: str | None = Field(None, description="Optional note explaining the change")
+    resolution_notes: str | None = Field(
+        None,
+        description="Structured outcome for resolved transitions (how the case was resolved)",
+    )
 
 
 @router.put("/cases/{case_id}/status")
@@ -1821,6 +1843,13 @@ async def update_my_case_status(
         )
 
     case.status = CaseStatusEnum[payload.status]  # type: ignore[assignment]
+
+    if payload.status == 'resolved':
+        case.resolved_at = datetime.utcnow()
+        case.resolution_notes = (payload.resolution_notes or payload.note or '').strip() or None
+    elif old_status == 'resolved' and payload.status == 'closed':
+        # Keep resolution notes/timestamp when a resolved case is formally closed.
+        pass
 
     if payload.note:
         note = CaseNote(
@@ -1935,6 +1964,26 @@ async def update_my_case_status(
 
     await db.commit()
     await db.refresh(case)
+
+    # Event parity with the admin status endpoint: downstream consumers
+    # (SSE bridge, autopilot) learn about counselor status changes too.
+    try:
+        from app.services.event_bus import EventType, publish_event
+
+        await publish_event(
+            event_type=EventType.CASE_STATUS_CHANGED,
+            source_agent='sda',
+            data={
+                'case_id': str(case.id),
+                'old_status': old_status,
+                'new_status': payload.status,
+                'changed_by': current_user.id,
+            },
+        )
+    except Exception:
+        logger.warning(
+            "Failed to publish CASE_STATUS_CHANGED for case %s", case.id, exc_info=True
+        )
 
     response_payload = {
         "case_id": str(case.id),

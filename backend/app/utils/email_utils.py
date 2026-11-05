@@ -2,6 +2,7 @@
 import smtplib
 import os
 import logging
+import re
 from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
 from dotenv import load_dotenv
@@ -17,8 +18,23 @@ EMAIL_PASSWORD = os.getenv("EMAIL_PASSWORD") # Use App Password if using Gmail
 EMAIL_SMTP_SERVER = os.getenv("EMAIL_SMTP_SERVER") # e.g., smtp.gmail.com
 EMAIL_SMTP_PORT = os.getenv("EMAIL_SMTP_PORT") # e.g., 587 or 465
 
-def send_email(recipient_email: str, subject: str, html_content: str) -> bool:
-    """Sends an email using configured SMTP settings."""
+def _html_to_plain(html_content: str) -> str:
+    """Derive a readable plain-text alternative from the branded HTML so
+    spam filters and text-only clients both see real content."""
+    text = re.sub(r"<(script|style)[^>]*>.*?</\1>", " ", html_content, flags=re.S | re.I)
+    text = re.sub(r"<br\s*/?>", "\n", text, flags=re.I)
+    text = re.sub(r"</(p|div|h[1-6]|li)>", "\n", text, flags=re.I)
+    text = re.sub(r"<a [^>]*href=\"([^\"]+)\"[^>]*>(.*?)</a>", r"\2 (\1)", text, flags=re.S | re.I)
+    text = re.sub(r"<[^>]+>", "", text)
+    text = text.replace("&nbsp;", " ").replace("&amp;", "&").replace("&lt;", "<").replace("&gt;", ">")
+    lines = [line.strip() for line in text.splitlines()]
+    return "\n".join(line for line in lines if line)
+
+def send_email(recipient_email: str, subject: str, html_content: str, plain_content: str = "", reply_to: str = "") -> bool:
+    """Sends an email using configured SMTP settings.
+
+    Attaches a plain-text alternative (derived from the HTML when not given)
+    for deliverability and text-only clients."""
     if not all([EMAIL_USERNAME, EMAIL_PASSWORD, EMAIL_SMTP_SERVER, EMAIL_SMTP_PORT]):
         logger.error("Email SMTP settings not fully configured in .env. Cannot send email.")
         return False
@@ -28,8 +44,12 @@ def send_email(recipient_email: str, subject: str, html_content: str) -> bool:
     message["Subject"] = subject
     message["From"] = f"Aika from UGM AI-Care  <{EMAIL_USERNAME}>" # Example friendly name
     message["To"] = recipient_email
+    if reply_to:
+        message["Reply-To"] = reply_to
 
-    # Attach HTML content
+    # Attach plain-text alternative first (preferred fallback), then HTML
+    plain = plain_content or _html_to_plain(html_content)
+    message.attach(MIMEText(plain, "plain"))
     message.attach(MIMEText(html_content, "html"))
 
     try:

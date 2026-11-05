@@ -135,7 +135,9 @@ async def check_counselor_tool_access(
     if role in {"admin", "admin_viewer"}:
         return ToolAccessDecision(True, "admin bypass")
 
-    if role != "counselor":
+    # peer_supporter uses the same Counselor-profile caseload scope — their
+    # visible conversations/cases are exactly the cases assigned to them.
+    if role not in {"counselor", "peer_supporter"}:
         return ToolAccessDecision(False, f"role '{role}' is not permitted")
 
     if requester_user_id is None:

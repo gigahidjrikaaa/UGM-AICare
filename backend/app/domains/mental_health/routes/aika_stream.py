@@ -187,7 +187,6 @@ async def stream_aika_execution(
         # Initial thinking indicator
         thinking_data = {'type': 'thinking', 'message': 'Memproses...'}
         yield f"data: {json.dumps(thinking_data)}\n\n"
-        await asyncio.sleep(0.05)
         
         # Start execution tracking
         # Redact before tracking: execution input_data is persisted to
@@ -374,7 +373,6 @@ async def stream_aika_execution(
                         'message': AGENT_STATUS_MESSAGES[node_name]
                     }
                     yield f"data: {json.dumps(status_data)}\n\n"
-                    await asyncio.sleep(0.05)
 
                 if isinstance(node_state, dict) and node_name not in sent_reasoning_nodes:
                     reasoning_payload = _build_reasoning_payload(node_name, node_state)
@@ -386,7 +384,6 @@ async def stream_aika_execution(
                             "data": reasoning_payload,
                         }
                         yield f"data: {json.dumps(reasoning_data)}\n\n"
-                        await asyncio.sleep(0.03)
                 
                 # Check for newly invoked agents
                 if isinstance(node_state, dict) and "agents_invoked" in node_state:
@@ -401,7 +398,6 @@ async def stream_aika_execution(
                                 'description': agent_info['desc']
                             }
                             yield f"data: {json.dumps(agent_data)}\n\n"
-                            await asyncio.sleep(0.05)
 
                 if isinstance(node_state, dict):
                     current_actions = node_state.get("actions_taken", [])
@@ -410,14 +406,13 @@ async def stream_aika_execution(
                             if isinstance(action, str) and action not in sent_tools:
                                 sent_tools.add(action)
                                 yield f"data: {json.dumps({'type': 'tool_start', 'tool': action})}\n\n"
-                                await asyncio.sleep(0.02)
                                 yield f"data: {json.dumps({'type': 'tool_end', 'tool': action})}\n\n"
-                                await asyncio.sleep(0.02)
         
         # Use accumulated state from astream instead of calling ainvoke again
         result = final_state
 
-        # Best-effort memory write (consent-gated)
+        # Best-effort memory write (consent-gated) — moved AFTER the response
+        # replay: its DB roundtrips used to delay the first visible token.
         try:
             await remember_from_user_message(db, current_user, request.message, source="conversation")
         except PendingRollbackError as tx_err:
@@ -425,7 +420,7 @@ async def stream_aika_execution(
             await db.rollback()
         except Exception as memory_err:
             logger.warning("Best-effort memory write failed (non-blocking): %s", memory_err)
-        
+
         processing_time_ms = (datetime.now() - start_time).total_seconds() * 1000
 
         # Close last node timing if we have one
@@ -443,7 +438,6 @@ async def stream_aika_execution(
                 'data': intervention_plan
             }
             yield f"data: {json.dumps(plan_data)}\n\n"
-            await asyncio.sleep(0.05)
         
         # Send appointment if available (check multiple keys and fetch from DB if needed)
         appointment = result.get("cma_appointment")
@@ -456,7 +450,6 @@ async def stream_aika_execution(
                 'data': appointment
             }
             yield f"data: {json.dumps(appointment_data)}\n\n"
-            await asyncio.sleep(0.05)
         elif appointment_id:
             # Only ID available, fetch from database
             try:
@@ -496,7 +489,6 @@ async def stream_aika_execution(
                         'data': appt_dict
                     }
                     yield f"data: {json.dumps(appointment_data)}\n\n"
-                    await asyncio.sleep(0.05)
             except Exception as e:
                 logger.error(f"Failed to fetch appointment {appointment_id}: {e}")
 
@@ -538,7 +530,6 @@ async def stream_aika_execution(
             'data': agent_activity
         }
         yield f"data: {json.dumps(activity_data)}\n\n"
-        await asyncio.sleep(0.05)
         
         # Send final complete message
         final_response = result.get("final_response", "Maaf, terjadi kesalahan.")
