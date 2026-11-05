@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect, useRef } from 'react';
 import api from '@/services/api';
-import { FiDatabase, FiRefreshCw, FiChevronLeft, FiChevronRight, FiAlertCircle, FiChevronDown, FiSearch, FiTrash2, FiArrowRight } from 'react-icons/fi';
+import { FiDatabase, FiRefreshCw, FiChevronLeft, FiChevronRight, FiAlertCircle, FiChevronDown, FiSearch, FiArrowRight } from 'react-icons/fi';
 
 interface Column {
     name: string;
@@ -59,10 +59,6 @@ export default function DatabaseViewerPage() {
     const [schema, setSchema] = useState<DatabaseSchema | null>(null);
     const [schemaLoading, setSchemaLoading] = useState(false);
 
-    // Selection state
-    const [selectedRows, setSelectedRows] = useState<Set<number>>(new Set());
-    const [isDeleting, setIsDeleting] = useState(false);
-
     // Dropdown state
     const [isDropdownOpen, setIsDropdownOpen] = useState(false);
     const [searchQuery, setSearchQuery] = useState('');
@@ -93,11 +89,6 @@ export default function DatabaseViewerPage() {
             fetchTableData(selectedTable, page, limit);
         }
     }, [selectedTable, page, limit]);
-
-    // Clear selection when table or page changes
-    useEffect(() => {
-        setSelectedRows(new Set());
-    }, [selectedTable, page]);
 
     const fetchTables = async () => {
         try {
@@ -145,66 +136,7 @@ export default function DatabaseViewerPage() {
         }
     };
 
-    const handleSelectAll = (e: React.ChangeEvent<HTMLInputElement>) => {
-        if (e.target.checked && tableData) {
-            const allIndices = new Set(tableData.data.map((_, idx) => idx));
-            setSelectedRows(allIndices);
-        } else {
-            setSelectedRows(new Set());
-        }
-    };
-
-    const handleSelectRow = (index: number) => {
-        const newSelected = new Set(selectedRows);
-        if (newSelected.has(index)) {
-            newSelected.delete(index);
-        } else {
-            newSelected.add(index);
-        }
-        setSelectedRows(newSelected);
-    };
-
-    const handleDelete = async () => {
-        if (!tableData || selectedRows.size === 0) return;
-        
-        if (!confirm(`Are you sure you want to delete ${selectedRows.size} rows? This action cannot be undone.`)) {
-            return;
-        }
-
-        setIsDeleting(true);
-        try {
-            // Identify PK columns
-            const pkColumns = tableData.columns.filter(col => col.primary_key).map(col => col.name);
-            
-            if (pkColumns.length === 0) {
-                throw new Error("Cannot delete rows from a table without a primary key.");
-            }
-
-            // Construct payload
-            const rowsToDelete = Array.from(selectedRows).map(idx => {
-                const row = tableData.data[idx];
-                const keyMap: Record<string, any> = {};
-                pkColumns.forEach(pk => {
-                    keyMap[pk] = row[pk];
-                });
-                return keyMap;
-            });
-
-            await api.delete(`/admin/database/tables/${selectedTable}`, {
-                data: { rows: rowsToDelete }
-            });
-
-            // Refresh data
-            fetchTableData(selectedTable, page, limit);
-            setSelectedRows(new Set());
-        } catch (err: any) {
-            setError(err.message || "Failed to delete rows");
-        } finally {
-            setIsDeleting(false);
-        }
-    };
-
-    const filteredTables = tables.filter(table => 
+    const filteredTables = tables.filter(table =>
         table.toLowerCase().includes(searchQuery.toLowerCase())
     );
 
@@ -215,63 +147,51 @@ export default function DatabaseViewerPage() {
         : [];
 
     return (
-        <div className="p-6 max-w-400 mx-auto space-y-6">
+        <div className="space-y-6">
             {/* Header */}
             <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
                 <div>
-                    <h1 className="text-2xl font-bold text-slate-900 dark:text-white flex items-center gap-2">
-                        <FiDatabase className="text-blue-500" />
+                    <h1 className="text-2xl font-bold text-white flex items-center gap-2">
+                        <FiDatabase className="text-[#FFCA40]" />
                         Database Viewer
                     </h1>
-                    <p className="text-slate-500 dark:text-slate-400 mt-1">
-                        Inspect raw database tables and content.
+                    <p className="text-white/50 mt-1">
+                        Read-only view of raw database tables and content.
                     </p>
                 </div>
 
                 <div className="flex items-center gap-3">
-                    {/* Delete Button */}
-                    {selectedRows.size > 0 && (
-                        <button
-                            onClick={handleDelete}
-                            disabled={isDeleting}
-                            className="flex items-center gap-2 px-4 py-2 bg-red-500 hover:bg-red-600 text-white rounded-lg transition-colors text-sm font-medium disabled:opacity-50"
-                        >
-                            <FiTrash2 />
-                            {isDeleting ? 'Deleting...' : `Delete (${selectedRows.size})`}
-                        </button>
-                    )}
-
                     {/* Custom Searchable Dropdown */}
                     <div className="relative w-64" ref={dropdownRef}>
                         <div
-                            className="flex items-center justify-between px-4 py-2 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg text-sm cursor-pointer hover:border-blue-500 transition-colors"
+                            className="flex items-center justify-between px-4 py-2 border border-white/10 bg-white/5 rounded-lg text-sm cursor-pointer hover:border-blue-500 transition-colors"
                             onClick={() => setIsDropdownOpen(!isDropdownOpen)}
                         >
-                            <span className={`truncate ${!selectedTable ? "text-slate-400" : "text-slate-900 dark:text-slate-200"}`}>
+                            <span className={`truncate ${!selectedTable ? "text-white/40" : "text-white"}`}>
                                 {selectedTable || "Select a table..."}
                             </span>
                             <FiChevronDown className={`transition-transform ${isDropdownOpen ? "rotate-180" : ""}`} />
                         </div>
 
                         {isDropdownOpen && (
-                            <div className="absolute top-full left-0 mt-1 w-full bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg shadow-xl z-50 max-h-80 flex flex-col overflow-hidden">
-                                <div className="p-2 border-b border-slate-100 dark:border-slate-700 bg-slate-50 dark:bg-slate-800/50">
-                                    <div className="flex items-center px-2 bg-white dark:bg-slate-900 rounded border border-slate-200 dark:border-slate-700 focus-within:ring-2 focus-within:ring-blue-500/20 focus-within:border-blue-500">
-                                        <FiSearch className="text-slate-400 shrink-0" />
+                            <div className="absolute top-full left-0 mt-1 w-full border border-white/10 bg-white/5 rounded-lg shadow-xl z-50 max-h-80 flex flex-col overflow-hidden">
+                                <div className="p-2 border-b border-white/10 bg-white/5">
+                                    <div className="flex items-center px-2 rounded border border-white/10 bg-white/5 focus-within:ring-2 focus-within:ring-[#FFCA40]/30 focus-within:border-[#FFCA40]/50">
+                                        <FiSearch className="text-white/40 shrink-0" />
                                         <input
                                             type="text"
                                             value={searchQuery}
                                             onChange={(e) => setSearchQuery(e.target.value)}
                                             placeholder="Search tables..."
-                                            className="w-full p-2 bg-transparent border-none focus:ring-0 text-sm outline-none text-slate-900 dark:text-slate-200 placeholder:text-slate-400"
+                                            className="w-full p-2 bg-transparent border-none focus:ring-0 text-sm outline-none text-white placeholder:text-white/40"
                                             autoFocus
                                             onClick={(e) => e.stopPropagation()}
                                         />
                                     </div>
                                 </div>
-                                <div className="overflow-y-auto flex-1 scrollbar-thin scrollbar-thumb-slate-200 dark:scrollbar-thumb-slate-700">
+                                <div className="overflow-y-auto flex-1 scrollbar-thin scrollbar-thumb-white/20">
                                     {filteredTables.length === 0 ? (
-                                        <div className="px-4 py-3 text-slate-400 text-sm text-center italic">
+                                        <div className="px-4 py-3 text-white/40 text-sm text-center italic">
                                             No tables found
                                         </div>
                                     ) : (
@@ -280,8 +200,8 @@ export default function DatabaseViewerPage() {
                                                 key={table}
                                                 className={`px-4 py-2 cursor-pointer text-sm transition-colors flex items-center justify-between
                                                     ${selectedTable === table 
-                                                        ? 'bg-blue-50 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400 font-medium' 
-                                                        : 'hover:bg-slate-50 dark:hover:bg-slate-700/50 text-slate-700 dark:text-slate-300'
+                                                        ? 'bg-[#FFCA40]/15 text-[#FFCA40] font-medium' 
+                                                        : 'hover:bg-white/10 text-white/80'
                                                     }`}
                                                 onClick={() => {
                                                     setSelectedTable(table);
@@ -291,7 +211,7 @@ export default function DatabaseViewerPage() {
                                                 }}
                                             >
                                                 {table}
-                                                {selectedTable === table && <div className="w-1.5 h-1.5 rounded-full bg-blue-500"></div>}
+                                                {selectedTable === table && <div className="w-1.5 h-1.5 rounded-full bg-[#FFCA40]"></div>}
                                             </div>
                                         ))
                                     )}
@@ -307,7 +227,7 @@ export default function DatabaseViewerPage() {
                             }
                             fetchSchema();
                         }}
-                        className="p-2 text-slate-500 hover:text-blue-500 transition-colors bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg"
+                        className="p-2 text-white/50 hover:text-[#FFCA40] transition-colors border border-white/10 bg-white/5 rounded-lg"
                         title="Refresh Data & Schema"
                     >
                         <FiRefreshCw className={loading ? "animate-spin" : ""} size={20} />
@@ -316,10 +236,10 @@ export default function DatabaseViewerPage() {
             </div>
 
             {/* ERD / Relationship Figure */}
-            <div className="bg-white dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 shadow-sm p-4 space-y-3">
+            <div className="rounded-2xl border border-white/10 bg-white/5 p-4 space-y-3">
                 <div className="flex items-center justify-between">
-                    <h2 className="text-sm font-semibold text-slate-900 dark:text-white">Table Relationship Figure</h2>
-                    <div className="text-xs text-slate-500">
+                    <h2 className="text-sm font-semibold text-white">Table Relationship Figure</h2>
+                    <div className="text-xs text-white/50">
                         {schemaLoading
                             ? 'Loading schema...'
                             : `Tables: ${schema?.tables.length ?? 0} · Relationships: ${schema?.relationships.length ?? 0}`}
@@ -327,11 +247,11 @@ export default function DatabaseViewerPage() {
                 </div>
 
                 {selectedTable ? (
-                    <p className="text-xs text-slate-500">
-                        Showing relationships for <span className="font-medium text-slate-700 dark:text-slate-300">{selectedTable}</span>
+                    <p className="text-xs text-white/50">
+                        Showing relationships for <span className="font-medium text-white/80">{selectedTable}</span>
                     </p>
                 ) : (
-                    <p className="text-xs text-slate-500">Select a table to focus its inbound/outbound relationships.</p>
+                    <p className="text-xs text-white/50">Select a table to focus its inbound/outbound relationships.</p>
                 )}
 
                 <div className="overflow-x-auto">
@@ -341,20 +261,20 @@ export default function DatabaseViewerPage() {
                                 const isOutbound = rel.source_table === selectedTable;
                                 return (
                                     <div key={`${rel.source_table}-${rel.source_column}-${rel.target_table}-${rel.target_column}-${idx}`} className="flex items-center gap-3 text-sm">
-                                        <span className={`rounded-md border px-2 py-1 ${isOutbound ? 'border-blue-200 bg-blue-50 text-blue-700 dark:border-blue-500/40 dark:bg-blue-900/20 dark:text-blue-300' : 'border-amber-200 bg-amber-50 text-amber-700 dark:border-amber-500/40 dark:bg-amber-900/20 dark:text-amber-300'}`}>
+                                        <span className={`rounded-md border px-2 py-1 ${isOutbound ? 'border-[#FFCA40]/30 bg-[#FFCA40]/10 text-[#FFCA40]' : 'border-amber-500/30 bg-amber-500/10 text-amber-300'}`}>
                                             {rel.source_table}.{rel.source_column}
                                         </span>
-                                        <FiArrowRight className="text-slate-400" />
-                                        <span className="rounded-md border border-slate-200 bg-slate-50 px-2 py-1 text-slate-700 dark:border-slate-600 dark:bg-slate-700/40 dark:text-slate-200">
+                                        <FiArrowRight className="text-white/40" />
+                                        <span className="rounded-md border border-white/10 bg-white/5 px-2 py-1 text-white/80">
                                             {rel.target_table}.{rel.target_column}
                                         </span>
-                                        <span className="text-xs text-slate-400">{rel.constraint_name ?? 'fk'}</span>
+                                        <span className="text-xs text-white/40">{rel.constraint_name ?? 'fk'}</span>
                                     </div>
                                 );
                             })}
                         </div>
                     ) : (
-                        <div className="text-sm text-slate-400 py-2">
+                        <div className="text-sm text-white/40 py-2">
                             {selectedTable ? 'No foreign-key relationship found for selected table.' : 'No table selected.'}
                         </div>
                     )}
@@ -363,7 +283,7 @@ export default function DatabaseViewerPage() {
 
             {/* Error Message */}
             {error && (
-                <div className="p-4 bg-red-50 dark:bg-red-900/20 text-red-600 dark:text-red-400 rounded-lg flex items-center gap-2">
+                <div className="p-4 border border-red-500/40 bg-red-500/10 text-red-200 rounded-lg flex items-center gap-2">
                     <FiAlertCircle />
                     {error}
                 </div>
@@ -371,15 +291,15 @@ export default function DatabaseViewerPage() {
 
             {/* Data Table */}
             {selectedTable && tableData ? (
-                <div className="bg-white dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 shadow-sm overflow-hidden flex flex-col h-[calc(100vh-250px)]">
+                <div className="rounded-2xl border border-white/10 bg-white/5 backdrop-blur-md overflow-hidden flex flex-col h-[calc(100vh-250px)]">
                     {/* Table Info Bar */}
-                    <div className="px-4 py-3 border-b border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800/50 flex justify-between items-center text-xs text-slate-500">
+                    <div className="px-4 py-3 border-b border-white/10 bg-white/5 flex justify-between items-center text-xs text-white/50">
                         <span>
                             Showing {tableData.data.length} rows (Total: {tableData.pagination.total_rows})
                         </span>
                         <div className="flex gap-4">
                             {tableData.columns.map(col => (
-                                <span key={col.name} className={col.primary_key ? "text-blue-500 font-medium" : ""}>
+                                <span key={col.name} className={col.primary_key ? "text-[#FFCA40] font-medium" : ""}>
                                     {col.name} <span className="opacity-50">({col.type})</span>
                                 </span>
                             ))}
@@ -389,63 +309,46 @@ export default function DatabaseViewerPage() {
                     {/* Scrollable Table Area */}
                     <div className="flex-1 overflow-auto">
                         <table className="w-full text-left text-sm border-collapse">
-                            <thead className="bg-slate-50 dark:bg-slate-900/50 sticky top-0 z-10 shadow-sm">
+                            <thead className="bg-white/5 sticky top-0 z-10 shadow-sm">
                                 <tr>
-                                    <th className="px-4 py-3 w-10 border-b border-slate-200 dark:border-slate-700">
-                                        <input 
-                                            type="checkbox" 
-                                            className="rounded border-slate-300 text-blue-600 focus:ring-blue-500"
-                                            checked={tableData.data.length > 0 && selectedRows.size === tableData.data.length}
-                                            onChange={handleSelectAll}
-                                        />
-                                    </th>
                                     {tableData.columns.map((col) => (
                                         <th
                                             key={col.name}
-                                            className="px-4 py-3 font-semibold text-slate-700 dark:text-slate-200 border-b border-slate-200 dark:border-slate-700 whitespace-nowrap"
+                                            className="px-4 py-3 font-semibold text-white/85 border-b border-white/10 whitespace-nowrap"
                                         >
                                             <div className="flex items-center gap-1">
                                                 {col.name}
-                                                {col.primary_key && <span className="text-[10px] bg-blue-100 text-blue-700 px-1 rounded">PK</span>}
-                                                {col.nullable && <span className="text-[10px] text-slate-400">null</span>}
+                                                {col.primary_key && <span className="text-[10px] bg-[#FFCA40]/15 text-[#FFCA40] px-1 rounded">PK</span>}
+                                                {col.nullable && <span className="text-[10px] text-white/40">null</span>}
                                             </div>
                                         </th>
                                     ))}
                                 </tr>
                             </thead>
-                            <tbody className="divide-y divide-slate-100 dark:divide-slate-700/50">
+                            <tbody className="divide-y divide-white/10">
                                 {tableData.data.length === 0 ? (
                                     <tr>
-                                        <td colSpan={tableData.columns.length + 1} className="px-4 py-8 text-center text-slate-500">
+                                        <td colSpan={tableData.columns.length} className="px-4 py-8 text-center text-white/50">
                                             No data found in this table.
                                         </td>
                                     </tr>
                                 ) : (
                                     tableData.data.map((row, idx) => (
-                                        <tr 
-                                            key={idx} 
-                                            className={`hover:bg-slate-50 dark:hover:bg-slate-700/30 transition-colors ${selectedRows.has(idx) ? 'bg-blue-50/50 dark:bg-blue-900/10' : ''}`}
-                                            onClick={() => handleSelectRow(idx)}
+                                        <tr
+                                            key={idx}
+                                            className="hover:bg-white/5 transition-colors"
                                         >
-                                            <td className="px-4 py-2.5 border-b border-slate-100 dark:border-slate-800" onClick={(e) => e.stopPropagation()}>
-                                                <input 
-                                                    type="checkbox" 
-                                                    className="rounded border-slate-300 text-blue-600 focus:ring-blue-500"
-                                                    checked={selectedRows.has(idx)}
-                                                    onChange={() => handleSelectRow(idx)}
-                                                />
-                                            </td>
                                             {tableData.columns.map((col) => {
                                                 const cellValue = row[col.name];
                                                 let displayValue = cellValue;
 
-                                                if (cellValue === null) displayValue = <span className="text-slate-300 italic">null</span>;
+                                                if (cellValue === null) displayValue = <span className="text-white/30 italic">null</span>;
                                                 else if (typeof cellValue === 'boolean') displayValue = cellValue ? 'true' : 'false';
                                                 else if (typeof cellValue === 'object') displayValue = JSON.stringify(cellValue);
                                                 else if (String(cellValue).length > 50) displayValue = <span title={String(cellValue)}>{String(cellValue).substring(0, 50)}...</span>;
 
                                                 return (
-                                                    <td key={col.name} className="px-4 py-2.5 border-b border-slate-100 dark:border-slate-800 text-slate-600 dark:text-slate-300 max-w-xs truncate">
+                                                    <td key={col.name} className="px-4 py-2.5 border-b border-white/10 text-white/70 max-w-xs truncate">
                                                         {displayValue}
                                                     </td>
                                                 );
@@ -458,22 +361,22 @@ export default function DatabaseViewerPage() {
                     </div>
 
                     {/* Pagination Footer */}
-                    <div className="p-4 border-t border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 flex items-center justify-between">
-                        <div className="text-sm text-slate-500">
+                    <div className="p-4 border-t border-white/10 bg-white/5 flex items-center justify-between">
+                        <div className="text-sm text-white/50">
                             Page {page} of {tableData.pagination.total_pages || 1}
                         </div>
                         <div className="flex items-center gap-2">
                             <button
                                 onClick={() => setPage(p => Math.max(1, p - 1))}
                                 disabled={page === 1 || loading}
-                                className="p-2 rounded hover:bg-slate-100 dark:hover:bg-slate-700 disabled:opacity-50 disabled:cursor-not-allowed"
+                                className="p-2 rounded hover:bg-white/10 disabled:opacity-50 disabled:cursor-not-allowed"
                             >
                                 <FiChevronLeft />
                             </button>
                             <button
                                 onClick={() => setPage(p => Math.min(tableData.pagination.total_pages, p + 1))}
                                 disabled={page >= tableData.pagination.total_pages || loading}
-                                className="p-2 rounded hover:bg-slate-100 dark:hover:bg-slate-700 disabled:opacity-50 disabled:cursor-not-allowed"
+                                className="p-2 rounded hover:bg-white/10 disabled:opacity-50 disabled:cursor-not-allowed"
                             >
                                 <FiChevronRight />
                             </button>
@@ -482,7 +385,7 @@ export default function DatabaseViewerPage() {
                 </div>
             ) : (
                 !loading && (
-                    <div className="flex flex-col items-center justify-center h-64 text-slate-400 border-2 border-dashed border-slate-200 dark:border-slate-700 rounded-xl">
+                    <div className="flex flex-col items-center justify-center h-64 text-white/40 border-2 border-dashed border-white/10 rounded-2xl">
                         <FiDatabase size={48} className="mb-4 opacity-50" />
                         <p>Select a table to view its contents</p>
                     </div>

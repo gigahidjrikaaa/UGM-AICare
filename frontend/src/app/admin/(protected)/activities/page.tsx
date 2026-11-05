@@ -72,7 +72,7 @@ export default function AdminActivitiesPage() {
             <FiActivity className="mr-3 text-[#FFCA40]" />
             Therapeutic Activities
           </h1>
-          <p className="text-gray-400 mt-1">
+          <p className="text-white/50 mt-1">
             View and preview interactive activities available to users
           </p>
         </div>
@@ -81,11 +81,11 @@ export default function AdminActivitiesPage() {
         <div className="flex gap-3">
           <div className="px-4 py-2 bg-white/5 border border-white/10 rounded-lg text-center shadow-lg">
             <div className="text-2xl font-bold text-[#FFCA40]">{allActivities.length}</div>
-            <div className="text-xs text-gray-400">Total</div>
+            <div className="text-xs text-white/50">Total</div>
           </div>
           <div className="px-4 py-2 bg-white/5 border border-white/10 rounded-lg text-center shadow-lg">
             <div className="text-2xl font-bold text-blue-400">{categories.length - 1}</div>
-            <div className="text-xs text-gray-400">Categories</div>
+            <div className="text-xs text-white/50">Categories</div>
           </div>
         </div>
       </div>
@@ -99,7 +99,7 @@ export default function AdminActivitiesPage() {
             className={`px-4 py-2 rounded-lg text-sm font-medium transition-all ${
               filterCategory === cat
                 ? 'bg-[#FFCA40] text-[#001D58] shadow-md'
-                : 'bg-white/5 text-gray-300 hover:bg-white/10 border border-white/10'
+                : 'bg-white/5 text-white/70 hover:bg-white/10 border border-white/10'
             }`}
           >
             {cat === 'all' ? 'All Activities' : (CATEGORY_CONFIG[cat]?.label || cat)}
@@ -112,12 +112,12 @@ export default function AdminActivitiesPage() {
         {filteredActivities.map((activity, index) => {
           const categoryConfig = CATEGORY_CONFIG[activity.category] || {
             label: activity.category, 
-            color: 'bg-gray-500/20 text-gray-300 border-gray-500/30',
+            color: 'bg-slate-500/10 text-white/70 border-slate-500/20',
             icon: <FiActivity className="w-4 h-4" />
           };
           const difficultyConfig = DIFFICULTY_CONFIG[activity.difficulty] || {
             label: activity.difficulty,
-            color: 'bg-gray-500/20 text-gray-300'
+            color: 'bg-slate-500/10 text-white/70'
           };
 
           return (
@@ -144,7 +144,7 @@ export default function AdminActivitiesPage() {
               <h3 className="text-lg font-bold text-white mb-2 group-hover:text-[#FFCA40] transition-colors">
                 {activity.name}
               </h3>
-              <p className="text-sm text-gray-400 mb-5 line-clamp-3 flex-1 grow">
+              <p className="text-sm text-white/50 mb-5 line-clamp-3 flex-1 grow">
                 {activity.description}
               </p>
 
@@ -164,13 +164,13 @@ export default function AdminActivitiesPage() {
                 {activity.tags.slice(0, 4).map(tag => (
                   <span 
                     key={tag}
-                    className="px-2 py-1 bg-white/5 hover:bg-white/10 text-gray-400 text-[10px] uppercase font-semibold tracking-wide rounded-md border border-white/10 cursor-default transition-colors"
+                    className="px-2 py-1 bg-white/5 hover:bg-white/10 text-white/50 text-[10px] uppercase font-semibold tracking-wide rounded-md border border-white/10 cursor-default transition-colors"
                   >
                     #{tag}
                   </span>
                 ))}
                 {activity.tags.length > 4 && (
-                  <span className="px-2 py-1 text-[10px] text-gray-500 font-semibold bg-transparent">+{activity.tags.length - 4} more</span>
+                  <span className="px-2 py-1 text-[10px] text-white/40 font-semibold bg-transparent">+{activity.tags.length - 4} more</span>
                 )}
               </div>
 
@@ -201,7 +201,7 @@ export default function AdminActivitiesPage() {
         <div className="text-center py-16 bg-white/5 rounded-2xl border border-white/10">
           <div className="text-6xl mb-4 opacity-50">#</div>
           <h3 className="text-xl font-bold text-white mb-2">No Activities Found</h3>
-          <p className="text-gray-400">Try selecting a different category.</p>
+          <p className="text-white/50">Try selecting a different category.</p>
         </div>
       )}
 
@@ -235,7 +235,7 @@ export default function AdminActivitiesPage() {
                 </div>
                 <button
                   onClick={() => setPreviewActivity(null)}
-                  className="p-2 bg-white/5 hover:bg-white/20 rounded-xl transition-colors text-gray-400 hover:text-white"
+                  className="p-2 bg-white/5 hover:bg-white/20 rounded-xl transition-colors text-white/50 hover:text-white"
                 >
                   <FiX className="w-5 h-5" />
                 </button>

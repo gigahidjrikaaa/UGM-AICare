@@ -98,7 +98,7 @@ export function InteractiveMetricsCharts({ overview, trends }: InteractiveMetric
                   type="button"
                   onClick={() => setCaseMode(mode)}
                   className={`relative rounded-full px-4 py-1.5 text-xs font-medium capitalize transition-colors duration-500 ${
-                    caseMode === mode ? 'text-[#00153a]' : 'text-white/55 hover:text-white'
+                    caseMode === mode ? 'text-[#001D58]' : 'text-white/55 hover:text-white'
                   }`}
                 >
                   {caseMode === mode && (

@@ -94,7 +94,7 @@ const StatusIndicator: React.FC<{ status: string; className?: string }> = ({
     case 'critical':
       return <XCircle className={`${className} text-red-500`} />;
     default:
-      return <Activity className={`${className} text-gray-500`} />;
+      return <Activity className={`${className} text-white/40`} />;
   }
 };
 
@@ -117,10 +117,10 @@ const MetricCard: React.FC<{
           {icon}
         </div>
         <div>
-          <h3 className="text-sm font-medium text-gray-600">{title}</h3>
-          <p className="text-2xl font-bold text-gray-900">{value}</p>
+          <h3 className="text-sm font-medium text-white/70">{title}</h3>
+          <p className="text-2xl font-bold text-white">{value}</p>
           {subtitle && (
-            <p className="text-sm text-gray-500">{subtitle}</p>
+            <p className="text-sm text-white/40">{subtitle}</p>
           )}
         </div>
       </div>
@@ -140,12 +140,12 @@ const MetricCard: React.FC<{
 
 const AlertsList: React.FC<{ alerts: Array<{ level: string; message: string; recommendation?: string }>; title: string }> = ({ alerts, title }) => (
   <div className="bg-white rounded-lg border border-gray-200 p-6 shadow-sm">
-    <h3 className="text-lg font-semibold text-gray-900 mb-4 flex items-center">
+    <h3 className="text-lg font-semibold text-white mb-4 flex items-center">
       <AlertTriangle className="w-5 h-5 mr-2 text-yellow-500" />
       {title}
     </h3>
     {alerts.length === 0 ? (
-      <p className="text-gray-500 text-center py-4">No active alerts</p>
+      <p className="text-white/40 text-center py-4">No active alerts</p>
     ) : (
       <div className="space-y-3">
         {alerts.map((alert, index) => (
@@ -162,9 +162,9 @@ const AlertsList: React.FC<{ alerts: Array<{ level: string; message: string; rec
                 : 'bg-blue-50 border-blue-400'
             }`}
           >
-            <p className="font-medium text-gray-900">{alert.message}</p>
+            <p className="font-medium text-white">{alert.message}</p>
             {alert.recommendation && (
-              <p className="text-sm text-gray-600 mt-1">{alert.recommendation}</p>
+              <p className="text-sm text-white/70 mt-1">{alert.recommendation}</p>
             )}
           </motion.div>
         ))}
@@ -247,7 +247,7 @@ const SystemStatusDashboard: React.FC = () => {
       <div className="min-h-screen bg-gray-50 flex items-center justify-center">
         <div className="text-center">
           <RefreshCw className="w-8 h-8 text-blue-500 animate-spin mx-auto mb-4" />
-          <p className="text-gray-600">Loading system status...</p>
+          <p className="text-white/70">Loading system status...</p>
         </div>
       </div>
     );
@@ -265,8 +265,8 @@ const SystemStatusDashboard: React.FC = () => {
           <div className="flex items-center space-x-4">
             <StatusIndicator status={overallStatus} className="w-8 h-8" />
             <div>
-              <h1 className="text-2xl font-bold text-gray-900">System Status Dashboard</h1>
-              <p className="text-gray-600">
+              <h1 className="text-2xl font-bold text-white">System Status Dashboard</h1>
+              <p className="text-white/70">
                 Last updated: {lastRefresh.toLocaleTimeString()}
               </p>
             </div>
@@ -321,19 +321,19 @@ const SystemStatusDashboard: React.FC = () => {
         {systemHealth && (
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
             <div className="bg-white rounded-lg border border-gray-200 p-6 shadow-sm">
-              <h3 className="text-lg font-semibold text-gray-900 mb-4 flex items-center">
+              <h3 className="text-lg font-semibold text-white mb-4 flex items-center">
                 <Zap className="w-5 h-5 mr-2 text-blue-500" />
                 Slowest Endpoints
               </h3>
               {systemHealth.top_slow_endpoints.length === 0 ? (
-                <p className="text-gray-500 text-center py-4">No slow endpoints detected</p>
+                <p className="text-white/40 text-center py-4">No slow endpoints detected</p>
               ) : (
                 <div className="space-y-3">
                   {systemHealth.top_slow_endpoints.map((endpoint, index) => (
                     <div key={index} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
                       <div>
-                        <p className="font-medium text-gray-900">{endpoint.endpoint}</p>
-                        <p className="text-sm text-gray-600">{endpoint.requests} requests</p>
+                        <p className="font-medium text-white">{endpoint.endpoint}</p>
+                        <p className="text-sm text-white/70">{endpoint.requests} requests</p>
                       </div>
                       <span className="text-orange-600 font-semibold">{endpoint.avg_response_time}</span>
                     </div>
@@ -343,19 +343,19 @@ const SystemStatusDashboard: React.FC = () => {
             </div>
 
             <div className="bg-white rounded-lg border border-gray-200 p-6 shadow-sm">
-              <h3 className="text-lg font-semibold text-gray-900 mb-4 flex items-center">
+              <h3 className="text-lg font-semibold text-white mb-4 flex items-center">
                 <XCircle className="w-5 h-5 mr-2 text-red-500" />
                 Highest Error Rates
               </h3>
               {systemHealth.top_error_endpoints.length === 0 ? (
-                <p className="text-gray-500 text-center py-4">No endpoints with errors</p>
+                <p className="text-white/40 text-center py-4">No endpoints with errors</p>
               ) : (
                 <div className="space-y-3">
                   {systemHealth.top_error_endpoints.map((endpoint, index) => (
                     <div key={index} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
                       <div>
-                        <p className="font-medium text-gray-900">{endpoint.endpoint}</p>
-                        <p className="text-sm text-gray-600">{endpoint.total_requests} requests</p>
+                        <p className="font-medium text-white">{endpoint.endpoint}</p>
+                        <p className="text-sm text-white/70">{endpoint.total_requests} requests</p>
                       </div>
                       <span className="text-red-600 font-semibold">{endpoint.error_rate}</span>
                     </div>
@@ -397,7 +397,7 @@ const SystemStatusDashboard: React.FC = () => {
         {/* Code Quality Section */}
         {cleanupReport && (
           <div className="bg-white rounded-lg border border-gray-200 p-6 shadow-sm">
-            <h3 className="text-lg font-semibold text-gray-900 mb-4 flex items-center">
+            <h3 className="text-lg font-semibold text-white mb-4 flex items-center">
               <Code className="w-5 h-5 mr-2 text-green-500" />
               Code Quality Report
             </h3>
@@ -407,21 +407,21 @@ const SystemStatusDashboard: React.FC = () => {
                 <p className="text-2xl font-bold text-blue-600">
                   {cleanupReport.summary.total_files_with_issues}
                 </p>
-                <p className="text-sm text-gray-600">Files with issues</p>
+                <p className="text-sm text-white/70">Files with issues</p>
               </div>
               
               <div className="text-center p-4 bg-yellow-50 rounded-lg">
                 <p className="text-2xl font-bold text-yellow-600">
                   {Object.values(cleanupReport.summary.category_totals).reduce((a, b) => a + b, 0)}
                 </p>
-                <p className="text-sm text-gray-600">Total issues</p>
+                <p className="text-sm text-white/70">Total issues</p>
               </div>
               
               <div className="text-center p-4 bg-green-50 rounded-lg">
                 <p className="text-2xl font-bold text-green-600">
                   {cleanupReport.recommendations.length}
                 </p>
-                <p className="text-sm text-gray-600">Recommendations</p>
+                <p className="text-sm text-white/70">Recommendations</p>
               </div>
             </div>
 
@@ -429,7 +429,7 @@ const SystemStatusDashboard: React.FC = () => {
               <div className="space-y-2">
                 {cleanupReport.recommendations.map((recommendation, index) => (
                   <div key={index} className="p-3 bg-gray-50 rounded-lg">
-                    <p className="text-gray-700">{recommendation}</p>
+                    <p className="text-white/80">{recommendation}</p>
                   </div>
                 ))}
               </div>
@@ -445,7 +445,7 @@ const SystemStatusDashboard: React.FC = () => {
           
           {systemHealth && (
             <div className="bg-white rounded-lg border border-gray-200 p-6 shadow-sm">
-              <h3 className="text-lg font-semibold text-gray-900 mb-4 flex items-center">
+              <h3 className="text-lg font-semibold text-white mb-4 flex items-center">
                 <BarChart3 className="w-5 h-5 mr-2 text-purple-500" />
                 Performance Summary
               </h3>
@@ -453,15 +453,15 @@ const SystemStatusDashboard: React.FC = () => {
               <div className="grid grid-cols-3 gap-4">
                 <div className="text-center">
                   <p className="text-2xl font-bold text-red-600">{systemHealth.alerts.critical}</p>
-                  <p className="text-sm text-gray-600">Critical</p>
+                  <p className="text-sm text-white/70">Critical</p>
                 </div>
                 <div className="text-center">
                   <p className="text-2xl font-bold text-yellow-600">{systemHealth.alerts.warning}</p>
-                  <p className="text-sm text-gray-600">Warning</p>
+                  <p className="text-sm text-white/70">Warning</p>
                 </div>
                 <div className="text-center">
                   <p className="text-2xl font-bold text-blue-600">{systemHealth.alerts.info}</p>
-                  <p className="text-sm text-gray-600">Info</p>
+                  <p className="text-sm text-white/70">Info</p>
                 </div>
               </div>
             </div>
@@ -471,7 +471,7 @@ const SystemStatusDashboard: React.FC = () => {
         {/* Recommendations */}
         {databaseHealth?.recommendations && databaseHealth.recommendations.length > 0 && (
           <div className="bg-white rounded-lg border border-gray-200 p-6 shadow-sm">
-            <h3 className="text-lg font-semibold text-gray-900 mb-4 flex items-center">
+            <h3 className="text-lg font-semibold text-white mb-4 flex items-center">
               <Settings className="w-5 h-5 mr-2 text-indigo-500" />
               System Recommendations
             </h3>
@@ -486,7 +486,7 @@ const SystemStatusDashboard: React.FC = () => {
                   className="flex items-start space-x-3 p-3 bg-indigo-50 rounded-lg"
                 >
                   <CheckCircle className="w-5 h-5 text-indigo-500 mt-0.5 flex-shrink-0" />
-                  <p className="text-gray-700">{recommendation}</p>
+                  <p className="text-white/80">{recommendation}</p>
                 </motion.div>
               ))}
             </div>

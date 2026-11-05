@@ -70,9 +70,9 @@ export default function SurveyAnalyticsPage() {
         </div>
       </div>
       {loading ? (
-        <div className="text-gray-300">Loading...</div>
+        <div className="text-white/70">Loading...</div>
       ) : !data ? (
-        <div className="text-gray-300">No analytics available.</div>
+        <div className="text-white/70">No analytics available.</div>
       ) : (
         <div className="bg-white/10 backdrop-blur-sm rounded-xl border border-white/20 overflow-hidden">
           <div className="p-6 space-y-6">
@@ -83,24 +83,24 @@ export default function SurveyAnalyticsPage() {
             {data.questions.map((q) => (
               <div key={q.question_id} className="border-t border-white/10 pt-4">
                 <div className="text-white font-semibold">{q.question_text}</div>
-                <div className="text-xs text-gray-300 mb-2">Type: {q.question_type}</div>
+                <div className="text-xs text-white/70 mb-2">Type: {q.question_type}</div>
                 {q.counts && (
-                  <ul className="space-y-1 text-gray-100 text-sm">
+                  <ul className="space-y-1 text-white/90 text-sm">
                     {Object.entries(q.counts).map(([opt, cnt]) => (
-                      <li key={opt} className="flex items-center justify-between"><span>{opt}</span><span className="text-gray-300">{cnt}</span></li>
+                      <li key={opt} className="flex items-center justify-between"><span>{opt}</span><span className="text-white/70">{cnt}</span></li>
                     ))}
                   </ul>
                 )}
                 {q.histogram && (
-                  <div className="space-y-1 text-gray-100 text-sm">
+                  <div className="space-y-1 text-white/90 text-sm">
                     <div>Average: <span className="font-semibold">{q.average ?? '-'}</span></div>
                     {Object.entries(q.histogram).map(([val, cnt]) => (
-                      <div key={val} className="flex items-center justify-between"><span>{val}</span><span className="text-gray-300">{cnt}</span></div>
+                      <div key={val} className="flex items-center justify-between"><span>{val}</span><span className="text-white/70">{cnt}</span></div>
                     ))}
                   </div>
                 )}
                 {typeof q.responses === 'number' && (
-                  <div className="text-gray-100 text-sm">Responses: {q.responses}</div>
+                  <div className="text-white/90 text-sm">Responses: {q.responses}</div>
                 )}
               </div>
             ))}

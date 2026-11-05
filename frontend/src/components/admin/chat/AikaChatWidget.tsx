@@ -312,7 +312,7 @@ export default function AikaChatWidget() {
             {/* Header */}
             <div className="flex items-center justify-between p-4 border-b border-white/10 bg-white/5 rounded-t-2xl cursor-pointer" onClick={() => !isMinimized && setIsMinimized(true)}>
                 <div className="flex items-center gap-3">
-                    <div className="w-8 h-8 rounded-full bg-gradient-to-br from-[#FFCA40] to-[#FFAB00] flex items-center justify-center text-[#001D58] font-bold">
+                    <div className="w-8 h-8 rounded-full bg-linear-to-br from-[#FFCA40] to-[#FFAB00] flex items-center justify-center text-[#001D58] font-bold">
                         A
                     </div>
                     <div>
@@ -374,7 +374,7 @@ export default function AikaChatWidget() {
                             <div key={m.id} className={`flex flex-col ${m.role === 'user' ? 'items-end' : 'items-start'}`}>
                                 <div className={`max-w-[85%] rounded-2xl px-4 py-3 text-sm ${m.role === 'user'
                                     ? 'bg-[#FFCA40] text-[#001D58] rounded-tr-none'
-                                    : 'bg-white/10 text-gray-100 rounded-tl-none border border-white/5'
+                                    : 'bg-white/10 text-white/90 rounded-tl-none border border-white/5'
                                     }`}>
                                     {m.pending && currentThinking ? (
                                         <div className="flex items-center gap-2">
@@ -394,12 +394,12 @@ export default function AikaChatWidget() {
                                             {/* Agent Pills */}
                                             <div className="flex flex-wrap gap-1.5">
                                                 {m.resolvedAgent && (
-                                                    <span className={`text-[10px] px-2 py-0.5 rounded-full border ${pillColor[m.resolvedAgent] || 'bg-gray-500/20 text-gray-300 border-gray-500/40'}`}>
+                                                    <span className={`text-[10px] px-2 py-0.5 rounded-full border ${pillColor[m.resolvedAgent] || 'bg-slate-500/10 text-white/70 border-gray-500/40'}`}>
                                                         {m.resolvedAgent}
                                                     </span>
                                                 )}
                                                 {m.agentsInvoked && m.agentsInvoked.map((agent, idx) => (
-                                                    <span key={idx} className={`text-[10px] px-2 py-0.5 rounded-full border ${pillColor[agent] || 'bg-gray-500/20 text-gray-300 border-gray-500/40'}`}>
+                                                    <span key={idx} className={`text-[10px] px-2 py-0.5 rounded-full border ${pillColor[agent] || 'bg-slate-500/10 text-white/70 border-gray-500/40'}`}>
                                                         {agent}
                                                     </span>
                                                 ))}
@@ -407,7 +407,7 @@ export default function AikaChatWidget() {
 
                                             {/* Risk Level Indicator (Admin-specific) */}
                                             {m.riskLevel && m.riskLevel !== 'none' && (
-                                                <div className={`text-[10px] px-2 py-1 rounded-lg flex items-center gap-1.5 ${riskLevelColors[m.riskLevel]?.bg || 'bg-gray-500/20'} ${riskLevelColors[m.riskLevel]?.text || 'text-gray-300'}`}>
+                                                <div className={`text-[10px] px-2 py-1 rounded-lg flex items-center gap-1.5 ${riskLevelColors[m.riskLevel]?.bg || 'bg-slate-500/10'} ${riskLevelColors[m.riskLevel]?.text || 'text-white/70'}`}>
                                                     <FiShield className="w-3 h-3" />
                                                     <span className="font-medium">Risk: {m.riskLevel}</span>
                                                     {m.riskScore !== undefined && (

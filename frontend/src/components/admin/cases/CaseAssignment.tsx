@@ -121,10 +121,10 @@ export default function CaseAssignment({
 
   return (
     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-      <div className="bg-white dark:bg-gray-800 rounded-lg shadow-xl max-w-md w-full">
+      <div className="bg-white rounded-lg shadow-xl max-w-md w-full">
         {/* Header */}
         <div className="px-6 py-4 border-b border-gray-200 dark:border-gray-700">
-          <h3 className="text-xl font-bold text-gray-900 dark:text-gray-100">
+          <h3 className="text-xl font-bold text-white">
             {currentAssignee ? 'Reassign Case' : 'Assign Case'}
           </h3>
         </div>
@@ -133,27 +133,27 @@ export default function CaseAssignment({
         <form onSubmit={handleSubmit} className="p-6 space-y-4">
           {currentAssignee && (
             <div>
-              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+              <label className="block text-sm font-medium text-white/80 dark:text-white/70 mb-2">
                 Current Assignee
               </label>
-              <div className="px-3 py-2 bg-gray-100 dark:bg-gray-700 rounded-md text-gray-900 dark:text-gray-100">
+              <div className="px-3 py-2 bg-gray-100 rounded-md text-white">
                 {currentAssignee}
               </div>
             </div>
           )}
 
           <div>
-            <label htmlFor="case-assignee" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+            <label htmlFor="case-assignee" className="block text-sm font-medium text-white/80 dark:text-white/70 mb-2">
               Assign To <span className="text-red-500">*</span>
             </label>
             {agentsLoading && (
-              <p className="text-xs text-gray-500 dark:text-gray-400 mb-2">Loading counselors...</p>
+              <p className="text-xs text-white/40 dark:text-white/50 mb-2">Loading counselors...</p>
             )}
             <select
               id="case-assignee"
               value={selectedOption}
               onChange={(e) => setSelectedOption(e.target.value)}
-              className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100"
+              className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white text-white"
               required
             >
               <option value="">Select counselor...</option>
@@ -169,7 +169,7 @@ export default function CaseAssignment({
 
           {selectedOption === '__custom__' && (
             <div>
-              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+              <label className="block text-sm font-medium text-white/80 dark:text-white/70 mb-2">
                 Counselor ID/Username
               </label>
               <input
@@ -177,7 +177,7 @@ export default function CaseAssignment({
                 value={customAssignee}
                 onChange={(e) => setCustomAssignee(e.target.value)}
                 placeholder="Enter counselor ID or username"
-                className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100"
+                className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white text-white"
                 required
               />
             </div>
@@ -185,7 +185,7 @@ export default function CaseAssignment({
 
           {currentAssignee && (
             <div>
-              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+              <label className="block text-sm font-medium text-white/80 dark:text-white/70 mb-2">
                 Reason for Reassignment {currentAssignee && <span className="text-red-500">*</span>}
               </label>
               <textarea
@@ -193,7 +193,7 @@ export default function CaseAssignment({
                 onChange={(e) => setReason(e.target.value)}
                 placeholder="Explain why the case is being reassigned..."
                 rows={3}
-                className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100"
+                className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white text-white"
                 required={!!currentAssignee}
               />
             </div>
@@ -201,7 +201,7 @@ export default function CaseAssignment({
 
           {!currentAssignee && (
             <div>
-              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+              <label className="block text-sm font-medium text-white/80 dark:text-white/70 mb-2">
                 Assignment Note (optional)
               </label>
               <textarea
@@ -209,7 +209,7 @@ export default function CaseAssignment({
                 onChange={(e) => setReason(e.target.value)}
                 placeholder="Add any notes about this assignment..."
                 rows={2}
-                className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100"
+                className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white text-white"
               />
             </div>
           )}

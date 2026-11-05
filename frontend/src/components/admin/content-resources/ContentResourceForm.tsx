@@ -128,7 +128,7 @@ const ContentResourceForm: React.FC<ContentResourceFormProps> = ({ resource, onS
           placeholder="e.g., Cognitive Behavioral Therapy Techniques"
           className="w-full pl-10 pr-3 py-3 bg-white/8 border border-white/15 rounded-xl text-white placeholder-white/40 focus:ring-2 focus:ring-[#FFCA40]/50 focus:border-[#FFCA40]/50 outline-none transition-all duration-300 backdrop-blur-sm hover:bg-white/10"
         />
-        <p className="mt-1.5 text-xs text-gray-400">Clear, descriptive title that helps identify the content</p>
+        <p className="mt-1.5 text-xs text-white/50">Clear, descriptive title that helps identify the content</p>
       </div>
 
       {/* Type Selection */}
@@ -145,11 +145,11 @@ const ContentResourceForm: React.FC<ContentResourceFormProps> = ({ resource, onS
           <option value="pdf" className="bg-gray-800">📄 PDF - Document upload</option>
         </Select>
         <div className="mt-2 space-y-1">
-          <p className="text-xs text-gray-400">Choose the format of your content:</p>
-          <ul className="text-xs text-gray-500 space-y-0.5 ml-4">
-            <li>• <span className="text-gray-400">Text:</span> Therapy techniques, coping strategies, guidelines</li>
-            <li>• <span className="text-gray-400">URL:</span> Trusted mental health websites and articles</li>
-            <li>• <span className="text-gray-400">PDF:</span> Clinical research, workbooks, manuals</li>
+          <p className="text-xs text-white/50">Choose the format of your content:</p>
+          <ul className="text-xs text-white/40 space-y-0.5 ml-4">
+            <li>• <span className="text-white/50">Text:</span> Therapy techniques, coping strategies, guidelines</li>
+            <li>• <span className="text-white/50">URL:</span> Trusted mental health websites and articles</li>
+            <li>• <span className="text-white/50">PDF:</span> Clinical research, workbooks, manuals</li>
           </ul>
         </div>
       </div>
@@ -164,7 +164,7 @@ const ContentResourceForm: React.FC<ContentResourceFormProps> = ({ resource, onS
           placeholder="Brief summary of what this resource covers"
           className="w-full pl-10 pr-3 py-3 bg-white/8 border border-white/15 rounded-xl text-white placeholder-white/40 focus:ring-2 focus:ring-[#FFCA40]/50 focus:border-[#FFCA40]/50 outline-none transition-all duration-300 backdrop-blur-sm hover:bg-white/10"
         />
-        <p className="mt-1.5 text-xs text-gray-400">Helps other admins quickly understand the resource's purpose</p>
+        <p className="mt-1.5 text-xs text-white/50">Helps other admins quickly understand the resource's purpose</p>
       </div>
 
       {/* Tags Field */}
@@ -177,7 +177,7 @@ const ContentResourceForm: React.FC<ContentResourceFormProps> = ({ resource, onS
           placeholder="anxiety, depression, coping-skills, therapy"
           className="w-full pl-10 pr-3 py-3 bg-white/8 border border-white/15 rounded-xl text-white placeholder-white/40 focus:ring-2 focus:ring-[#FFCA40]/50 focus:border-[#FFCA40]/50 outline-none transition-all duration-300 backdrop-blur-sm hover:bg-white/10"
         />
-        <p className="mt-1.5 text-xs text-gray-400">
+        <p className="mt-1.5 text-xs text-white/50">
           Comma-separated keywords for better organization. Common tags: anxiety, depression, stress, therapy, self-care, mindfulness
         </p>
       </div>
@@ -185,7 +185,7 @@ const ContentResourceForm: React.FC<ContentResourceFormProps> = ({ resource, onS
       {/* Type-Specific Fields */}
       {formData.type === 'text' && (
         <div className="space-y-2">
-          <label htmlFor="content" className="block text-sm font-medium text-gray-300">
+          <label htmlFor="content" className="block text-sm font-medium text-white/70">
             Content *
           </label>
           <Textarea
@@ -246,7 +246,7 @@ const ContentResourceForm: React.FC<ContentResourceFormProps> = ({ resource, onS
 
       {formData.type === 'pdf' && (
         <div className="space-y-2">
-          <label className="block text-sm font-medium text-gray-300">PDF File *</label>
+          <label className="block text-sm font-medium text-white/70">PDF File *</label>
           <div className="border-2 border-dashed border-white/20 rounded-xl p-6 hover:border-[#FFCA40]/50 transition-colors">
             <input
               type="file"
@@ -254,7 +254,7 @@ const ContentResourceForm: React.FC<ContentResourceFormProps> = ({ resource, onS
               onChange={(e) => setFile(e.target.files?.[0] ?? null)}
               aria-label="Upload PDF file"
               title="Upload PDF file"
-              className="block w-full text-sm text-white file:mr-4 file:rounded-lg file:border-0 file:bg-[#FFCA40] file:px-4 file:py-2.5 file:text-sm file:font-semibold file:text-black hover:file:bg-[#FFD700] file:cursor-pointer cursor-pointer"
+              className="block w-full text-sm text-white file:mr-4 file:rounded-lg file:border-0 file:bg-[#FFCA40] file:px-4 file:py-2.5 file:text-sm file:font-semibold file:text-[#001D58] hover:file:bg-[#FFD700] file:cursor-pointer cursor-pointer"
             />
             {file && (
               <div className="mt-3 flex items-center gap-2 text-sm text-green-400">
@@ -285,7 +285,7 @@ const ContentResourceForm: React.FC<ContentResourceFormProps> = ({ resource, onS
 
       {error && <ErrorMessage message={error} />}
 
-      <Button type="submit" disabled={isLoading} className="w-full flex items-center justify-center px-4 py-3 bg-gradient-to-r from-[#FFCA40] to-[#FFD700] text-[#001D58] font-semibold rounded-xl hover:from-[#FFD700] hover:to-[#FFCA40] focus:outline-none focus:ring-2 focus:ring-[#FFCA40] focus:ring-offset-2 focus:ring-offset-transparent transition-all duration-300 disabled:opacity-70 disabled:cursor-not-allowed group shadow-lg hover:shadow-xl transform hover:-translate-y-0.5">
+      <Button type="submit" disabled={isLoading} className="w-full flex items-center justify-center px-4 py-3 bg-linear-to-r from-[#FFCA40] to-[#FFD700] text-[#001D58] font-semibold rounded-xl hover:from-[#FFD700] hover:to-[#FFCA40] focus:outline-none focus:ring-2 focus:ring-[#FFCA40] focus:ring-offset-2 focus:ring-offset-transparent transition-all duration-300 disabled:opacity-70 disabled:cursor-not-allowed group shadow-lg hover:shadow-xl transform hover:-translate-y-0.5">
         {isLoading ? 'Saving...' : 'Save Resource'}
       </Button>
     </form>

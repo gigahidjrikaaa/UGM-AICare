@@ -53,11 +53,11 @@ export default function AdminAgentDecisionsPage() {
 
   return (
     <div className="space-y-6">
-      <div className="rounded-2xl border border-white/10 bg-linear-to-r from-white/10 via-white/5 to-transparent p-5">
+      <div>
         <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
           <div>
-            <h1 className="text-2xl font-semibold text-white">Agent Decisions & Attestations</h1>
-            <p className="text-sm text-white/70">Transparency view of policy decisions, execution outcomes, and attestation links.</p>
+            <h1 className="text-3xl font-bold text-white">Agent Decisions & Attestations</h1>
+            <p className="mt-1 text-sm text-white/60">Transparency view of policy decisions, execution outcomes, and attestation links.</p>
             <p className="mt-1 text-xs text-white/50">Records: <span className="font-medium text-white">{total}</span></p>
           </div>
           <Button onClick={load} disabled={loading}>{loading ? 'Loading...' : 'Refresh'}</Button>

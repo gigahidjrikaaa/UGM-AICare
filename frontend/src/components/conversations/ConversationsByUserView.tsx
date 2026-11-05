@@ -393,15 +393,15 @@ export function ConversationsByUserView({
   }
 
   return (
-    <div className="space-y-5">
-      <div className="rounded-xl border border-white/10 bg-white/5 p-5 backdrop-blur-sm">
+    <div className="space-y-6">
+      <div>
         <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
           <div>
             <div className="mb-1 flex items-center gap-3">
-              <FiMessageSquare className="h-6 w-6 text-[#FFCA40]" />
-              <h1 className="text-2xl font-bold text-white">{title}</h1>
+              <FiMessageSquare className="h-7 w-7 text-[#FFCA40]" />
+              <h1 className="text-3xl font-bold text-white">{title}</h1>
             </div>
-            <p className="ml-9 text-sm text-white/55">{subtitle}</p>
+            <p className="ml-10 text-sm text-white/60">{subtitle}</p>
           </div>
 
           <div className="flex items-center gap-2">

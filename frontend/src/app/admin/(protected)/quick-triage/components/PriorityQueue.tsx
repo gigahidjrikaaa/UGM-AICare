@@ -16,16 +16,16 @@ interface PriorityQueueProps {
 }
 
 const SEVERITY_COLORS: Record<string, string> = {
-  critical: 'bg-red-500/20 border-red-500/30 text-red-300',
-  high: 'bg-orange-500/20 border-orange-500/30 text-orange-300',
-  moderate: 'bg-yellow-500/20 border-yellow-500/30 text-yellow-300',
-  low: 'bg-green-500/20 border-green-500/30 text-green-300',
+  critical: 'bg-red-500/10 border-red-500/20 text-red-400',
+  high: 'bg-orange-500/10 border-orange-500/20 text-orange-400',
+  moderate: 'bg-amber-500/10 border-amber-500/20 text-amber-400',
+  low: 'bg-blue-500/10 border-blue-500/20 text-blue-400',
 };
 
 const STATUS_COLORS: Record<string, string> = {
   new: 'bg-blue-500/20 border-blue-500/30 text-blue-300',
-  in_progress: 'bg-emerald-500/20 border-emerald-500/30 text-emerald-300',
-  resolved: 'bg-purple-500/20 border-purple-500/30 text-purple-300',
+  in_progress: 'bg-amber-500/10 border-amber-500/20 text-amber-400',
+  resolved: 'bg-emerald-500/10 border-emerald-500/20 text-emerald-400',
   closed: 'bg-white/10 border-white/20 text-white/50',
 };
 

@@ -592,7 +592,7 @@ export default function SurveyManagementPage() {
       <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
         <div>
           <h1 className="text-3xl font-bold text-white">Survey Management</h1>
-          <p className="text-sm text-gray-300">Create, edit, and review surveys shared with students.</p>
+          <p className="text-sm text-white/70">Create, edit, and review surveys shared with students.</p>
         </div>
         <Button onClick={handleCreateModalOpen} variant="primaryGold" className="inline-flex items-center">
           <FiPlus className="h-4 w-4 mr-2" />
@@ -615,7 +615,7 @@ export default function SurveyManagementPage() {
         {/* Mobile / small screen card list */}
         <div className="md:hidden px-4 pb-4 space-y-3">
           {paginated.length === 0 && (
-            <div className="text-center text-sm text-gray-400 py-6">No surveys found.</div>
+            <div className="text-center text-sm text-white/50 py-6">No surveys found.</div>
           )}
           {paginated.map((survey, idx) => (
             <div
@@ -625,13 +625,13 @@ export default function SurveyManagementPage() {
               <div className="flex items-start justify-between gap-3">
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center gap-2 mb-1">
-                    <span className="text-[10px] font-mono text-gray-500 bg-white/10 px-1.5 py-0.5 rounded">{start + idx + 1}</span>
+                    <span className="text-[10px] font-mono text-white/40 bg-white/10 px-1.5 py-0.5 rounded">{start + idx + 1}</span>
                     <h3 className="text-sm font-semibold text-white break-words" title={survey.title}>{survey.title}</h3>
                   </div>
                   {survey.description && (
-                    <p className="text-xs text-gray-400 mt-1 break-words whitespace-pre-wrap" title={survey.description}>{survey.description}</p>
+                    <p className="text-xs text-white/50 mt-1 break-words whitespace-pre-wrap" title={survey.description}>{survey.description}</p>
                   )}
-                  <div className="mt-2 flex flex-wrap items-center gap-x-2 gap-y-1 text-[10px] uppercase tracking-wide text-gray-400">
+                  <div className="mt-2 flex flex-wrap items-center gap-x-2 gap-y-1 text-[10px] uppercase tracking-wide text-white/50">
                     <span>{survey.questions.length} q</span>
                     <span className="w-1 h-1 rounded-full bg-gray-500" />
                     <span>{survey.is_active ? 'Active' : 'Inactive'}</span>
@@ -641,7 +641,7 @@ export default function SurveyManagementPage() {
                   <button
                     type="button"
                     onClick={() => handleToggleSurveyActive(survey)}
-                    className={`inline-flex items-center px-2 py-1 text-[10px] rounded-md border transition-colors ${survey.is_active ? 'bg-green-700/25 border-green-500/50 text-green-200' : 'bg-gray-700/25 border-gray-500/50 text-gray-300'}`}
+                    className={`inline-flex items-center px-2 py-1 text-[10px] rounded-md border transition-colors ${survey.is_active ? 'bg-green-700/25 border-green-500/50 text-green-200' : 'bg-gray-700/25 border-gray-500/50 text-white/70'}`}
                     aria-label={survey.is_active ? 'Set survey inactive' : 'Set survey active'}
                   >
                     {survey.is_active ? 'Active' : 'Inactive'}
@@ -671,51 +671,51 @@ export default function SurveyManagementPage() {
           <table className="min-w-full divide-y divide-white/20 table-fixed">
             <thead className="bg-white/10 sticky top-0 z-20 backdrop-blur-md border-b border-white/20">
               <tr>
-                <th className="px-3 lg:px-4 py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider w-[4%]">
+                <th className="px-3 lg:px-4 py-3 text-left text-xs font-medium text-white/70 uppercase tracking-wider w-[4%]">
                   <button type="button" onClick={() => cycleSort('index')} className="flex items-center gap-1 group focus:outline-none focus:ring-2 focus:ring-[#FFCA40]/60 rounded px-1 -mx-1">
                     #
                     {sort.key === 'index' ? null : (
-                      <span className="text-[9px] text-gray-400 group-hover:text-gray-300">×</span>
+                      <span className="text-[9px] text-white/50 group-hover:text-white/70">×</span>
                     )}
                   </button>
                 </th>
-                <th className="px-3 lg:px-4 py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider w-[20%]">
+                <th className="px-3 lg:px-4 py-3 text-left text-xs font-medium text-white/70 uppercase tracking-wider w-[20%]">
                   <button type="button" onClick={() => cycleSort('title')} className="flex items-center gap-1 group focus:outline-none focus:ring-2 focus:ring-[#FFCA40]/60 rounded px-1 -mx-1">
                     Title
-                    {sort.key === 'title' && <span className="text-[9px] text-gray-400 group-hover:text-gray-300">{sort.direction === 'asc' ? '▲' : '▼'}</span>}
+                    {sort.key === 'title' && <span className="text-[9px] text-white/50 group-hover:text-white/70">{sort.direction === 'asc' ? '▲' : '▼'}</span>}
                   </button>
                 </th>
-                <th className="px-3 lg:px-4 py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider w-[15%]">
+                <th className="px-3 lg:px-4 py-3 text-left text-xs font-medium text-white/70 uppercase tracking-wider w-[15%]">
                   <button type="button" onClick={() => cycleSort('category')} className="flex items-center gap-1 group focus:outline-none focus:ring-2 focus:ring-[#FFCA40]/60 rounded px-1 -mx-1">
                     Category
-                    {sort.key === 'category' && <span className="text-[9px] text-gray-400 group-hover:text-gray-300">{sort.direction === 'asc' ? '▲' : '▼'}</span>}
+                    {sort.key === 'category' && <span className="text-[9px] text-white/50 group-hover:text-white/70">{sort.direction === 'asc' ? '▲' : '▼'}</span>}
                   </button>
                 </th>
-                <th className="px-3 lg:px-4 py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider">
+                <th className="px-3 lg:px-4 py-3 text-left text-xs font-medium text-white/70 uppercase tracking-wider">
                   <button type="button" onClick={() => cycleSort('description')} className="flex items-center gap-1 group focus:outline-none focus:ring-2 focus:ring-[#FFCA40]/60 rounded px-1 -mx-1">
                     Description
-                    {sort.key === 'description' && <span className="text-[9px] text-gray-400 group-hover:text-gray-300">{sort.direction === 'asc' ? '▲' : '▼'}</span>}
+                    {sort.key === 'description' && <span className="text-[9px] text-white/50 group-hover:text-white/70">{sort.direction === 'asc' ? '▲' : '▼'}</span>}
                   </button>
                 </th>
-                <th className="px-3 lg:px-4 py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider w-[13%]">
+                <th className="px-3 lg:px-4 py-3 text-left text-xs font-medium text-white/70 uppercase tracking-wider w-[13%]">
                   <button type="button" onClick={() => cycleSort('created')} className="flex items-center gap-1 group focus:outline-none focus:ring-2 focus:ring-[#FFCA40]/60 rounded px-1 -mx-1">
                     Created
-                    {sort.key === 'created' && <span className="text-[9px] text-gray-400 group-hover:text-gray-300">{sort.direction === 'asc' ? '▲' : '▼'}</span>}
+                    {sort.key === 'created' && <span className="text-[9px] text-white/50 group-hover:text-white/70">{sort.direction === 'asc' ? '▲' : '▼'}</span>}
                   </button>
                 </th>
-                <th className="px-3 lg:px-4 py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider w-[13%]">
+                <th className="px-3 lg:px-4 py-3 text-left text-xs font-medium text-white/70 uppercase tracking-wider w-[13%]">
                   <button type="button" onClick={() => cycleSort('updated')} className="flex items-center gap-1 group focus:outline-none focus:ring-2 focus:ring-[#FFCA40]/60 rounded px-1 -mx-1">
                     Updated
-                    {sort.key === 'updated' && <span className="text-[9px] text-gray-400 group-hover:text-gray-300">{sort.direction === 'asc' ? '▲' : '▼'}</span>}
+                    {sort.key === 'updated' && <span className="text-[9px] text-white/50 group-hover:text-white/70">{sort.direction === 'asc' ? '▲' : '▼'}</span>}
                   </button>
                 </th>
-                <th className="px-3 lg:px-4 py-3 text-right text-xs font-medium text-gray-300 uppercase tracking-wider w-[17%]">Actions</th>
+                <th className="px-3 lg:px-4 py-3 text-right text-xs font-medium text-white/70 uppercase tracking-wider w-[17%]">Actions</th>
               </tr>
             </thead>
              <tbody className="bg-white/[0.02] divide-y divide-white/10 relative z-0">
                {paginated.length === 0 && (
                  <tr>
-                   <td colSpan={8} className="px-6 py-10 text-center text-sm text-gray-400">No surveys found. Adjust your search or create a new survey.</td>
+                   <td colSpan={8} className="px-6 py-10 text-center text-sm text-white/50">No surveys found. Adjust your search or create a new survey.</td>
                  </tr>
                )}
                {paginated.map((survey, idx) => {
@@ -724,7 +724,7 @@ export default function SurveyManagementPage() {
                  const displayDesc = long && !isExpanded ? (survey.description || '').slice(0,240) + '…' : (survey.description || '');
                  return (
                  <tr key={survey.id} className="align-top hover:bg-white/5 transition-colors relative">
-                  <td className="px-3 lg:px-4 py-4 text-[11px] text-gray-400 font-mono">
+                  <td className="px-3 lg:px-4 py-4 text-[11px] text-white/50 font-mono">
                     <button
                       type="button"
                       onClick={() => cycleSort('index')}
@@ -737,20 +737,20 @@ export default function SurveyManagementPage() {
                   <td className="px-3 lg:px-4 py-4 text-sm font-medium text-white">
                     <div className="pr-2 break-words leading-snug">{survey.title}</div>
                   </td>
-                  <td className="px-3 lg:px-4 py-4 text-sm text-gray-300">
+                  <td className="px-3 lg:px-4 py-4 text-sm text-white/70">
                     <div className="pr-2 break-words leading-snug">
                       {survey.category ? (
                         <span className="inline-flex items-center px-2 py-1 text-xs rounded-md bg-blue-500/20 text-blue-200 border border-blue-500/30">
                           {survey.category}
                         </span>
                       ) : (
-                        <span className="italic text-gray-500 text-xs">No category</span>
+                        <span className="italic text-white/40 text-xs">No category</span>
                       )}
                     </div>
                   </td>
-                  <td className="px-3 lg:px-4 py-4 text-sm text-gray-300">
+                  <td className="px-3 lg:px-4 py-4 text-sm text-white/70">
                     <div className="prose prose-invert max-w-none whitespace-pre-wrap break-words leading-snug text-[13px]">
-                      {displayDesc ? displayDesc : <span className="italic text-gray-500">No description</span>}
+                      {displayDesc ? displayDesc : <span className="italic text-white/40">No description</span>}
                     </div>
                     {long && (
                       <button
@@ -764,15 +764,15 @@ export default function SurveyManagementPage() {
                       </button>
                     )}
                   </td>
-                  <td className="px-3 lg:px-4 py-4 text-xs text-gray-400 whitespace-nowrap align-top">{formatTimestamp(survey.created_at as unknown as string)}</td>
-                  <td className="px-3 lg:px-4 py-4 text-xs text-gray-400 whitespace-nowrap align-top">{formatTimestamp(survey.updated_at as unknown as string)}</td>
+                  <td className="px-3 lg:px-4 py-4 text-xs text-white/50 whitespace-nowrap align-top">{formatTimestamp(survey.created_at as unknown as string)}</td>
+                  <td className="px-3 lg:px-4 py-4 text-xs text-white/50 whitespace-nowrap align-top">{formatTimestamp(survey.updated_at as unknown as string)}</td>
                   <td className="px-3 lg:px-4 py-4 text-right text-sm font-medium">
                     <div className="flex items-start justify-end gap-2">
                       <div className="mr-1">
                         <button
                           type="button"
                           onClick={() => handleToggleSurveyActive(survey)}
-                          className={`inline-flex items-center gap-1 px-2 py-1 text-xs rounded-md border transition-colors focus:outline-none focus:ring-2 focus:ring-offset-1 focus:ring-[#FFCA40]/60 focus:ring-offset-[#1c1f26] ${survey.is_active ? 'bg-green-700/25 border-green-500/50 text-green-200 hover:bg-green-700/35' : 'bg-gray-700/25 border-gray-500/50 text-gray-300 hover:bg-gray-700/35'}`}
+                          className={`inline-flex items-center gap-1 px-2 py-1 text-xs rounded-md border transition-colors focus:outline-none focus:ring-2 focus:ring-offset-1 focus:ring-[#FFCA40]/60 focus:ring-offset-[#1c1f26] ${survey.is_active ? 'bg-green-700/25 border-green-500/50 text-green-200 hover:bg-green-700/35' : 'bg-gray-700/25 border-gray-500/50 text-white/70 hover:bg-gray-700/35'}`}
                           data-state={survey.is_active ? 'on' : 'off'}
                           aria-label={survey.is_active ? 'Set survey inactive' : 'Set survey active'}
                         >
@@ -800,7 +800,7 @@ export default function SurveyManagementPage() {
         {/* Pagination controls */}
         <div className="p-4 flex items-center justify-center gap-2">
           <Button variant="outline" className="text-white" disabled={currentPage === 1} onClick={() => setCurrentPage(p => Math.max(1, p - 1))}>Previous</Button>
-          <span className="text-sm text-gray-300">Page {currentPage} of {totalPages}</span>
+          <span className="text-sm text-white/70">Page {currentPage} of {totalPages}</span>
           <Button variant="outline" className="text-white" disabled={currentPage === totalPages} onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}>Next</Button>
         </div>
       </div>
@@ -832,7 +832,7 @@ export default function SurveyManagementPage() {
               </div>
               <div className="p-6 space-y-4">
                 <div className="space-y-1">
-                  <label htmlFor="title" className="block text-sm font-medium text-gray-300">Title</label>
+                  <label htmlFor="title" className="block text-sm font-medium text-white/70">Title</label>
                   <input
                     id="title"
                     name="title"
@@ -845,7 +845,7 @@ export default function SurveyManagementPage() {
                   />
                 </div>
                 <div className="space-y-1">
-                  <label htmlFor="category" className="block text-sm font-medium text-gray-300">Category</label>
+                  <label htmlFor="category" className="block text-sm font-medium text-white/70">Category</label>
                   <select
                     key="create-category-select"
                     id="category"
@@ -854,16 +854,16 @@ export default function SurveyManagementPage() {
                     onChange={handleNewSurveyChange}
                     className="w-full pl-3 pr-3 py-2 bg-white/8 border border-white/15 rounded-lg text-white placeholder-white/40 focus:ring-2 focus:ring-[#FFCA40]/50 focus:border-[#FFCA40]/50 outline-none transition-all duration-300 backdrop-blur-sm"
                   >
-                    <option value="" className="bg-[#1c1f26] text-gray-300">Select category</option>
+                    <option value="" className="bg-[#1c1f26] text-white/70">Select category</option>
                     {surveyCategoryOptions.map((category) => (
-                      <option key={category} value={category} className="bg-[#1c1f26] text-gray-100">
+                      <option key={category} value={category} className="bg-[#1c1f26] text-white/90">
                         {category}
                       </option>
                     ))}
                   </select>
                 </div>
                 <div className="space-y-1">
-                  <label htmlFor="description" className="block text-sm font-medium text-gray-300">Description</label>
+                  <label htmlFor="description" className="block text-sm font-medium text-white/70">Description</label>
                   <textarea
                     id="description"
                     name="description"
@@ -933,7 +933,7 @@ export default function SurveyManagementPage() {
               </div>
               <div className="p-6 space-y-4">
                 <div className="space-y-1">
-                  <label htmlFor="edit-title" className="block text-sm font-medium text-gray-300">Title</label>
+                  <label htmlFor="edit-title" className="block text-sm font-medium text-white/70">Title</label>
                   <input
                     key="edit-title-input"
                     id="edit-title"
@@ -947,7 +947,7 @@ export default function SurveyManagementPage() {
                   />
                 </div>
                 <div className="space-y-1">
-                  <label htmlFor="edit-category" className="block text-sm font-medium text-gray-300">Category</label>
+                  <label htmlFor="edit-category" className="block text-sm font-medium text-white/70">Category</label>
                   <select
                     key="edit-category-select"
                     id="edit-category"
@@ -956,16 +956,16 @@ export default function SurveyManagementPage() {
                     onChange={handleEditCategoryChange}
                     className="w-full pl-3 pr-3 py-2 bg-white/8 border border-white/15 rounded-lg text-white placeholder-white/40 focus:ring-2 focus:ring-[#FFCA40]/50 focus:border-[#FFCA40]/50 outline-none transition-all duration-300 backdrop-blur-sm"
                   >
-                    <option value="" className="bg-[#1c1f26] text-gray-300">Select category</option>
+                    <option value="" className="bg-[#1c1f26] text-white/70">Select category</option>
                     {surveyCategoryOptions.map((category) => (
-                      <option key={category} value={category} className="bg-[#1c1f26] text-gray-100">
+                      <option key={category} value={category} className="bg-[#1c1f26] text-white/90">
                         {category}
                       </option>
                     ))}
                   </select>
                 </div>
                 <div className="space-y-1">
-                  <label className="block text-sm font-medium text-gray-300">Description</label>
+                  <label className="block text-sm font-medium text-white/70">Description</label>
                   <Textarea
                     key="edit-description-textarea"
                     value={editMeta.description}
@@ -983,7 +983,7 @@ export default function SurveyManagementPage() {
                       onChange={(e) => setEditMeta(meta => ({ ...meta, is_active: e.target.checked }))}
                       className="h-4 w-4 text-[#FFCA40] focus:ring-[#FFCA40] bg-white/10 border-white/20 rounded"
                     />
-                    <span className="ml-2 text-sm text-gray-300">Active</span>
+                    <span className="ml-2 text-sm text-white/70">Active</span>
                   </label>
                 </div>
                 <div>
@@ -1050,12 +1050,12 @@ export default function SurveyManagementPage() {
                       <div key={response.id} className="p-4 border border-white/20 rounded-lg">
                         <div className="flex justify-between items-center mb-2">
                           <p className="text-sm font-medium text-white">User ID: {response.user_id}</p>
-                          <p className="text-xs text-gray-400">{new Date(response.created_at).toLocaleString()}</p>
+                          <p className="text-xs text-white/50">{new Date(response.created_at).toLocaleString()}</p>
                         </div>
                         <div className="space-y-2">
                           {response.answers.map((answer) => (
                             <div key={answer.id}>
-                              <p className="text-sm font-medium text-gray-300">{answer.question_text}</p>
+                              <p className="text-sm font-medium text-white/70">{answer.question_text}</p>
                               <p className="text-sm text-white">{answer.answer_text}</p>
                             </div>
                           ))}
@@ -1064,7 +1064,7 @@ export default function SurveyManagementPage() {
                     ))}
                   </div>
                 ) : (
-                  <p className="text-center text-gray-400">No results found for this survey.</p>
+                  <p className="text-center text-white/50">No results found for this survey.</p>
                 )}
               </div>
               <div className="px-6 py-4 border-t border-white/20 flex justify-end">

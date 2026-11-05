@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect, useCallback } from 'react';
-import Image from 'next/image';
+import UserAvatar from '@/components/ui/profile/UserAvatar';
 import {
   FiSearch,
   FiFilter,
@@ -140,14 +140,14 @@ export default function AdminCRMPage() {
             <FiUsers className="mr-3 text-[#FFCA40]" />
             CRM
           </h1>
-          <p className="text-gray-400 mt-1">Manage student contact information and reach out directly</p>
+          <p className="text-white/50 mt-1">Manage student contact information and reach out directly</p>
         </div>
         <div className="flex items-center gap-3">
           <button
             onClick={() => setShowFilters(!showFilters)}
             className={`inline-flex items-center px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
               showFilters 
-                ? 'bg-[#FFCA40] text-black' 
+                ? 'bg-[#FFCA40] text-[#001D58]' 
                 : 'bg-white/10 hover:bg-white/20 text-white border border-white/20'
             }`}
           >
@@ -157,7 +157,7 @@ export default function AdminCRMPage() {
           <button
             onClick={fetchUsers}
             disabled={loading}
-            className="inline-flex items-center px-4 py-2 bg-[#FFCA40] hover:bg-[#ffda63] text-black rounded-lg text-sm font-medium transition-colors disabled:opacity-50"
+            className="inline-flex items-center px-4 py-2 bg-[#FFCA40] hover:bg-[#ffda63] text-[#001D58] rounded-lg text-sm font-medium transition-colors disabled:opacity-50"
           >
             <FiRefreshCw className={`h-4 w-4 mr-2 ${loading ? 'animate-spin' : ''}`} />
             Refresh
@@ -171,7 +171,7 @@ export default function AdminCRMPage() {
           <div className="bg-white/5 backdrop-blur border border-white/10 rounded-xl p-6">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm font-medium text-gray-400">Total Contacts</p>
+                <p className="text-sm font-medium text-white/50">Total Contacts</p>
                 <p className="text-2xl font-bold text-white">{stats.total_users.toLocaleString()}</p>
               </div>
               <div className="p-3 bg-[#FFCA40]/20 rounded-lg">
@@ -183,7 +183,7 @@ export default function AdminCRMPage() {
           <div className="bg-white/5 backdrop-blur border border-white/10 rounded-xl p-6">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm font-medium text-gray-400">Active (30d)</p>
+                <p className="text-sm font-medium text-white/50">Active (30d)</p>
                 <p className="text-2xl font-bold text-white">{stats.active_users_30d.toLocaleString()}</p>
               </div>
               <div className="p-3 bg-green-500/20 rounded-lg">
@@ -195,7 +195,7 @@ export default function AdminCRMPage() {
           <div className="bg-white/5 backdrop-blur border border-white/10 rounded-xl p-6">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm font-medium text-gray-400">With Email</p>
+                <p className="text-sm font-medium text-white/50">With Email</p>
                 <p className="text-2xl font-bold text-white">{totalWithEmail > 0 ? `${totalWithEmail}+` : '0'}</p>
               </div>
               <div className="p-3 bg-blue-500/20 rounded-lg">
@@ -207,7 +207,7 @@ export default function AdminCRMPage() {
           <div className="bg-white/5 backdrop-blur border border-white/10 rounded-xl p-6">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm font-medium text-gray-400">With Phone</p>
+                <p className="text-sm font-medium text-white/50">With Phone</p>
                 <p className="text-2xl font-bold text-white">{totalWithPhone > 0 ? `${totalWithPhone}+` : '0'}</p>
               </div>
               <div className="p-3 bg-purple-500/20 rounded-lg">
@@ -223,11 +223,11 @@ export default function AdminCRMPage() {
         <div className="bg-white/5 backdrop-blur border border-white/10 rounded-xl p-6">
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div>
-              <label className="block text-sm font-medium text-gray-300 mb-2">
+              <label className="block text-sm font-medium text-white/70 mb-2">
                 Search Contacts
               </label>
               <div className="relative">
-                <FiSearch className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
+                <FiSearch className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-white/50" />
                 <input
                   type="text"
                   placeholder="Search by name, email, or phone..."
@@ -239,7 +239,7 @@ export default function AdminCRMPage() {
             </div>
 
             <div>
-              <label className="block text-sm font-medium text-gray-300 mb-2">
+              <label className="block text-sm font-medium text-white/70 mb-2">
                 Filter
               </label>
               <div className="flex items-center h-10">
@@ -250,7 +250,7 @@ export default function AdminCRMPage() {
                   onChange={(e) => setActiveOnly(e.target.checked)}
                   className="h-4 w-4 text-[#FFCA40] focus:ring-[#FFCA40] bg-white/10 border-white/20 rounded"
                 />
-                <label htmlFor="activeOnly" className="ml-2 text-sm text-gray-300">
+                <label htmlFor="activeOnly" className="ml-2 text-sm text-white/70">
                   Active users only
                 </label>
               </div>
@@ -265,22 +265,22 @@ export default function AdminCRMPage() {
           <table className="min-w-full divide-y divide-white/20">
             <thead className="bg-white/5">
               <tr>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider">
+                <th className="px-6 py-3 text-left text-xs font-medium text-white/70 uppercase tracking-wider">
                   Contact
                 </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider">
+                <th className="px-6 py-3 text-left text-xs font-medium text-white/70 uppercase tracking-wider">
                   Phone
                 </th>
-                <th className="px-6 py-3 text-center text-xs font-medium text-gray-300 uppercase tracking-wider">
+                <th className="px-6 py-3 text-center text-xs font-medium text-white/70 uppercase tracking-wider">
                   Channels
                 </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider">
+                <th className="px-6 py-3 text-left text-xs font-medium text-white/70 uppercase tracking-wider">
                   Role
                 </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider">
+                <th className="px-6 py-3 text-left text-xs font-medium text-white/70 uppercase tracking-wider">
                   Status
                 </th>
-                <th className="px-6 py-3 text-right text-xs font-medium text-gray-300 uppercase tracking-wider">
+                <th className="px-6 py-3 text-right text-xs font-medium text-white/70 uppercase tracking-wider">
                   Last Activity
                 </th>
               </tr>
@@ -291,25 +291,13 @@ export default function AdminCRMPage() {
                   <td className="px-6 py-4 whitespace-nowrap">
                     <div className="flex items-center">
                       <div className="relative h-10 w-10 rounded-full overflow-hidden border border-white/15 bg-white/5 flex-shrink-0">
-                        {user.avatar_url ? (
-                          <Image
-                            src={user.avatar_url}
-                            alt={`Avatar for ${user.email || `user ${user.id}`}`}
-                            fill
-                            sizes="40px"
-                            className="object-cover"
-                          />
-                        ) : (
-                          <div className="flex h-full w-full items-center justify-center bg-[#FFCA40]/10 text-sm font-medium text-[#FFCA40]">
-                            {user.name?.charAt(0).toUpperCase() || user.email?.charAt(0).toUpperCase() || 'U'}
-                          </div>
-                        )}
+                        <UserAvatar src={user.avatar_url} name={user.name} email={user.email} initialsClassName="text-sm" />
                       </div>
                       <div className="ml-4">
                         <div className="text-sm font-medium text-white">
                           {user.name || 'Unknown Name'}
                         </div>
-                        <div className="text-sm text-gray-400">
+                        <div className="text-sm text-white/50">
                           {user.email || 'No email'}
                         </div>
                       </div>
@@ -317,11 +305,11 @@ export default function AdminCRMPage() {
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap">
                     {user.phone ? (
-                      <a href={`tel:${user.phone}`} className="text-sm text-gray-300 hover:text-white transition-colors">
+                      <a href={`tel:${user.phone}`} className="text-sm text-white/70 hover:text-white transition-colors">
                         {user.phone}
                       </a>
                     ) : (
-                      <span className="text-sm text-gray-500">-</span>
+                      <span className="text-sm text-white/40">-</span>
                     )}
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap text-center">
@@ -355,7 +343,7 @@ export default function AdminCRMPage() {
                           href={`mailto:${user.email}`}
                           target="_blank"
                           rel="noopener noreferrer"
-                          className="p-2 rounded-full bg-white/5 hover:bg-white/10 text-gray-300 hover:text-white transition-colors"
+                          className="p-2 rounded-full bg-white/5 hover:bg-white/10 text-white/70 hover:text-white transition-colors"
                           title="Email"
                         >
                           <FiMail className="w-4 h-4" />
@@ -363,7 +351,7 @@ export default function AdminCRMPage() {
                       )}
 
                       {!user.phone && !user.telegram_username && !user.email && (
-                        <span className="text-xs text-gray-500">No channels</span>
+                        <span className="text-xs text-white/40">No channels</span>
                       )}
                     </div>
                   </td>
@@ -372,9 +360,9 @@ export default function AdminCRMPage() {
                       className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${
                         user.role === 'admin' 
                           ? 'bg-red-500/20 text-red-400' 
-                          : user.role === 'counselor'
+                          : ['counselor', 'peer_supporter'].includes(user.role ?? '')
                           ? 'bg-blue-500/20 text-blue-400'
-                          : 'bg-gray-500/20 text-gray-400'
+                          : 'bg-slate-500/10 text-white/50'
                       }`}
                     >
                       {user.role === 'counselor' ? 'Counselor' : user.role || 'user'}
@@ -391,7 +379,7 @@ export default function AdminCRMPage() {
                       {user.is_active ?? true ? 'Active' : 'Inactive'}
                     </span>
                   </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-right text-sm text-gray-400">
+                  <td className="px-6 py-4 whitespace-nowrap text-right text-sm text-white/50">
                     {formatDate(user.last_activity_date)}
                   </td>
                 </tr>
@@ -399,7 +387,7 @@ export default function AdminCRMPage() {
               
               {users.length === 0 && !loading && (
                 <tr>
-                  <td colSpan={6} className="px-6 py-8 text-center text-gray-400">
+                  <td colSpan={6} className="px-6 py-8 text-center text-white/50">
                     No contacts found.
                   </td>
                 </tr>
@@ -429,7 +417,7 @@ export default function AdminCRMPage() {
             </div>
             <div className="hidden sm:flex-1 sm:flex sm:items-center sm:justify-between">
               <div>
-                <p className="text-sm text-gray-300">
+                <p className="text-sm text-white/70">
                   Showing{' '}
                   <span className="font-medium text-white">{(currentPage - 1) * ITEMS_PER_PAGE + 1}</span>
                   {' '}to{' '}
@@ -446,7 +434,7 @@ export default function AdminCRMPage() {
                   <button
                     onClick={() => setCurrentPage(Math.max(1, currentPage - 1))}
                     disabled={currentPage === 1}
-                    className="relative inline-flex items-center px-2 py-2 rounded-l-md border border-white/20 bg-white/10 text-sm font-medium text-gray-300 hover:bg-white/20 disabled:opacity-50"
+                    className="relative inline-flex items-center px-2 py-2 rounded-l-md border border-white/20 bg-white/10 text-sm font-medium text-white/70 hover:bg-white/20 disabled:opacity-50"
                   >
                     Previous
                   </button>
@@ -461,7 +449,7 @@ export default function AdminCRMPage() {
                         className={`relative inline-flex items-center px-4 py-2 border text-sm font-medium ${
                           page === currentPage
                             ? 'z-10 bg-[#FFCA40]/20 border-[#FFCA40] text-[#FFCA40]'
-                            : 'bg-white/10 border-white/20 text-gray-300 hover:bg-white/20'
+                            : 'bg-white/10 border-white/20 text-white/70 hover:bg-white/20'
                         }`}
                       >
                         {page}
@@ -472,7 +460,7 @@ export default function AdminCRMPage() {
                   <button
                     onClick={() => setCurrentPage(Math.min(totalPages, currentPage + 1))}
                     disabled={currentPage === totalPages}
-                    className="relative inline-flex items-center px-2 py-2 rounded-r-md border border-white/20 bg-white/10 text-sm font-medium text-gray-300 hover:bg-white/20 disabled:opacity-50"
+                    className="relative inline-flex items-center px-2 py-2 rounded-r-md border border-white/20 bg-white/10 text-sm font-medium text-white/70 hover:bg-white/20 disabled:opacity-50"
                   >
                     Next
                   </button>

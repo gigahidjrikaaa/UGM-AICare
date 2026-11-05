@@ -37,9 +37,9 @@ const CATEGORY_COLORS: Record<string, string> = {
 };
 
 const STATUS_CONFIG: Record<string, { icon: React.ReactNode; color: string; bg: string }> = {
-  open: { icon: <FiAlertCircle size={14} />, color: 'text-yellow-300', bg: 'bg-yellow-500/20 border-yellow-500/30' },
-  reviewing: { icon: <FiEye size={14} />, color: 'text-blue-300', bg: 'bg-blue-500/20 border-blue-500/30' },
-  resolved: { icon: <FiCheckCircle size={14} />, color: 'text-green-300', bg: 'bg-green-500/20 border-green-500/30' },
+  open: { icon: <FiAlertCircle size={14} />, color: 'text-amber-400', bg: 'bg-amber-500/10 border-amber-500/20' },
+  reviewing: { icon: <FiEye size={14} />, color: 'text-blue-400', bg: 'bg-blue-500/10 border-blue-500/20' },
+  resolved: { icon: <FiCheckCircle size={14} />, color: 'text-emerald-400', bg: 'bg-emerald-500/10 border-emerald-500/20' },
 };
 
 interface FlagItem {
@@ -210,7 +210,7 @@ export default function FlagsPage() {
   const resolvedCount = flags.filter(f => f.status === 'resolved').length;
 
   return (
-    <div className="space-y-5 px-1">
+    <div className="space-y-6">
       {/* Header + Summary Stats */}
       <div className="bg-white/5 backdrop-blur-sm border border-white/10 rounded-lg p-5">
         <div className="flex items-center justify-between mb-4">

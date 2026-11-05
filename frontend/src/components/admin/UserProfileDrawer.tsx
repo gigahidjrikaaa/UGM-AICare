@@ -1,7 +1,9 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import Image from 'next/image';
+import UserAvatar from '@/components/ui/profile/UserAvatar';
 import { X, Mail, Phone, ExternalLink, Calendar, CheckCircle, AlertTriangle } from 'lucide-react';
+import toast from 'react-hot-toast';
+import { apiCall } from '@/utils/adminApi';
 import { User, UserLog } from '@/types/admin/users';
 import { ScreeningProfile, DIMENSION_LABELS, RISK_CONFIG, INSTRUMENT_CONFIG, RiskLevel } from '@/types/admin/screening';
 
@@ -24,6 +26,29 @@ const formatDate = (dateString: string | null | undefined) => {
 
 export default function UserProfileDrawer({ isOpen, onClose, user, screeningProfile, isLoading }: UserProfileDrawerProps) {
     const [activeTab, setActiveTab] = useState<TabType>('overview');
+    const [checkinsEnabled, setCheckinsEnabled] = useState(false);
+    const [checkinsSaving, setCheckinsSaving] = useState(false);
+
+    useEffect(() => {
+        setCheckinsEnabled(Boolean(user?.allow_email_checkins));
+    }, [user?.id, user?.allow_email_checkins]);
+
+    const toggleCheckins = async () => {
+        if (!user) return;
+        const next = !checkinsEnabled;
+        setCheckinsSaving(true);
+        try {
+            await apiCall(`/api/v1/admin/users/${user.id}/email-checkins?enabled=${next}`, {
+                method: 'PUT',
+            });
+            setCheckinsEnabled(next);
+            toast.success(next ? 'Email check-ins enabled' : 'Email check-ins disabled');
+        } catch {
+            toast.error('Failed to update email check-ins');
+        } finally {
+            setCheckinsSaving(false);
+        }
+    };
 
     if (!isOpen || !user) return null;
 
@@ -98,13 +123,7 @@ export default function UserProfileDrawer({ isOpen, onClose, user, screeningProf
                                 <div className="flex justify-between items-start mb-4">
                                     <div className="flex items-center gap-4">
                                         <div className="relative h-16 w-16 rounded-full overflow-hidden border border-white/20 bg-white/5 shrink-0">
-                                            {user.avatar_url ? (
-                                                <Image src={user.avatar_url} alt="Avatar" fill className="object-cover" />
-                                            ) : (
-                                                <div className="flex h-full w-full items-center justify-center bg-[#FFCA40]/10 text-xl font-bold text-[#FFCA40]">
-                                                    {(user.name || user.email || 'U').charAt(0).toUpperCase()}
-                                                </div>
-                                            )}
+                                            <UserAvatar src={user.avatar_url} name={user.name} email={user.email} initialsClassName="text-xl" />
                                         </div>
                                         <div>
                                             <h2 className="text-xl font-bold text-white">{user.name || user.email || `User ${user.id}`}</h2>
@@ -190,12 +209,18 @@ export default function UserProfileDrawer({ isOpen, onClose, user, screeningProf
                                         <div>
                                             <h3 className="text-lg font-bold text-white mb-3">Quick Links</h3>
                                             <div className="flex flex-wrap gap-2">
-                                                <Link href={`/admin/conversations?user_id=${user.id}`} className="px-3 py-2 bg-white/5 hover:bg-white/10 border border-white/10 rounded-lg text-sm text-white flex items-center gap-2 transition-colors">
+                                                <Link href="/admin/conversations" className="px-3 py-2 bg-white/5 hover:bg-white/10 border border-white/10 rounded-lg text-sm text-white flex items-center gap-2 transition-colors">
                                                     Chats <ExternalLink className="w-3 h-3" />
                                                 </Link>
-                                                <Link href={`/admin/cases?user_id=${user.id}`} className="px-3 py-2 bg-white/5 hover:bg-white/10 border border-white/10 rounded-lg text-sm text-white flex items-center gap-2 transition-colors">
-                                                    Cases <ExternalLink className="w-3 h-3" />
-                                                </Link>
+                                                {user.user_hash ? (
+                                                    <Link href={`/admin/cases?search=${user.user_hash}`} className="px-3 py-2 bg-white/5 hover:bg-white/10 border border-white/10 rounded-lg text-sm text-white flex items-center gap-2 transition-colors">
+                                                        Cases <ExternalLink className="w-3 h-3" />
+                                                    </Link>
+                                                ) : (
+                                                    <Link href="/admin/cases" className="px-3 py-2 bg-white/5 hover:bg-white/10 border border-white/10 rounded-lg text-sm text-white flex items-center gap-2 transition-colors">
+                                                        Cases <ExternalLink className="w-3 h-3" />
+                                                    </Link>
+                                                )}
                                             </div>
                                         </div>
                                     </div>
@@ -273,11 +298,24 @@ export default function UserProfileDrawer({ isOpen, onClose, user, screeningProf
                                                     <div>
                                                         <div className="text-xs text-white/50 uppercase font-bold tracking-wider mb-1">Email</div>
                                                         <div className="text-sm text-white select-all">{user.email || 'Not provided'}</div>
-                                                        {user.allow_email_checkins && (
-                                                            <div className="mt-1 flex items-center gap-1 text-[10px] text-green-400 bg-green-500/10 px-2 py-0.5 rounded inline-block w-fit">
-                                                                <CheckCircle className="w-3 h-3" /> Check-ins enabled
-                                                            </div>
-                                                        )}
+                                                        <button
+                                                            type="button"
+                                                            onClick={toggleCheckins}
+                                                            disabled={checkinsSaving}
+                                                            className={`mt-1 inline-flex items-center gap-1 text-[10px] font-medium px-2 py-0.5 rounded border transition disabled:opacity-60 ${
+                                                                checkinsEnabled
+                                                                    ? 'text-green-400 bg-green-500/10 border-green-500/30'
+                                                                    : 'text-white/50 bg-white/5 border-white/10 hover:text-white'
+                                                            }`}
+                                                            title="Toggle scheduled email check-ins for this user"
+                                                        >
+                                                            <CheckCircle className="w-3 h-3" />
+                                                            {checkinsSaving
+                                                                ? 'Saving…'
+                                                                : checkinsEnabled
+                                                                    ? 'Check-ins enabled — click to disable'
+                                                                    : 'Check-ins disabled — click to enable'}
+                                                        </button>
                                                     </div>
                                                 </div>
                                                 <div className="flex items-start gap-3">

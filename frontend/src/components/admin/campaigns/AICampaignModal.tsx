@@ -92,12 +92,12 @@ export function AICampaignModal({ onClose, onSuccess }: AICampaignModalProps) {
           initial={{ opacity: 0, scale: 0.95 }}
           animate={{ opacity: 1, scale: 1 }}
           exit={{ opacity: 0, scale: 0.95 }}
-          className="w-full max-w-3xl bg-gradient-to-br from-[#001a47] to-[#00153a] rounded-2xl border border-white/10 shadow-2xl overflow-hidden max-h-[90vh] flex flex-col"
+          className="w-full max-w-3xl bg-linear-to-br from-[#001a47] to-[#00153a] rounded-2xl border border-white/10 shadow-2xl overflow-hidden max-h-[90vh] flex flex-col"
         >
           {/* Header */}
           <div className="flex items-center justify-between p-6 border-b border-white/10 bg-white/5">
             <div className="flex items-center gap-3">
-              <div className="p-2 bg-gradient-to-br from-purple-500 to-pink-500 rounded-xl">
+              <div className="p-2 bg-linear-to-br from-purple-500 to-pink-500 rounded-xl">
                 <SparklesIcon className="w-6 h-6 text-white" />
               </div>
               <div>
@@ -154,7 +154,7 @@ export function AICampaignModal({ onClose, onSuccess }: AICampaignModalProps) {
                 </div>
 
                 {/* AI Features Info */}
-                <div className="p-4 bg-gradient-to-r from-purple-500/10 to-pink-500/10 border border-purple-500/20 rounded-xl">
+                <div className="p-4 bg-linear-to-r from-purple-500/10 to-pink-500/10 border border-purple-500/20 rounded-xl">
                   <h3 className="text-sm font-semibold text-white mb-2 flex items-center gap-2">
                     <SparklesIcon className="w-4 h-4" />
                     AI Will Generate:
@@ -178,7 +178,7 @@ export function AICampaignModal({ onClose, onSuccess }: AICampaignModalProps) {
               <>
                 {/* Generated Config Preview */}
                 <div className="space-y-4">
-                  <div className="p-4 bg-gradient-to-r from-green-500/10 to-emerald-500/10 border border-green-500/20 rounded-xl">
+                  <div className="p-4 bg-linear-to-r from-green-500/10 to-emerald-500/10 border border-green-500/20 rounded-xl">
                     <p className="text-sm text-green-400 flex items-center gap-2">
                       <SparklesIcon className="w-4 h-4" />
                       Campaign configuration generated successfully!
@@ -266,7 +266,7 @@ export function AICampaignModal({ onClose, onSuccess }: AICampaignModalProps) {
               <button
                 onClick={handleGenerate}
                 disabled={isGenerating || !campaignName.trim() || !campaignDescription.trim()}
-                className="px-6 py-2.5 bg-gradient-to-r from-purple-500 to-pink-500 hover:from-purple-600 hover:to-pink-600 text-white font-semibold rounded-xl transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+                className="px-6 py-2.5 bg-linear-to-r from-purple-500 to-pink-500 hover:from-purple-600 hover:to-pink-600 text-white font-semibold rounded-xl transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
               >
                 {isGenerating ? (
                   <>
@@ -290,7 +290,7 @@ export function AICampaignModal({ onClose, onSuccess }: AICampaignModalProps) {
                 </button>
                 <button
                   onClick={handleCreateCampaign}
-                  className="px-6 py-2.5 bg-[#FFCA40] hover:bg-[#FFCA40]/90 text-[#00153a] font-semibold rounded-xl transition-all flex items-center gap-2"
+                  className="px-6 py-2.5 bg-[#FFCA40] hover:bg-[#FFCA40]/90 text-[#001D58] font-semibold rounded-xl transition-all flex items-center gap-2"
                 >
                   Create Campaign
                 </button>

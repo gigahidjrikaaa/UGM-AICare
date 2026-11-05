@@ -131,7 +131,7 @@ export default function AdminRetentionPage() {
               <p className="text-sm text-white/60 mt-1">{error}</p>
               <button
                 onClick={load}
-                className="mt-4 inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-[#FFCA40] text-[#00153a] font-semibold hover:bg-[#FFCA40]/90 transition-colors"
+                className="mt-4 inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-[#FFCA40] text-[#001D58] font-semibold hover:bg-[#FFCA40]/90 transition-colors"
               >
                 <ArrowPathIcon className="w-4 h-4" />
                 {t('admin.retention.retry', 'Retry')}

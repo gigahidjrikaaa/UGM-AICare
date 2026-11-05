@@ -95,7 +95,7 @@ export function InsightsPanelCard({ insights, onGenerateReport, onGenerateCampai
               <div className="flex flex-wrap items-center gap-2">
                 <h3 className="text-sm font-semibold tracking-tight text-white">AI Insights</h3>
                 {insights.llm_powered && (
-                  <span className="inline-flex items-center gap-1 rounded-full bg-gradient-to-r from-blue-500/15 to-purple-500/15 px-2.5 py-0.5 text-[10px] font-semibold uppercase tracking-[0.15em] text-blue-300 ring-1 ring-blue-500/25">
+                  <span className="inline-flex items-center gap-1 rounded-full bg-linear-to-r from-blue-500/15 to-purple-500/15 px-2.5 py-0.5 text-[10px] font-semibold uppercase tracking-[0.15em] text-blue-300 ring-1 ring-blue-500/25">
                     <SparklesIcon className="h-3 w-3" />
                     Gemini
                   </span>
@@ -120,7 +120,7 @@ export function InsightsPanelCard({ insights, onGenerateReport, onGenerateCampai
               {onGenerateReport && (
                 <button
                   onClick={onGenerateReport}
-                  className="rounded-full bg-[#FFCA40] px-4 py-2 text-xs font-semibold text-[#00153a] transition-all duration-700 ease-[cubic-bezier(0.32,0.72,0,1)] hover:shadow-[0_6px_28px_-6px_rgba(255,202,64,0.5)] active:scale-[0.97]"
+                  className="rounded-full bg-[#FFCA40] px-4 py-2 text-xs font-semibold text-[#001D58] transition-all duration-700 ease-[cubic-bezier(0.32,0.72,0,1)] hover:shadow-[0_6px_28px_-6px_rgba(255,202,64,0.5)] active:scale-[0.97]"
                   title="Generate new AI-powered IA report"
                 >
                   Generate
@@ -245,7 +245,7 @@ export function InsightsPanelCard({ insights, onGenerateReport, onGenerateCampai
                           animate={{ scaleX: percentage / 100 }}
                           style={{ transformOrigin: 'left' }}
                           transition={{ duration: 0.9, ease: EASE, delay: 0.2 + index * 0.08 }}
-                          className="absolute inset-0 rounded-full bg-gradient-to-r from-[#FFCA40]/80 to-[#5B8DEF]/80"
+                          className="absolute inset-0 rounded-full bg-linear-to-r from-[#FFCA40]/80 to-[#5B8DEF]/80"
                         />
                       </div>
                     </div>

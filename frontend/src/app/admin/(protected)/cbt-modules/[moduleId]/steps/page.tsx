@@ -21,7 +21,7 @@ const CbtModuleStepsPage = async ({ params }: { params?: ParamsPromise }) => {
                         <FiList className="mr-3 text-[#FFCA40]" />
                         CBT Module Steps
                     </h1>
-                    <p className="text-gray-400 mt-1">Manage steps for module {moduleIdNumber}</p>
+                    <p className="text-white/50 mt-1">Manage steps for module {moduleIdNumber}</p>
                 </div>
             </div>
             <CbtModuleStepsTable moduleId={moduleIdNumber} />

@@ -103,17 +103,17 @@ export default function QuickTriageClient() {
   return (
     <div className="space-y-6">
       {/* Header */}
-      <div className="bg-white/5 backdrop-blur-sm border border-white/10 rounded-xl p-5">
+      <div>
         <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
           <div>
             <div className="flex items-center gap-3 mb-1">
-              <FolderOpenIcon className="w-6 h-6 text-[#FFCA40]" />
-              <h1 className="text-2xl font-bold text-white">Quick Triage</h1>
+              <FolderOpenIcon className="h-7 w-7 text-[#FFCA40]" />
+              <h1 className="text-3xl font-bold text-white">Quick Triage</h1>
               <span className="px-2.5 py-0.5 bg-emerald-500/20 border border-emerald-500/30 text-emerald-300 text-[11px] font-semibold rounded-full">
                 REAL-TIME
               </span>
             </div>
-            <p className="text-white/50 text-sm ml-9">
+            <p className="text-white/60 text-sm ml-10">
               Create cases via CMA with automatic SLA tracking
             </p>
             <a

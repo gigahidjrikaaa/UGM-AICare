@@ -5,7 +5,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { Search, Filter, Download, UserPlus, Eye, Mail, ExternalLink, RefreshCw, BarChart2, ShieldAlert, AlertTriangle, Phone } from 'lucide-react';
 import { apiCall } from '@/utils/adminApi';
 import { toast } from 'react-hot-toast';
-import Image from 'next/image';
+import UserAvatar from '@/components/ui/profile/UserAvatar';
 import Link from 'next/link';
 import { User, UsersResponse, UserLog, UserStats } from '@/types/admin/users';
 import { getScreeningDashboard, listScreeningProfiles } from '@/services/adminScreeningApi';
@@ -47,13 +47,13 @@ export default function UserManagementPage() {
         sort_order: sortOrder,
         ...(searchQuery && { search: searchQuery }),
         ...(roleFilter && { role: roleFilter }),
-        ...(activeOnly && { is_active: 'true' })
+        ...(activeOnly && { active_only: 'true' })
       }).toString();
 
       const [usersData, sdData, spData] = await Promise.all([
         apiCall(`/api/v1/admin/users?${queryParams}`) as Promise<UsersResponse>,
         getScreeningDashboard().catch(() => null),
-        listScreeningProfiles({ limit: 1000 }).catch(() => null)
+        listScreeningProfiles({ limit: 100 }).catch(() => null)
       ]);
 
       setUsers(usersData.users);
@@ -87,17 +87,6 @@ export default function UserManagementPage() {
     fetchUsers();
   };
 
-  const handleTableSort = (field: 'id' | 'last_activity_date' | 'current_streak' | 'sentiment_score') => {
-    if (sortBy === field) {
-      setSortOrder(sortOrder === 'asc' ? 'desc' : 'asc');
-    } else {
-      setSortBy(field);
-      setSortOrder('desc');
-    }
-    setCurrentPage(1);
-    // Let useCallback dependency trigger refetch
-  };
-
   const toggleUserStatus = async (userId: number, currentStatus: boolean) => {
     try {
       if (!confirm(`Are you sure you want to ${currentStatus ? 'deactivate' : 'activate'} this user?`)) return;
@@ -128,19 +117,6 @@ export default function UserManagementPage() {
     }
   };
 
-  const toggleEmailCheckins = async (userId: number, allow: boolean) => {
-    try {
-      await apiCall(`/api/v1/admin/users/${userId}`, {
-        method: 'PUT',
-        body: JSON.stringify({ allow_email_checkins: allow })
-      });
-      toast.success(`Email check-ins ${allow ? 'enabled' : 'disabled'}`);
-      fetchUsers();
-    } catch (error) {
-      toast.error('Failed to update email check-in preferences');
-    }
-  };
-
   const deleteUser = async (userId: number, permanent = false) => {
     try {
       if (!confirm(`Are you absolutely sure you want to ${permanent ? 'PERMANENTLY DELETE' : 'soft delete'} user ${userId}? ${permanent ? 'This cannot be undone!' : ''}`)) return;
@@ -165,12 +141,12 @@ export default function UserManagementPage() {
     try {
       if (!confirm(`Generate a temporary password for user ${userId}? They will be forced to change it on next login.`)) return;
 
-      const response = await apiCall<{ temp_password?: string }>(`/api/v1/admin/users/${userId}/reset-password`, {
+      const response = await apiCall<{ temp_password?: string; message?: string }>(`/api/v1/admin/users/${userId}/reset-password`, {
         method: 'POST'
       });
 
-      // In a real app we might email this to them, but for admin we can show it
-      toast.success(`Password reset to: ${response.temp_password || 'temporary123'}`, { duration: 10000 });
+      // The backend emails the reset instructions; never display credentials.
+      toast.success(response.message || 'Password reset email sent to the user', { duration: 6000 });
     } catch (error) {
       toast.error('Failed to reset password');
     }
@@ -237,19 +213,19 @@ export default function UserManagementPage() {
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
           <h1 className="text-3xl font-bold text-white tracking-tight">Command Center</h1>
-          <p className="text-gray-400 mt-1">Unified User, CRM & Screening Dashboard</p>
+          <p className="text-white/50 mt-1">Unified User, CRM & Screening Dashboard</p>
         </div>
         <div className="flex items-center gap-3">
           <button
             onClick={() => fetchUsers()}
-            className="p-2 bg-white/5 border border-white/10 rounded-lg text-gray-300 hover:text-white hover:bg-white/10 transition-colors"
+            className="p-2 bg-white/5 border border-white/10 rounded-lg text-white/70 hover:text-white hover:bg-white/10 transition-colors"
             title="Refresh"
           >
             <RefreshCw className={`h-5 w-5 ${loading ? 'animate-spin text-[#FFCA40]' : ''}`} />
           </button>
           <button
             onClick={handleExport}
-            className="flex items-center gap-2 px-4 py-2 bg-white/5 border border-white/10 rounded-lg text-gray-300 hover:text-white hover:bg-white/10 transition-colors"
+            className="flex items-center gap-2 px-4 py-2 bg-white/5 border border-white/10 rounded-lg text-white/70 hover:text-white hover:bg-white/10 transition-colors"
           >
             <Download className="h-4 w-4" /> Export CSV
           </button>
@@ -265,7 +241,7 @@ export default function UserManagementPage() {
         >
           <div className="flex items-start justify-between">
             <div>
-              <p className="text-sm font-medium text-gray-400">Total Monitored Users</p>
+              <p className="text-sm font-medium text-white/50">Total Monitored Users</p>
               <h3 className="text-3xl font-bold text-white mt-1">{stats?.total_users || 0}</h3>
             </div>
             <div className="p-3 bg-blue-500/10 rounded-lg">
@@ -274,7 +250,7 @@ export default function UserManagementPage() {
           </div>
           <div className="mt-4 flex items-center text-sm">
             <span className="text-green-400 font-medium">+{stats?.new_7d || 0}</span>
-            <span className="text-gray-400 ml-2">new users this week</span>
+            <span className="text-white/50 ml-2">new users this week</span>
           </div>
         </motion.div>
 
@@ -282,11 +258,11 @@ export default function UserManagementPage() {
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 0.1 }}
-          className="bg-gradient-to-br from-red-500/10 to-transparent backdrop-blur-sm border border-red-500/20 rounded-xl p-5"
+          className="bg-linear-to-br from-red-500/10 to-transparent backdrop-blur-sm border border-red-500/20 rounded-xl p-5"
         >
           <div className="flex items-start justify-between">
             <div>
-              <p className="text-sm font-medium text-gray-400">Requires Attention</p>
+              <p className="text-sm font-medium text-white/50">Requires Attention</p>
               <h3 className="text-3xl font-bold text-red-500 mt-1">{screeningDashboard?.profiles_requiring_attention || 0}</h3>
             </div>
             <div className="p-3 bg-red-500/20 rounded-lg">
@@ -294,7 +270,7 @@ export default function UserManagementPage() {
             </div>
           </div>
           <div className="mt-4 flex items-center text-sm">
-            <span className="text-gray-300">Across screening signals</span>
+            <span className="text-white/70">Across screening signals</span>
           </div>
         </motion.div>
 
@@ -306,7 +282,7 @@ export default function UserManagementPage() {
         >
           <div className="flex items-start justify-between">
             <div>
-              <p className="text-sm font-medium text-gray-400">High Risk Profiles</p>
+              <p className="text-sm font-medium text-white/50">High Risk Profiles</p>
               <h3 className="text-3xl font-bold text-orange-400 mt-1">
                 {(screeningDashboard?.risk_distribution['critical'] || 0) + (screeningDashboard?.risk_distribution['severe'] || 0)}
               </h3>
@@ -317,7 +293,7 @@ export default function UserManagementPage() {
           </div>
           <div className="mt-4 flex items-center text-sm">
             <span className="text-orange-400">{screeningDashboard?.risk_distribution['critical'] || 0} Critical</span>
-            <span className="text-gray-400 mx-2">•</span>
+            <span className="text-white/50 mx-2">•</span>
             <span className="text-yellow-400">{screeningDashboard?.risk_distribution['severe'] || 0} Severe</span>
           </div>
         </motion.div>
@@ -330,14 +306,14 @@ export default function UserManagementPage() {
         >
           <div className="flex items-start justify-between">
             <div>
-              <p className="text-sm font-medium text-gray-400">Engagement Health</p>
+              <p className="text-sm font-medium text-white/50">Engagement Health</p>
               <h3 className="text-3xl font-bold text-green-400 mt-1">{stats?.active_users_7d || 0}</h3>
             </div>
             <div className="p-3 bg-green-500/10 rounded-lg">
               <RefreshCw className="w-6 h-6 text-green-400" />
             </div>
           </div>
-          <div className="mt-4 flex items-center text-sm text-gray-400">
+          <div className="mt-4 flex items-center text-sm text-white/50">
             Active users within the last 7 days
           </div>
         </motion.div>
@@ -346,7 +322,7 @@ export default function UserManagementPage() {
       {/* Toolbar */}
       <div className="flex flex-col sm:flex-row gap-4 items-center justify-between bg-white/5 p-4 rounded-xl border border-white/10">
         <form onSubmit={handleSearch} className="flex-1 w-full relative">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-gray-400" />
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-white/50" />
           <input
             type="text"
             placeholder="Search by name, email, or ID..."
@@ -360,7 +336,7 @@ export default function UserManagementPage() {
             onClick={() => setShowFilters(!showFilters)}
             className={`flex-1 sm:flex-none flex items-center justify-center gap-2 px-4 py-2 rounded-lg border transition-colors ${showFilters || roleFilter || activeOnly
               ? 'bg-[#FFCA40]/20 border-[#FFCA40]/50 text-[#FFCA40]'
-              : 'bg-black/20 border-white/10 text-gray-300 hover:bg-white/10 hover:text-white'
+              : 'bg-black/20 border-white/10 text-white/70 hover:bg-white/10 hover:text-white'
               }`}
           >
             <Filter className="h-4 w-4" /> Filters
@@ -382,7 +358,7 @@ export default function UserManagementPage() {
           >
             <div className="p-4 bg-white/5 border border-white/10 rounded-xl flex gap-6 items-center flex-wrap">
               <div>
-                <label className="block text-xs font-medium text-gray-400 mb-1">Role</label>
+                <label className="block text-xs font-medium text-white/50 mb-1">Role</label>
                 <select
                   value={roleFilter}
                   onChange={(e) => setRoleFilter(e.target.value)}
@@ -391,6 +367,7 @@ export default function UserManagementPage() {
                   <option value="">All Roles</option>
                   <option value="user">User</option>
                   <option value="counselor">Counselor</option>
+                        <option value="peer_supporter">Peer Supporter</option>
                   <option value="admin">Admin</option>
                 </select>
               </div>
@@ -402,8 +379,8 @@ export default function UserManagementPage() {
                   onChange={(e) => setActiveOnly(e.target.checked)}
                   className="h-4 w-4 text-[#FFCA40] focus:ring-[#FFCA40] bg-white/10 border-white/20 rounded"
                 />
-                <label htmlFor="activeOnly" className="ml-2 text-sm text-gray-300">
-                  Active users only
+                <label htmlFor="activeOnly" className="ml-2 text-sm text-white/70">
+                  Active in the last 30 days
                 </label>
               </div>
             </div>
@@ -412,17 +389,17 @@ export default function UserManagementPage() {
       </AnimatePresence>
 
       {/* Users Master Table */}
-      <div className="bg-white/10 backdrop-blur-sm rounded-xl border border-white/20 overflow-hidden">
+      <div className="rounded-2xl border border-white/10 bg-white/5 backdrop-blur-md overflow-hidden">
         <div className="overflow-x-auto">
           <table className="min-w-full divide-y divide-white/20">
             <thead className="bg-white/5">
               <tr>
-                <th className="px-6 py-4 text-left text-xs font-semibold text-gray-300 uppercase tracking-wider">User Profile</th>
-                <th className="px-6 py-4 text-left text-xs font-semibold text-gray-300 uppercase tracking-wider">Access & Role</th>
-                <th className="px-6 py-4 text-left text-xs font-semibold text-gray-300 uppercase tracking-wider">Screening Risk</th>
-                <th className="px-6 py-4 text-left text-xs font-semibold text-gray-300 uppercase tracking-wider">Engagement</th>
-                <th className="px-6 py-4 text-left text-xs font-semibold text-gray-300 uppercase tracking-wider">CRM Output</th>
-                <th className="px-6 py-4 text-right text-xs font-semibold text-gray-300 uppercase tracking-wider">Actions</th>
+                <th className="px-6 py-4 text-left text-xs font-semibold text-white/70 uppercase tracking-wider">User Profile</th>
+                <th className="px-6 py-4 text-left text-xs font-semibold text-white/70 uppercase tracking-wider">Access & Role</th>
+                <th className="px-6 py-4 text-left text-xs font-semibold text-white/70 uppercase tracking-wider">Screening Risk</th>
+                <th className="px-6 py-4 text-left text-xs font-semibold text-white/70 uppercase tracking-wider">Engagement</th>
+                <th className="px-6 py-4 text-left text-xs font-semibold text-white/70 uppercase tracking-wider">CRM Output</th>
+                <th className="px-6 py-4 text-right text-xs font-semibold text-white/70 uppercase tracking-wider">Actions</th>
               </tr>
             </thead>
             <tbody className="bg-transparent divide-y divide-white/10">
@@ -447,13 +424,7 @@ export default function UserManagementPage() {
                     <td className="px-6 py-4 whitespace-nowrap">
                       <div className="flex items-center">
                         <div className="relative h-10 w-10 text-white rounded-full border border-white/20 bg-white/10 shrink-0 overflow-hidden">
-                          {user.avatar_url ? (
-                            <Image src={user.avatar_url} alt="Avatar" fill className="object-cover" />
-                          ) : (
-                            <div className="flex h-full w-full items-center justify-center text-[#FFCA40] font-bold">
-                              {(user.name || user.email || 'U').charAt(0).toUpperCase()}
-                            </div>
-                          )}
+                          <UserAvatar src={user.avatar_url} name={user.name} email={user.email} initialsClassName="text-sm" />
                         </div>
                         <div className="ml-4">
                           <div className="text-sm font-bold text-white">{user.name || `User ${user.id}`}</div>
@@ -538,14 +509,14 @@ export default function UserManagementPage() {
                             case 'make-counselor':
                               updateUserRole(user.id, 'counselor');
                               break;
+                            case 'make-peer-supporter':
+                              updateUserRole(user.id, 'peer_supporter');
+                              break;
                             case 'make-user':
                               updateUserRole(user.id, 'user');
                               break;
                             case 'reset-password':
                               resetUserPassword(user.id);
-                              break;
-                            case 'delete':
-                              deleteUser(user.id, false);
                               break;
                             case 'delete-permanent':
                               deleteUser(user.id, true);
@@ -558,9 +529,9 @@ export default function UserManagementPage() {
                         <option value="toggle-status">{user.is_active ? 'Deactivate' : 'Activate'}</option>
                         <option value="make-admin">Make Admin</option>
                         <option value="make-counselor">Make Counselor</option>
+                        <option value="make-peer-supporter">Make Peer Supporter</option>
                         <option value="make-user">Make User</option>
                         <option value="reset-password">Reset Password</option>
-                        <option value="delete">Deactivate</option>
                         <option value="delete-permanent">Delete Permanently</option>
                       </select>
                     </td>
@@ -574,7 +545,7 @@ export default function UserManagementPage() {
         {/* Pagination Header (Optional padding bottom) */}
         {totalPages > 1 && (
           <div className="bg-white/5 px-4 py-3 border-t border-white/20 flex flex-col sm:flex-row justify-between items-center gap-4">
-            <div className="text-sm text-gray-400">
+            <div className="text-sm text-white/50">
               Showing {(currentPage - 1) * ITEMS_PER_PAGE + 1} to {Math.min(currentPage * ITEMS_PER_PAGE, totalCount)} of {totalCount} users
             </div>
             <div className="flex items-center gap-2">
@@ -592,7 +563,7 @@ export default function UserManagementPage() {
                   <button
                     key={page}
                     onClick={() => setCurrentPage(page)}
-                    className={`px-3 py-1 rounded-md text-sm transition-colors ${page === currentPage ? 'bg-[#FFCA40] text-black font-bold' : 'bg-white/5 text-white hover:bg-white/10'
+                    className={`px-3 py-1 rounded-md text-sm transition-colors ${page === currentPage ? 'bg-[#FFCA40] text-[#001D58] font-bold' : 'bg-white/5 text-white hover:bg-white/10'
                       }`}
                   >
                     {page}

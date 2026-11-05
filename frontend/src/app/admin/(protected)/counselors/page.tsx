@@ -237,7 +237,7 @@ function AvailabilityGrid({
   }, []);
 
   return (
-    <div className="space-y-3 select-none">
+    <div className="space-y-6">
       {/* Day column headers */}
       <div className="flex gap-1 overflow-x-auto pb-2">
         <div className="w-14 shrink-0" aria-hidden />
@@ -1043,7 +1043,7 @@ function CounselorsTable({
                     className={`px-3 py-1.5 inline-flex text-xs font-semibold rounded-lg transition-all ${
                       counselor.is_available
                         ? 'bg-green-500/20 text-green-400 border border-green-500/30 hover:bg-green-500/30'
-                        : 'bg-gray-500/20 text-gray-400 border border-gray-500/30 hover:bg-gray-500/30'
+                        : 'bg-slate-500/10 text-white/50 border border-slate-500/20 hover:bg-gray-500/30'
                     }`}
                   >
                     {counselor.is_available ? 'Available' : 'Unavailable'}
@@ -1529,6 +1529,18 @@ function CreateCounselorModal({ onClose }: { onClose: () => void }) {
           </div>
 
           <div>
+            <label className="block text-sm font-semibold text-white/90 mb-2">Photo URL (https)</label>
+            <input
+              type="url"
+              value={formData.image_url || ''}
+              onChange={(e) => setFormData({ ...formData, image_url: e.target.value || undefined })}
+              className="w-full px-4 py-3 bg-white/5 border border-white/10 rounded-lg text-white placeholder-white/40 focus:ring-2 focus:ring-[#FFCA40] focus:border-transparent transition-all"
+              placeholder="https://example.com/photo.jpg"
+              title="Photo URL"
+            />
+          </div>
+
+          <div>
             <label className="block text-sm font-semibold text-white/90 mb-2">Professional Bio</label>
             <textarea
               value={formData.bio || ''}
@@ -1681,6 +1693,7 @@ function EditCounselorModal({
   const [formData, setFormData] = useState<api.CounselorUpdate>({
     name: counselor.name,
     specialization: counselor.specialization,
+    image_url: counselor.image_url,
     bio: counselor.bio,
     years_of_experience: counselor.years_of_experience,
     consultation_fee: counselor.consultation_fee,
@@ -1965,6 +1978,21 @@ function EditCounselorModal({
                     placeholder="Areas of focus or modalities"
                   />
                 </div>
+              </div>
+
+              <div>
+                <label className="block text-sm font-semibold text-white/90 mb-2">
+                  Photo URL (https)
+                </label>
+                <input
+                  type="url"
+                  value={formData.image_url || ''}
+                  onChange={(event) =>
+                    setFormData({ ...formData, image_url: event.target.value || undefined })
+                  }
+                  className="w-full px-4 py-3 bg-white/5 border border-white/10 rounded-lg text-white placeholder-white/40 focus:ring-2 focus:ring-[#FFCA40] focus:border-transparent transition-all"
+                  placeholder="https://example.com/photo.jpg"
+                />
               </div>
 
               <div>

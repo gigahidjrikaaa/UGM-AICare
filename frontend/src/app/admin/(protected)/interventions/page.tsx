@@ -5,13 +5,11 @@ import toast from "react-hot-toast";
 import {
     FiClipboard, FiUser, FiCheckCircle, FiBell, FiChevronDown, FiChevronUp, FiBarChart2, FiList, FiUsers, FiRefreshCw
 } from "react-icons/fi";
+import { apiCall } from "@/utils/adminApi";
 import { AnalyticsOverview } from "./components/AnalyticsOverview";
 import { CBTModuleUsage } from "./components/CBTModuleUsage";
 import { UserProgressTable } from "./components/UserProgressTable";
 import { useAnalytics } from "./hooks/useAnalytics";
-
-const apiOrigin = (process.env.NEXT_PUBLIC_API_URL || "").replace(/\/$/, "");
-const apiUrl = (path: string) => (apiOrigin ? `${apiOrigin}${path}` : path);
 
 interface InterventionPlan {
     id: number;
@@ -84,11 +82,7 @@ export default function InterventionPlansPage() {
         try {
             setExecutionsLoading(true);
             const params = new URLSearchParams({ limit: '50' });
-            const response = await fetch(apiUrl(`/api/v1/admin/interventions/executions?${params.toString()}`), {
-                credentials: 'include',
-            });
-            if (!response.ok) throw new Error('Failed to load executions');
-            const data = await response.json();
+            const data = await apiCall<{ items: InterventionExecution[] }>(`/api/v1/admin/interventions/executions?${params.toString()}`);
             const items = (data.items || []) as InterventionExecution[];
             setExecutions(items.filter((it) => it.status === 'pending_review' || it.status === 'approved'));
         } catch (error) {
@@ -105,12 +99,9 @@ export default function InterventionPlansPage() {
         try {
             const params = new URLSearchParams();
             if (note.trim()) params.set('note', note.trim());
-            const url = apiUrl(`/api/v1/admin/interventions/executions/${executionId}/approve${params.toString() ? `?${params.toString()}` : ''}`);
-            const response = await fetch(url, {
+            await apiCall(`/api/v1/admin/interventions/executions/${executionId}/approve${params.toString() ? `?${params.toString()}` : ''}`, {
                 method: 'POST',
-                credentials: 'include',
             });
-            if (!response.ok) throw new Error('Failed to approve execution');
             toast.success('Execution approved');
             await loadExecutions();
         } catch (error) {
@@ -128,11 +119,9 @@ export default function InterventionPlansPage() {
         setExecutionActioning(executionId);
         try {
             const params = new URLSearchParams({ reason: reason.trim() });
-            const response = await fetch(apiUrl(`/api/v1/admin/interventions/executions/${executionId}/reject?${params.toString()}`), {
+            await apiCall(`/api/v1/admin/interventions/executions/${executionId}/reject?${params.toString()}`, {
                 method: 'POST',
-                credentials: 'include',
             });
-            if (!response.ok) throw new Error('Failed to reject execution');
             toast.success('Execution rejected');
             await loadExecutions();
         } catch (error) {
@@ -148,11 +137,9 @@ export default function InterventionPlansPage() {
 
         setExecutionActioning(executionId);
         try {
-            const response = await fetch(apiUrl(`/api/v1/admin/interventions/executions/${executionId}/send`), {
+            await apiCall(`/api/v1/admin/interventions/executions/${executionId}/send`, {
                 method: 'POST',
-                credentials: 'include',
             });
-            if (!response.ok) throw new Error('Failed to send execution');
             toast.success('Execution sent');
             await loadExecutions();
         } catch (error) {
@@ -166,17 +153,13 @@ export default function InterventionPlansPage() {
     const loadPlans = async () => {
         try {
             setLoading(true);
-            const response = await fetch(apiUrl("/api/v1/admin/interventions/plans"), {
-                credentials: "include",
-            });
-            if (!response.ok) throw new Error("Failed to load plans");
-            const data = await response.json();
+            const data = await apiCall<{ items: Array<{ plan_data: unknown }> }>("/api/v1/admin/interventions/plans");
             // Parse plan_data if it's a string (defensive coding)
-            const parsedItems = data.items.map((plan: any) => ({
+            const parsedItems = data.items.map((plan) => ({
                 ...plan,
                 plan_data: typeof plan.plan_data === 'string' ? JSON.parse(plan.plan_data) : plan.plan_data
             }));
-            setPlans(parsedItems);
+            setPlans(parsedItems as InterventionPlan[]);
         } catch (error) {
             console.error("Error:", error);
             toast.error("Failed to load intervention plans");
@@ -191,12 +174,9 @@ export default function InterventionPlansPage() {
 
         setNotifying(planId);
         try {
-            const response = await fetch(apiUrl(`/api/v1/admin/interventions/plans/${planId}/notify`), {
+            await apiCall(`/api/v1/admin/interventions/plans/${planId}/notify`, {
                 method: "POST",
-                credentials: "include",
             });
-
-            if (!response.ok) throw new Error("Failed to send notification");
             toast.success("Notification sent successfully");
         } catch (error) {
             console.error("Error:", error);
@@ -212,21 +192,21 @@ export default function InterventionPlansPage() {
             case 1: return <span className="px-2 py-1 rounded text-xs bg-yellow-500/20 text-yellow-300">Moderate</span>;
             case 2: return <span className="px-2 py-1 rounded text-xs bg-orange-500/20 text-orange-300">High</span>;
             case 3: return <span className="px-2 py-1 rounded text-xs bg-red-500/20 text-red-300">Critical</span>;
-            default: return <span className="px-2 py-1 rounded text-xs bg-gray-500/20 text-gray-300">Unknown</span>;
+            default: return <span className="px-2 py-1 rounded text-xs bg-slate-500/10 text-white/70">Unknown</span>;
         }
     };
 
     return (
         <div className="space-y-6">
             {/* Header */}
-            <div className="bg-white/5 backdrop-blur-sm border border-white/10 rounded-lg p-6">
+            <div>
                 <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
                     <div>
-                        <h1 className="text-2xl font-bold text-white mb-2 flex items-center gap-2">
+                        <h1 className="text-3xl font-bold text-white flex items-center gap-3">
                             <FiClipboard className="text-[#FFCA40]" />
                             Intervention Plans
                         </h1>
-                        <p className="text-white/70">
+                        <p className="mt-1 text-sm text-white/60">
                             Monitor and manage active intervention plans generated by the TCA agent.
                         </p>
                     </div>
@@ -236,7 +216,7 @@ export default function InterventionPlansPage() {
                         <button
                             onClick={() => setActiveTab('dashboard')}
                             className={`px-4 py-2 rounded-md text-sm font-medium transition-colors flex items-center gap-2 ${activeTab === 'dashboard'
-                                ? 'bg-[#FFCA40] text-black'
+                                ? 'bg-[#FFCA40] text-[#001D58]'
                                 : 'text-white/60 hover:text-white hover:bg-white/5'
                                 }`}
                         >
@@ -245,7 +225,7 @@ export default function InterventionPlansPage() {
                         <button
                             onClick={() => setActiveTab('queue')}
                             className={`px-4 py-2 rounded-md text-sm font-medium transition-colors flex items-center gap-2 ${activeTab === 'queue'
-                                ? 'bg-[#FFCA40] text-black'
+                                ? 'bg-[#FFCA40] text-[#001D58]'
                                 : 'text-white/60 hover:text-white hover:bg-white/5'
                                 }`}
                         >
@@ -254,7 +234,7 @@ export default function InterventionPlansPage() {
                         <button
                             onClick={() => setActiveTab('plans')}
                             className={`px-4 py-2 rounded-md text-sm font-medium transition-colors flex items-center gap-2 ${activeTab === 'plans'
-                                ? 'bg-[#FFCA40] text-black'
+                                ? 'bg-[#FFCA40] text-[#001D58]'
                                 : 'text-white/60 hover:text-white hover:bg-white/5'
                                 }`}
                         >
@@ -263,7 +243,7 @@ export default function InterventionPlansPage() {
                         <button
                             onClick={() => setActiveTab('users')}
                             className={`px-4 py-2 rounded-md text-sm font-medium transition-colors flex items-center gap-2 ${activeTab === 'users'
-                                ? 'bg-[#FFCA40] text-black'
+                                ? 'bg-[#FFCA40] text-[#001D58]'
                                 : 'text-white/60 hover:text-white hover:bg-white/5'
                                 }`}
                         >

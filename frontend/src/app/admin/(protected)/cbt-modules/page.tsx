@@ -16,7 +16,7 @@ const CbtModulesPage = () => {
                         <FiHeart className="mr-3 text-[#FFCA40]" />
                         CBT Modules
                     </h1>
-                    <p className="text-gray-400 mt-1">Manage content for the CBT modules</p>
+                    <p className="text-white/50 mt-1">Manage content for the CBT modules</p>
                 </div>
             </div>
             <CbtModulesTable />

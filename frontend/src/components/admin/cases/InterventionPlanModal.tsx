@@ -49,7 +49,7 @@ export default function InterventionPlanModal({
       case 'general_coping':
         return { bg: 'bg-emerald-500/20', border: 'border-emerald-500/30', text: 'text-emerald-300', icon: '💪' };
       default:
-        return { bg: 'bg-gray-500/20', border: 'border-gray-500/30', text: 'text-gray-300', icon: '📋' };
+        return { bg: 'bg-slate-500/10', border: 'border-slate-500/20', text: 'text-white/70', icon: '📋' };
     }
   };
 
@@ -63,7 +63,7 @@ export default function InterventionPlanModal({
           animate={{ opacity: 1, scale: 1 }}
           exit={{ opacity: 0, scale: 0.95 }}
           transition={{ duration: 0.2 }}
-          className="bg-gradient-to-br from-[#00153a] via-[#001a47] to-[#00153a] rounded-2xl shadow-2xl max-w-4xl w-full max-h-[90vh] overflow-hidden border border-white/10"
+          className="bg-linear-to-br from-[#00153a] via-[#001a47] to-[#00153a] rounded-2xl shadow-2xl max-w-4xl w-full max-h-[90vh] overflow-hidden border border-white/10"
         >
           {/* Header */}
           <div className="px-6 py-5 border-b border-white/10 flex justify-between items-center bg-white/5">
@@ -127,7 +127,7 @@ export default function InterventionPlanModal({
                       transition={{ delay: index * 0.1 }}
                       className="flex gap-4"
                     >
-                      <div className="flex-shrink-0 w-8 h-8 rounded-full bg-[#FFCA40] text-[#00153a] flex items-center justify-center font-bold text-sm">
+                      <div className="flex-shrink-0 w-8 h-8 rounded-full bg-[#FFCA40] text-[#001D58] flex items-center justify-center font-bold text-sm">
                         {step.order || index + 1}
                       </div>
                       <div className="flex-1">
@@ -205,7 +205,7 @@ export default function InterventionPlanModal({
                 navigator.clipboard.writeText(JSON.stringify(plan, null, 2));
                 // Could add toast notification here
               }}
-              className="px-6 py-2 bg-[#FFCA40] hover:bg-[#FFD666] text-[#00153a] rounded-lg font-semibold transition-colors"
+              className="px-6 py-2 bg-[#FFCA40] hover:bg-[#FFD666] text-[#001D58] rounded-lg font-semibold transition-colors"
             >
               Copy to Clipboard
             </button>

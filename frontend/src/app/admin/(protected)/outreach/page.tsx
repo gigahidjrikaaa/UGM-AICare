@@ -46,7 +46,7 @@ export default function OutreachPage() {
               <CalendarDaysIcon className="mr-3 text-[#FFCA40] w-8 h-8" />
               Outreach Hub
             </h1>
-            <p className="text-gray-400 mt-1 max-w-2xl">
+            <p className="text-white/50 mt-1 max-w-2xl">
               Manage proactive student check-ins, automated workflows, and system-wide reminders.
             </p>
           </div>
@@ -343,7 +343,7 @@ function JobCard({ job }: { job: SchedulerJob }) {
           <button
             onClick={() => runMutation.mutate()}
             disabled={runMutation.isPending || toggleMutation.isPending}
-            className="flex-1 flex items-center justify-center gap-2 py-3.5 bg-white/5 hover:bg-[#FFCA40] text-white hover:text-[#00153a] font-bold rounded-2xl transition-all duration-300 disabled:opacity-50 disabled:cursor-not-allowed border border-white/10 hover:border-transparent group/btn"
+            className="flex-1 flex items-center justify-center gap-2 py-3.5 bg-white/5 hover:bg-[#FFCA40] text-white hover:text-[#001D58] font-bold rounded-2xl transition-all duration-300 disabled:opacity-50 disabled:cursor-not-allowed border border-white/10 hover:border-transparent group/btn"
           >
             {runMutation.isPending ? (
               <div className="w-5 h-5 border-2 border-current border-t-transparent rounded-full animate-spin" />
@@ -564,7 +564,7 @@ function CheckinsTab() {
                 <button
                   type="submit"
                   disabled={mutation.isPending || !userId}
-                  className="w-full py-4 bg-[#FFCA40] hover:bg-[#FFCA40]/90 text-[#00153a] font-extrabold text-lg rounded-2xl transition-all shadow-[0_0_20px_rgba(255,202,64,0.15)] hover:shadow-[0_0_30px_rgba(255,202,64,0.25)] hover:-translate-y-0.5 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:translate-y-0 flex items-center justify-center gap-3"
+                  className="w-full py-4 bg-[#FFCA40] hover:bg-[#FFCA40]/90 text-[#001D58] font-extrabold text-lg rounded-2xl transition-all shadow-[0_0_20px_rgba(255,202,64,0.15)] hover:shadow-[0_0_30px_rgba(255,202,64,0.25)] hover:-translate-y-0.5 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:translate-y-0 flex items-center justify-center gap-3"
                 >
                   {mutation.isPending ? (
                     <>

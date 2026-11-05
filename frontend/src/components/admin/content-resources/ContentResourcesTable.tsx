@@ -186,7 +186,7 @@ const ContentResourcesTable = () => {
         <div className="space-y-6">
             {/* Statistics Cards */}
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-                <div className="bg-gradient-to-br from-[#FFCA40]/20 to-[#FFD700]/10 border border-[#FFCA40]/30 rounded-xl p-5">
+                <div className="bg-linear-to-br from-[#FFCA40]/20 to-[#FFD700]/10 border border-[#FFCA40]/30 rounded-xl p-5">
                     <div className="flex items-center justify-between">
                         <div>
                             <p className="text-xs font-medium text-white/60 uppercase tracking-wide">Total Resources</p>
@@ -198,7 +198,7 @@ const ContentResourcesTable = () => {
                     </div>
                 </div>
 
-                <div className="bg-gradient-to-br from-green-500/20 to-green-600/10 border border-green-500/30 rounded-xl p-5">
+                <div className="bg-linear-to-br from-green-500/20 to-green-600/10 border border-green-500/30 rounded-xl p-5">
                     <div className="flex items-center justify-between">
                         <div>
                             <p className="text-xs font-medium text-white/60 uppercase tracking-wide">AI Ready</p>
@@ -211,7 +211,7 @@ const ContentResourcesTable = () => {
                     </div>
                 </div>
 
-                <div className="bg-gradient-to-br from-yellow-500/20 to-yellow-600/10 border border-yellow-500/30 rounded-xl p-5">
+                <div className="bg-linear-to-br from-yellow-500/20 to-yellow-600/10 border border-yellow-500/30 rounded-xl p-5">
                     <div className="flex items-center justify-between">
                         <div>
                             <p className="text-xs font-medium text-white/60 uppercase tracking-wide">Processing</p>
@@ -224,7 +224,7 @@ const ContentResourcesTable = () => {
                     </div>
                 </div>
 
-                <div className="bg-gradient-to-br from-red-500/20 to-red-600/10 border border-red-500/30 rounded-xl p-5">
+                <div className="bg-linear-to-br from-red-500/20 to-red-600/10 border border-red-500/30 rounded-xl p-5">
                     <div className="flex items-center justify-between">
                         <div>
                             <p className="text-xs font-medium text-white/60 uppercase tracking-wide">Failed</p>
@@ -242,7 +242,7 @@ const ContentResourcesTable = () => {
                 <div className="p-6 flex justify-between items-center">
                     <div className="flex items-center gap-4">
                         <div className="relative">
-                            <FiSearch className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
+                            <FiSearch className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-white/50" />
                             <input
                                 type="text"
                                 placeholder="Search resources..."
@@ -253,7 +253,7 @@ const ContentResourcesTable = () => {
                             />
                         </div>
                         <div className="relative">
-                            <FiFilter className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
+                            <FiFilter className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-white/50" />
                             <select
                                 value={selectedType}
                                 onChange={(e) => setSelectedType(e.target.value)}
@@ -268,7 +268,7 @@ const ContentResourcesTable = () => {
                             </select>
                         </div>
                     </div>
-                    <Button onClick={handleAddNew} className="inline-flex items-center px-4 py-2 bg-[#FFCA40] hover:bg-[#ffda63] text-black rounded-lg text-sm font-medium transition-colors">
+                    <Button onClick={handleAddNew} className="inline-flex items-center gap-2 rounded-xl bg-[#FFCA40] px-5 py-2.5 text-sm font-semibold text-[#001D58] shadow-lg shadow-[#FFCA40]/20 transition-all hover:bg-[#FFCA40]/90 disabled:cursor-not-allowed disabled:opacity-50">
                         <FiPlus className="mr-2" />
                         Add Resource
                     </Button>
@@ -277,21 +277,21 @@ const ContentResourcesTable = () => {
                         <table className="min-w-full divide-y divide-white/20">
                             <thead className="bg-white/5">
                                 <tr>
-                                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider cursor-pointer" onClick={() => handleSort('title')}>
+                                    <th className="px-6 py-3 text-left text-xs font-medium text-white/70 uppercase tracking-wider cursor-pointer" onClick={() => handleSort('title')}>
                                         Title {sortBy === 'title' && (sortOrder === 'asc' ? <FiChevronUp className="inline" /> : <FiChevronDown className="inline" />)}
                                     </th>
-                                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider cursor-pointer" onClick={() => handleSort('type')}>
+                                    <th className="px-6 py-3 text-left text-xs font-medium text-white/70 uppercase tracking-wider cursor-pointer" onClick={() => handleSort('type')}>
                                         Type {sortBy === 'type' && (sortOrder === 'asc' ? <FiChevronUp className="inline" /> : <FiChevronDown className="inline" />)}
                                     </th>
-                                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider">Source</th>
-                                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider cursor-pointer" onClick={() => handleSort('created_at')}>
+                                    <th className="px-6 py-3 text-left text-xs font-medium text-white/70 uppercase tracking-wider">Source</th>
+                                    <th className="px-6 py-3 text-left text-xs font-medium text-white/70 uppercase tracking-wider cursor-pointer" onClick={() => handleSort('created_at')}>
                                         Created At {sortBy === 'created_at' && (sortOrder === 'asc' ? <FiChevronUp className="inline" /> : <FiChevronDown className="inline" />)}
                                     </th>
-                                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider">Tags</th>
-                                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider cursor-pointer" onClick={() => handleSort('embedding_status')}>
+                                    <th className="px-6 py-3 text-left text-xs font-medium text-white/70 uppercase tracking-wider">Tags</th>
+                                    <th className="px-6 py-3 text-left text-xs font-medium text-white/70 uppercase tracking-wider cursor-pointer" onClick={() => handleSort('embedding_status')}>
                                         Embedding {sortBy === 'embedding_status' && (sortOrder === 'asc' ? <FiChevronUp className="inline" /> : <FiChevronDown className="inline" />)}
                                     </th>
-                                    <th className="px-6 py-3 text-right text-xs font-medium text-gray-300 uppercase tracking-wider">Actions</th>
+                                    <th className="px-6 py-3 text-right text-xs font-medium text-white/70 uppercase tracking-wider">Actions</th>
                                 </tr>
                             </thead>
                             <tbody className="bg-transparent divide-y divide-white/20">
@@ -300,21 +300,21 @@ const ContentResourcesTable = () => {
                                         <td className="px-6 py-4 text-sm">
                                             <div className="font-medium text-white">{resource.title}</div>
                                             {resource.description && (
-                                                <div className="text-xs text-gray-400 mt-1 max-w-xs truncate">{resource.description}</div>
+                                                <div className="text-xs text-white/50 mt-1 max-w-xs truncate">{resource.description}</div>
                                             )}
                                         </td>
                                         <td className="px-6 py-4 whitespace-nowrap text-sm">
-                                            <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-white/5 text-gray-300">
+                                            <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-white/5 text-white/70">
                                                 {getTypeIcon(resource.type)}
                                                 <span className="capitalize">{resource.type}</span>
                                             </div>
                                         </td>
-                                        <td className="px-6 py-4 text-sm text-gray-300 max-w-xs">
+                                        <td className="px-6 py-4 text-sm text-white/70 max-w-xs">
                                             {resource.source ? (
                                                 <span className="truncate block" title={resource.source}>{resource.source}</span>
                                             ) : '—'}
                                         </td>
-                                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-300">
+                                        <td className="px-6 py-4 whitespace-nowrap text-sm text-white/70">
                                             {new Date(resource.created_at).toLocaleDateString()}
                                         </td>
                                         <td className="px-6 py-4 text-sm">
@@ -326,13 +326,13 @@ const ContentResourcesTable = () => {
                                                         </span>
                                                     ))}
                                                     {resource.tags.length > 2 && (
-                                                        <span className="inline-block px-2 py-0.5 rounded-full text-xs bg-white/10 text-gray-400">
+                                                        <span className="inline-block px-2 py-0.5 rounded-full text-xs bg-white/10 text-white/50">
                                                             +{resource.tags.length - 2}
                                                         </span>
                                                     )}
                                                 </div>
                                             ) : (
-                                                <span className="text-gray-500">—</span>
+                                                <span className="text-white/40">—</span>
                                             )}
                                         </td>
                                         <td className="px-6 py-4 whitespace-nowrap text-sm">
@@ -381,14 +381,14 @@ const ContentResourcesTable = () => {
                         </div>
                         <div className="hidden sm:flex-1 sm:flex sm:items-center sm:justify-between">
                             <div>
-                                <p className="text-sm text-gray-300">
+                                <p className="text-sm text-white/70">
                                     Page {page} of {totalPages}
                                 </p>
                             </div>
                             <div>
                                 <nav className="relative z-0 inline-flex rounded-md shadow-sm -space-x-px" aria-label="Pagination">
-                                    <Button onClick={() => setPage(p => Math.max(1, p - 1))} disabled={page === 1} className="relative inline-flex items-center px-2 py-2 rounded-l-md border border-white/20 bg-white/10 text-sm font-medium text-gray-300 hover:bg-white/20">Previous</Button>
-                                    <Button onClick={() => setPage(p => Math.min(totalPages, p + 1))} disabled={page === totalPages} className="relative inline-flex items-center px-2 py-2 rounded-r-md border border-white/20 bg-white/10 text-sm font-medium text-gray-300 hover:bg-white/20">Next</Button>
+                                    <Button onClick={() => setPage(p => Math.max(1, p - 1))} disabled={page === 1} className="relative inline-flex items-center px-2 py-2 rounded-l-md border border-white/20 bg-white/10 text-sm font-medium text-white/70 hover:bg-white/20">Previous</Button>
+                                    <Button onClick={() => setPage(p => Math.min(totalPages, p + 1))} disabled={page === totalPages} className="relative inline-flex items-center px-2 py-2 rounded-r-md border border-white/20 bg-white/10 text-sm font-medium text-white/70 hover:bg-white/20">Next</Button>
                                 </nav>
                             </div>
                         </div>
@@ -405,7 +405,7 @@ const ContentResourcesTable = () => {
                             </h3>
                             <button
                                 onClick={() => setIsFormVisible(false)}
-                                className="p-2 hover:bg-white/10 rounded-lg transition-colors text-gray-400 hover:text-white"
+                                className="p-2 hover:bg-white/10 rounded-lg transition-colors text-white/50 hover:text-white"
                                 title="Close"
                             >
                                 <FiX className="h-5 w-5" />
@@ -425,9 +425,9 @@ const ContentResourcesTable = () => {
                         <div className="px-6 py-4 border-b border-white/20">
                             <h3 className="text-lg font-medium text-white">{viewingResource.title}</h3>
                             {viewingResource.description && (
-                                <p className="mt-1 text-sm text-gray-300">{viewingResource.description}</p>
+                                <p className="mt-1 text-sm text-white/70">{viewingResource.description}</p>
                             )}
-                            <div className="mt-2 flex flex-wrap gap-2 text-xs text-gray-300">
+                            <div className="mt-2 flex flex-wrap gap-2 text-xs text-white/70">
                                 <span className="rounded-full bg-white/10 px-3 py-1 uppercase tracking-wide">{viewingResource.type}</span>
                                 {(viewingResource.tags || []).map((tag) => (
                                     <span key={tag} className="rounded-full bg-white/10 px-3 py-1">{tag}</span>
@@ -452,17 +452,17 @@ const ContentResourcesTable = () => {
                                             {viewingResource.source}
                                         </a>
                                     )}
-                                    <div className="bg-black/20 p-4 rounded-xl text-gray-200 whitespace-pre-wrap max-h-[60vh] overflow-y-auto">
+                                    <div className="bg-black/20 p-4 rounded-xl text-white/85 whitespace-pre-wrap max-h-[60vh] overflow-y-auto">
                                         {viewingResource.content || 'No extracted content available yet.'}
                                     </div>
                                 </div>
                             ) : (
-                                <div className="bg-black/20 p-4 rounded-xl text-gray-200 whitespace-pre-wrap max-h-[60vh] overflow-y-auto">
+                                <div className="bg-black/20 p-4 rounded-xl text-white/85 whitespace-pre-wrap max-h-[60vh] overflow-y-auto">
                                     {viewingResource.content}
                                 </div>
                             )}
                         </div>
-                        <div className="px-6 pb-6 text-xs text-gray-300 space-y-1">
+                        <div className="px-6 pb-6 text-xs text-white/70 space-y-1">
                             <div>Created: {new Date(viewingResource.created_at).toLocaleString()}</div>
                             <div>Updated: {new Date(viewingResource.updated_at).toLocaleString()}</div>
                             {viewingResource.embedding_last_processed_at && (
@@ -470,7 +470,7 @@ const ContentResourcesTable = () => {
                             )}
                             {viewingResource.metadata && Object.keys(viewingResource.metadata).length > 0 && (
                                 <div className="mt-3">
-                                    <h4 className="font-medium text-gray-200 mb-2">Metadata</h4>
+                                    <h4 className="font-medium text-white/85 mb-2">Metadata</h4>
                                     <pre className="bg-black/20 p-3 rounded-lg text-[11px] whitespace-pre-wrap break-words">{JSON.stringify(viewingResource.metadata, null, 2)}</pre>
                                 </div>
                             )}

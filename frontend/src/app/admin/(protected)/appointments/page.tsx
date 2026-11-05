@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useCallback, useMemo } from 'react';
 import Image from 'next/image';
+import UserAvatar from '@/components/ui/profile/UserAvatar';
 import {
   FiCalendar,
   FiClock,
@@ -225,13 +226,13 @@ export default function AppointmentManagementPage() {
   const getStatusColor = (status: string) => {
     switch (status) {
       case 'scheduled':
-        return 'bg-blue-500/20 text-blue-300 border-blue-500/30';
+        return 'bg-blue-500/10 text-blue-400 border-blue-500/20';
       case 'completed':
-        return 'bg-green-500/20 text-green-300 border-green-500/30';
+        return 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20';
       case 'cancelled':
-        return 'bg-red-500/20 text-red-300 border-red-500/30';
+        return 'bg-rose-500/10 text-rose-400 border-rose-500/20';
       default:
-        return 'bg-gray-500/20 text-gray-300 border-gray-500/30';
+        return 'bg-slate-500/10 text-slate-400 border-slate-500/20';
     }
   };
 
@@ -320,7 +321,7 @@ export default function AppointmentManagementPage() {
             onClick={() => setQuickFilter('all')}
             className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
               quickFilter === 'all'
-                ? 'bg-[#FFCA40] text-black'
+                ? 'bg-[#FFCA40] text-[#001D58]'
                 : 'bg-white/10 text-white hover:bg-white/20'
             }`}
           >
@@ -330,7 +331,7 @@ export default function AppointmentManagementPage() {
             onClick={() => setQuickFilter('today')}
             className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
               quickFilter === 'today'
-                ? 'bg-[#FFCA40] text-black'
+                ? 'bg-[#FFCA40] text-[#001D58]'
                 : 'bg-white/10 text-white hover:bg-white/20'
             }`}
           >
@@ -340,7 +341,7 @@ export default function AppointmentManagementPage() {
             onClick={() => setQuickFilter('upcoming')}
             className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
               quickFilter === 'upcoming'
-                ? 'bg-[#FFCA40] text-black'
+                ? 'bg-[#FFCA40] text-[#001D58]'
                 : 'bg-white/10 text-white hover:bg-white/20'
             }`}
           >
@@ -350,7 +351,7 @@ export default function AppointmentManagementPage() {
             onClick={() => setQuickFilter('past')}
             className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
               quickFilter === 'past'
-                ? 'bg-[#FFCA40] text-black'
+                ? 'bg-[#FFCA40] text-[#001D58]'
                 : 'bg-white/10 text-white hover:bg-white/20'
             }`}
           >
@@ -466,7 +467,6 @@ export default function AppointmentManagementPage() {
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
               {filteredAppointments.map(appointment => {
                 const patientAvatar = appointment.user.avatar_url;
-                const patientInitial = (appointment.user.email || 'U').charAt(0).toUpperCase();
                 const isPast = new Date(appointment.appointment_datetime) < new Date();
 
                 return (
@@ -481,19 +481,7 @@ export default function AppointmentManagementPage() {
                     <div className="flex items-start justify-between mb-4">
                       <div className="flex items-center gap-3">
                         <div className="relative h-12 w-12 rounded-full overflow-hidden border border-white/15 bg-white/5 flex-shrink-0">
-                          {patientAvatar ? (
-                            <Image
-                              src={patientAvatar}
-                              alt={`Avatar for ${appointment.user.email || 'user'}`}
-                              fill
-                              sizes="48px"
-                              className="object-cover"
-                            />
-                          ) : (
-                            <div className="flex h-full w-full items-center justify-center bg-[#FFCA40]/10 text-base font-semibold text-[#FFCA40]">
-                              {patientInitial}
-                            </div>
-                          )}
+                          <UserAvatar src={patientAvatar} email={appointment.user.email} initialsClassName="text-base" />
                         </div>
                         <div className="min-w-0">
                           <div className="text-sm font-semibold text-white truncate">
@@ -571,26 +559,13 @@ export default function AppointmentManagementPage() {
                   <tbody className="divide-y divide-white/10">
                     {filteredAppointments.map(appointment => {
                       const patientAvatar = appointment.user.avatar_url;
-                      const patientInitial = (appointment.user.email || 'U').charAt(0).toUpperCase();
 
                       return (
                         <tr key={appointment.id} className="hover:bg-white/5 transition-colors">
                           <td className="px-6 py-4 whitespace-nowrap">
                             <div className="flex items-center gap-3">
                               <div className="relative h-10 w-10 rounded-full overflow-hidden border border-white/15 bg-white/5">
-                                {patientAvatar ? (
-                                  <Image
-                                    src={patientAvatar}
-                                    alt={`Avatar for ${appointment.user.email || 'user'}`}
-                                    fill
-                                    sizes="40px"
-                                    className="object-cover"
-                                  />
-                                ) : (
-                                  <div className="flex h-full w-full items-center justify-center bg-[#FFCA40]/10 text-sm font-semibold text-[#FFCA40]">
-                                    {patientInitial}
-                                  </div>
-                                )}
+                                <UserAvatar src={patientAvatar} email={appointment.user.email} initialsClassName="text-sm" />
                               </div>
                               <div>
                                 <div className="text-sm font-medium text-white">{appointment.user.email || 'Unknown'}</div>

@@ -24,7 +24,7 @@ const ContentResourcesPage = () => {
             </div>
 
             {/* Info Banner */}
-            <div className="bg-gradient-to-r from-[#FFCA40]/10 to-[#FFD700]/10 border border-[#FFCA40]/30 rounded-xl p-5">
+            <div className="bg-linear-to-r from-[#FFCA40]/10 to-[#FFD700]/10 border border-[#FFCA40]/30 rounded-xl p-5">
                 <div className="flex gap-4">
                     <div className="flex-shrink-0">
                         <div className="w-10 h-10 rounded-full bg-[#FFCA40]/20 flex items-center justify-center">

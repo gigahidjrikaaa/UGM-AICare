@@ -199,7 +199,7 @@ export default function AdminQuestTemplatesPage() {
 
   return (
     <div className="space-y-6">
-      <header className="rounded-3xl border border-white/10 bg-gradient-to-br from-[#041a3c] via-[#001d58] to-[#041a3c] px-6 py-8 text-white shadow-[0_20px_45px_rgba(4,18,44,0.45)]">
+      <header className="rounded-3xl border border-white/10 bg-linear-to-br from-[#041a3c] via-[#001d58] to-[#041a3c] px-6 py-8 text-white shadow-[0_20px_45px_rgba(4,18,44,0.45)]">
         <div className="flex flex-col items-start justify-between gap-4 md:flex-row md:items-center">
           <div>
             <p className="flex items-center gap-2 text-xs uppercase tracking-[0.35em] text-white/60">
@@ -401,7 +401,7 @@ export default function AdminQuestTemplatesPage() {
 
             <button
               type="submit"
-              className="inline-flex w-full items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-[#FFCA40] to-[#FFB347] px-4 py-2 text-sm font-semibold text-[#001d58] shadow-[0_12px_30px_rgba(255,202,64,0.35)] transition hover:shadow-[0_16px_35px_rgba(255,202,64,0.45)] focus:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-[#FFCA40]/60 focus-visible:ring-offset-[#00112e]"
+              className="inline-flex w-full items-center justify-center gap-2 rounded-xl bg-linear-to-r from-[#FFCA40] to-[#FFB347] px-4 py-2 text-sm font-semibold text-[#001d58] shadow-[0_12px_30px_rgba(255,202,64,0.35)] transition hover:shadow-[0_16px_35px_rgba(255,202,64,0.45)] focus:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-[#FFCA40]/60 focus-visible:ring-offset-[#00112e]"
               disabled={createMutation.isPending || updateMutation.isPending}
             >
               {editingTemplate ? <FiCheck className="h-4 w-4" /> : <FiPlus className="h-4 w-4" />}

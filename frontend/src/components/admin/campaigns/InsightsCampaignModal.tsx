@@ -125,7 +125,7 @@ export function InsightsCampaignModal({
           className="relative bg-[#001a47] rounded-2xl shadow-2xl border border-white/10 w-full max-w-4xl max-h-[90vh] overflow-hidden"
         >
           {/* Header */}
-          <div className="relative px-8 py-6 bg-gradient-to-r from-pink-500/20 to-orange-500/20 border-b border-white/10">
+          <div className="relative px-8 py-6 bg-linear-to-r from-pink-500/20 to-orange-500/20 border-b border-white/10">
             <div className="flex items-center gap-3">
               <SparklesIcon className="w-8 h-8 text-pink-400" />
               <div>
@@ -185,7 +185,7 @@ export function InsightsCampaignModal({
                 <button
                   onClick={handleGenerate}
                   disabled={isGenerating}
-                  className="px-8 py-3 bg-gradient-to-r from-pink-500 to-orange-500 hover:from-pink-600 
+                  className="px-8 py-3 bg-linear-to-r from-pink-500 to-orange-500 hover:from-pink-600 
                     hover:to-orange-600 disabled:from-pink-500/50 disabled:to-orange-500/50 
                     text-white font-semibold rounded-xl shadow-lg shadow-pink-500/30 
                     transition-all duration-200 flex items-center gap-3 mx-auto"
@@ -306,7 +306,7 @@ export function InsightsCampaignModal({
               <button
                 onClick={handleCreateCampaign}
                 disabled={isCreating || !campaignName.trim()}
-                className="px-8 py-3 bg-gradient-to-r from-pink-500 to-orange-500 hover:from-pink-600 
+                className="px-8 py-3 bg-linear-to-r from-pink-500 to-orange-500 hover:from-pink-600 
                   hover:to-orange-600 disabled:from-pink-500/50 disabled:to-orange-500/50 
                   text-white font-semibold rounded-xl shadow-lg shadow-pink-500/30 
                   transition-all duration-200 flex items-center gap-3"

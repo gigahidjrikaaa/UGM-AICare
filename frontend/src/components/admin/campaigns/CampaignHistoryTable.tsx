@@ -35,7 +35,7 @@ export function CampaignHistoryTable({ executions, loading }: CampaignHistoryTab
 
   if (!executions || executions.length === 0) {
     return (
-      <div className="text-center py-12 text-gray-500">
+      <div className="text-center py-12 text-white/40">
         <Send className="w-12 h-12 mx-auto mb-4 opacity-50" />
         <p>No execution history yet</p>
         <p className="text-sm mt-2">Execute this campaign to see logs here</p>
@@ -49,19 +49,19 @@ export function CampaignHistoryTable({ executions, loading }: CampaignHistoryTab
         <thead className="bg-gray-50">
           <tr>
             <th className="w-12 px-4 py-3"></th>
-            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+            <th className="px-6 py-3 text-left text-xs font-medium text-white/40 uppercase tracking-wider">
               Execution Time
             </th>
-            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+            <th className="px-6 py-3 text-left text-xs font-medium text-white/40 uppercase tracking-wider">
               Targets
             </th>
-            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+            <th className="px-6 py-3 text-left text-xs font-medium text-white/40 uppercase tracking-wider">
               Messages
             </th>
-            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+            <th className="px-6 py-3 text-left text-xs font-medium text-white/40 uppercase tracking-wider">
               Duration
             </th>
-            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+            <th className="px-6 py-3 text-left text-xs font-medium text-white/40 uppercase tracking-wider">
               Status
             </th>
           </tr>
@@ -82,19 +82,19 @@ export function CampaignHistoryTable({ executions, loading }: CampaignHistoryTab
                 >
                   <td className="px-4 py-4 text-center">
                     {isExpanded ? (
-                      <ChevronUp className="w-4 h-4 text-gray-500" />
+                      <ChevronUp className="w-4 h-4 text-white/40" />
                     ) : (
-                      <ChevronDown className="w-4 h-4 text-gray-500" />
+                      <ChevronDown className="w-4 h-4 text-white/40" />
                     )}
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap">
                     <div className="flex items-center gap-2">
-                      <Clock className="w-4 h-4 text-gray-400" />
+                      <Clock className="w-4 h-4 text-white/50" />
                       <div>
-                        <div className="text-sm font-medium text-gray-900">
+                        <div className="text-sm font-medium text-white">
                           {format(new Date(execution.executed_at), 'MMM dd, yyyy')}
                         </div>
-                        <div className="text-xs text-gray-500">
+                        <div className="text-xs text-white/40">
                           {format(new Date(execution.executed_at), 'HH:mm:ss')}
                         </div>
                       </div>
@@ -103,11 +103,11 @@ export function CampaignHistoryTable({ executions, loading }: CampaignHistoryTab
                   <td className="px-6 py-4 whitespace-nowrap">
                     <div className="flex items-center gap-2">
                       <Users className="w-4 h-4 text-blue-500" />
-                      <span className="text-sm text-gray-900">{execution.total_targeted}</span>
+                      <span className="text-sm text-white">{execution.total_targeted}</span>
                     </div>
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap">
-                    <div className="text-sm text-gray-900">
+                    <div className="text-sm text-white">
                       <span className="text-green-600 font-medium">{execution.messages_sent}</span>
                       {execution.messages_failed > 0 && (
                         <span className="text-red-600 ml-2">
@@ -116,7 +116,7 @@ export function CampaignHistoryTable({ executions, loading }: CampaignHistoryTab
                       )}
                     </div>
                   </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                  <td className="px-6 py-4 whitespace-nowrap text-sm text-white/40">
                     {execution.execution_time_seconds.toFixed(2)}s
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap">
@@ -144,8 +144,8 @@ export function CampaignHistoryTable({ executions, loading }: CampaignHistoryTab
                       <div className="space-y-4">
                         {/* Message Content */}
                         <div>
-                          <h4 className="text-sm font-semibold text-gray-700 mb-2">Message Sent:</h4>
-                          <div className="bg-white border border-gray-200 rounded p-3 text-sm text-gray-800 whitespace-pre-wrap">
+                          <h4 className="text-sm font-semibold text-white/80 mb-2">Message Sent:</h4>
+                          <div className="bg-white border border-gray-200 rounded p-3 text-sm text-white/90 whitespace-pre-wrap">
                             {execution.message_content}
                           </div>
                         </div>
@@ -153,7 +153,7 @@ export function CampaignHistoryTable({ executions, loading }: CampaignHistoryTab
                         {/* Targeted Users */}
                         {execution.targeted_user_ids && execution.targeted_user_ids.length > 0 && (
                           <div>
-                            <h4 className="text-sm font-semibold text-gray-700 mb-2">
+                            <h4 className="text-sm font-semibold text-white/80 mb-2">
                               Targeted Users ({execution.targeted_user_ids.length}):
                             </h4>
                             <div className="bg-white border border-gray-200 rounded p-3 max-h-40 overflow-y-auto">
@@ -182,7 +182,7 @@ export function CampaignHistoryTable({ executions, loading }: CampaignHistoryTab
                         )}
 
                         {/* Metadata */}
-                        <div className="flex items-center gap-6 text-xs text-gray-500">
+                        <div className="flex items-center gap-6 text-xs text-white/40">
                           <div>
                             <span className="font-medium">Campaign:</span> {execution.campaign_name}
                           </div>

@@ -66,9 +66,9 @@ const QUICK_LINKS: QuickLinkItem[] = [
     icon: <SparklesIcon className="h-4 w-4 text-emerald-300" aria-hidden="true" />,
   },
   {
-    href: '/admin/settings',
-    label: 'Settings',
-    description: 'Configure platform controls and operational thresholds',
+    href: '/admin/api-keys',
+    label: 'API Keys & Models',
+    description: 'Monitor key rotation health and switch the active AI model',
     icon: <Cog6ToothIcon className="h-4 w-4 text-slate-300" aria-hidden="true" />,
   },
 ];

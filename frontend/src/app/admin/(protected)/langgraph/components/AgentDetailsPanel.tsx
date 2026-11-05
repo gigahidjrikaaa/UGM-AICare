@@ -50,7 +50,7 @@ export function AgentDetailsPanel({ agentId, onClose, healthData }: AgentDetails
     return (
         <div className="fixed inset-y-0 right-0 w-[500px] bg-[#00153a]/80 backdrop-blur-2xl border-l border-white/5 shadow-2xl transform transition-transform duration-300 z-50 flex flex-col">
             {/* Header */}
-            <div className="p-8 border-b border-white/5 flex justify-between items-start bg-gradient-to-b from-white/5 to-transparent">
+            <div className="p-8 border-b border-white/5 flex justify-between items-start bg-linear-to-b from-white/5 to-transparent">
                 <div>
                     <h2 className="text-3xl font-bold text-white mb-2 tracking-tight">{getAgentName(agentId)}</h2>
                     <div className="flex items-center gap-2">

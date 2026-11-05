@@ -125,7 +125,7 @@ const AgentNode = ({ data }: NodeProps<AgentNodeData>) => {
       
       {/* Description */}
       {data.description && (
-        <p className="text-xs text-gray-300 leading-relaxed line-clamp-3">
+        <p className="text-xs text-white/70 leading-relaxed line-clamp-3">
           {data.description}
         </p>
       )}
@@ -134,7 +134,7 @@ const AgentNode = ({ data }: NodeProps<AgentNodeData>) => {
       {executionState && (
         <div className="mt-3 pt-2 border-t border-white/10">
           <div className="flex items-center justify-between text-xs">
-            <span className="text-gray-400">
+            <span className="text-white/50">
               {executionState.execution_time_ms ? 
                 `${executionState.execution_time_ms}ms` : 
                 executionState.status
@@ -429,7 +429,7 @@ const LangGraphViewer = () => {
   if (isLoading) {
     return (
       <div className="flex h-[420px] items-center justify-center rounded-xl border border-white/10 bg-white/5">
-        <div className="animate-pulse text-sm text-gray-300">Loading agent graph...</div>
+        <div className="animate-pulse text-sm text-white/70">Loading agent graph...</div>
       </div>
     );
   }
@@ -444,7 +444,7 @@ const LangGraphViewer = () => {
 
   if (!graphState) {
     return (
-      <div className="rounded-xl border border-white/10 bg-white/5 p-6 text-sm text-gray-300">
+      <div className="rounded-xl border border-white/10 bg-white/5 p-6 text-sm text-white/70">
         No LangGraph configuration available yet.
       </div>
     );
@@ -456,7 +456,7 @@ const LangGraphViewer = () => {
   {agentLegend.map(({ id, label }) => (
           <div key={id} className="flex items-center gap-2">
             <span className={`h-3 w-3 rounded-full legend-dot agent-${id}`} />
-            <span className="text-xs font-medium uppercase tracking-wide text-gray-300">
+            <span className="text-xs font-medium uppercase tracking-wide text-white/70">
               {label}
             </span>
           </div>
@@ -476,7 +476,7 @@ const LangGraphViewer = () => {
           className={`flex items-center gap-2 rounded-lg px-3 py-1.5 text-xs font-medium transition-colors ${
             realTimeUpdates
               ? 'bg-green-500/20 text-green-300 hover:bg-green-500/30'
-              : 'bg-white/10 text-gray-300 hover:bg-white/20'
+              : 'bg-white/10 text-white/70 hover:bg-white/20'
           }`}
         >
           <div className={`h-2 w-2 rounded-full ${realTimeUpdates ? 'bg-green-400' : 'bg-gray-400'}`} />
@@ -532,12 +532,12 @@ const LangGraphViewer = () => {
           {selectedNode && (
             <Panel
               position="top-right"
-              className="max-h-[500px] w-80 max-w-[320px] overflow-y-auto rounded-xl border border-white/15 bg-slate-900/85 p-4 text-xs text-gray-200 shadow-xl"
+              className="max-h-[500px] w-80 max-w-[320px] overflow-y-auto rounded-xl border border-white/15 bg-slate-900/85 p-4 text-xs text-white/85 shadow-xl"
               onMouseDown={(event) => event.stopPropagation()}
             >
               <div className="flex items-center justify-between gap-4">
                 <div>
-                  <p className="text-[10px] uppercase tracking-wide text-gray-400">
+                  <p className="text-[10px] uppercase tracking-wide text-white/50">
                     {(selectedNode.data?.agent as string) ?? 'Agent'}
                   </p>
                   <h3 className="text-lg font-semibold text-white">
@@ -545,7 +545,7 @@ const LangGraphViewer = () => {
                   </h3>
                 </div>
                 <button
-                  className="text-[11px] text-gray-400 transition hover:text-gray-100"
+                  className="text-[11px] text-white/50 transition hover:text-white/90"
                   onClick={() => setSelectedNode(null)}
                   type="button"
                 >
@@ -555,12 +555,12 @@ const LangGraphViewer = () => {
               {(() => {
                 const description = selectedNode.data?.description;
                 return description && typeof description === 'string' ? (
-                  <p className="mt-2 text-gray-300">
+                  <p className="mt-2 text-white/70">
                     {description}
                   </p>
                 ) : null;
               })()}
-              <div className="mt-3 rounded-lg bg-white/5 p-3 text-[11px] text-gray-200">
+              <div className="mt-3 rounded-lg bg-white/5 p-3 text-[11px] text-white/85">
                 <pre className="whitespace-pre-wrap break-words">
                   {JSON.stringify(selectedNode.data, null, 2)}
                 </pre>

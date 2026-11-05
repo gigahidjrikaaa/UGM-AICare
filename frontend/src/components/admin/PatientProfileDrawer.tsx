@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import Image from 'next/image';
+import UserAvatar from '@/components/ui/profile/UserAvatar';
 import { X, Mail, Phone, ExternalLink, Calendar, CheckCircle, AlertTriangle } from 'lucide-react';
 import { User, UserLog } from '@/types/admin/users';
 import { ScreeningProfile, DIMENSION_LABELS, RISK_CONFIG, INSTRUMENT_CONFIG, RiskLevel } from '@/types/admin/screening';
@@ -99,13 +99,7 @@ export default function PatientProfileDrawer({ isOpen, onClose, user, screeningP
                                 <div className="flex justify-between items-start mb-4">
                                     <div className="flex items-center gap-4">
                                         <div className="relative h-16 w-16 rounded-full overflow-hidden border border-white/20 bg-white/5 shrink-0">
-                                            {user.avatar_url ? (
-                                                <Image src={user.avatar_url} alt="Avatar" fill className="object-cover" />
-                                            ) : (
-                                                <div className="flex h-full w-full items-center justify-center bg-[#FFCA40]/10 text-xl font-bold text-[#FFCA40]">
-                                                    {(user.name || user.email || 'U').charAt(0).toUpperCase()}
-                                                </div>
-                                            )}
+                                            <UserAvatar src={user.avatar_url} name={user.name} email={user.email} initialsClassName="text-xl" />
                                         </div>
                                         <div>
                                             <h2 className="text-xl font-bold text-white">{user.name || user.email || `User ${user.id}`}</h2>
@@ -213,12 +207,18 @@ export default function PatientProfileDrawer({ isOpen, onClose, user, screeningP
                                         <div>
                                             <h3 className="text-lg font-bold text-white mb-3">Quick Links</h3>
                                             <div className="flex flex-wrap gap-2">
-                                                <Link href={`/admin/conversations?user_id=${user.id}`} className="px-3 py-2 bg-white/5 hover:bg-white/10 border border-white/10 rounded-lg text-sm text-white flex items-center gap-2 transition-colors">
+                                                <Link href="/admin/conversations" className="px-3 py-2 bg-white/5 hover:bg-white/10 border border-white/10 rounded-lg text-sm text-white flex items-center gap-2 transition-colors">
                                                     Chats <ExternalLink className="w-3 h-3" />
                                                 </Link>
-                                                <Link href={`/admin/cases?user_id=${user.id}`} className="px-3 py-2 bg-white/5 hover:bg-white/10 border border-white/10 rounded-lg text-sm text-white flex items-center gap-2 transition-colors">
-                                                    Cases <ExternalLink className="w-3 h-3" />
-                                                </Link>
+                                                {user.user_hash ? (
+                                                    <Link href={`/admin/cases?search=${user.user_hash}`} className="px-3 py-2 bg-white/5 hover:bg-white/10 border border-white/10 rounded-lg text-sm text-white flex items-center gap-2 transition-colors">
+                                                        Cases <ExternalLink className="w-3 h-3" />
+                                                    </Link>
+                                                ) : (
+                                                    <Link href="/admin/cases" className="px-3 py-2 bg-white/5 hover:bg-white/10 border border-white/10 rounded-lg text-sm text-white flex items-center gap-2 transition-colors">
+                                                        Cases <ExternalLink className="w-3 h-3" />
+                                                    </Link>
+                                                )}
                                             </div>
                                         </div>
                                     </div>

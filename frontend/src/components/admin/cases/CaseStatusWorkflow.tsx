@@ -71,10 +71,10 @@ export default function CaseStatusWorkflow({
 
   return (
     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-      <div className="bg-white dark:bg-gray-800 rounded-lg shadow-xl max-w-md w-full">
+      <div className="bg-white rounded-lg shadow-xl max-w-md w-full">
         {/* Header */}
         <div className="px-6 py-4 border-b border-gray-200 dark:border-gray-700">
-          <h3 className="text-xl font-bold text-gray-900 dark:text-gray-100">
+          <h3 className="text-xl font-bold text-white">
             Update Case Status
           </h3>
         </div>
@@ -82,20 +82,20 @@ export default function CaseStatusWorkflow({
         {/* Form */}
         <form onSubmit={handleSubmit} className="p-6 space-y-4">
           <div>
-            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+            <label className="block text-sm font-medium text-white/80 dark:text-white/70 mb-2">
               Current Status
             </label>
-            <div className="px-3 py-2 bg-gray-100 dark:bg-gray-700 rounded-md text-gray-900 dark:text-gray-100">
+            <div className="px-3 py-2 bg-gray-100 rounded-md text-white">
               {currentStatus.replace('_', ' ')}
             </div>
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+            <label className="block text-sm font-medium text-white/80 dark:text-white/70 mb-2">
               New Status <span className="text-red-500">*</span>
             </label>
             {availableStatuses.length === 0 ? (
-              <p className="text-sm text-gray-500 dark:text-gray-400 italic">
+              <p className="text-sm text-white/40 dark:text-white/50 italic">
                 No status transitions available. Case is already closed.
               </p>
             ) : (
@@ -103,7 +103,7 @@ export default function CaseStatusWorkflow({
                 id="case-new-status"
                 value={newStatus}
                 onChange={(e) => setNewStatus(e.target.value as CaseStatus)}
-                className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100"
+                className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white text-white"
                 required
                 aria-label="Select new case status"
               >
@@ -118,7 +118,7 @@ export default function CaseStatusWorkflow({
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+            <label className="block text-sm font-medium text-white/80 dark:text-white/70 mb-2">
               Note (optional)
             </label>
             <textarea
@@ -126,7 +126,7 @@ export default function CaseStatusWorkflow({
               onChange={(e) => setNote(e.target.value)}
               placeholder="Add a note explaining the status change..."
               rows={3}
-              className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100"
+              className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white text-white"
             />
           </div>
 

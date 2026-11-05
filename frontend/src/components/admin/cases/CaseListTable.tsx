@@ -57,13 +57,13 @@ export default function CaseListTable({
     const baseClasses = 'px-3 py-1 text-xs font-semibold rounded-full backdrop-blur-sm border';
     switch (severity) {
       case 'critical':
-        return `${baseClasses} bg-red-500/20 text-red-300 border-red-500/40`;
+        return `${baseClasses} bg-red-500/10 text-red-400 border-red-500/20`;
       case 'high':
-        return `${baseClasses} bg-orange-500/20 text-orange-300 border-orange-500/40`;
+        return `${baseClasses} bg-orange-500/10 text-orange-400 border-orange-500/20`;
       case 'med':
-        return `${baseClasses} bg-yellow-500/20 text-yellow-300 border-yellow-500/40`;
+        return `${baseClasses} bg-amber-500/10 text-amber-400 border-amber-500/20`;
       case 'low':
-        return `${baseClasses} bg-green-500/20 text-green-300 border-green-500/40`;
+        return `${baseClasses} bg-blue-500/10 text-blue-400 border-blue-500/20`;
       default:
         return `${baseClasses} bg-white/10 text-white/60 border-white/20`;
     }
@@ -74,15 +74,15 @@ export default function CaseListTable({
     const baseClasses = 'px-3 py-1 text-xs font-semibold rounded-full backdrop-blur-sm border';
     switch (status) {
       case 'new':
-        return `${baseClasses} bg-blue-500/20 text-blue-300 border-blue-500/40`;
+        return `${baseClasses} bg-blue-500/10 text-blue-400 border-blue-500/20`;
       case 'in_progress':
-        return `${baseClasses} bg-purple-500/20 text-purple-300 border-purple-500/40`;
+        return `${baseClasses} bg-amber-500/10 text-amber-400 border-amber-500/20`;
       case 'waiting':
-        return `${baseClasses} bg-amber-500/20 text-amber-300 border-amber-500/40`;
+        return `${baseClasses} bg-amber-500/10 text-amber-400 border-amber-500/20`;
       case 'resolved':
-        return `${baseClasses} bg-green-500/20 text-green-300 border-green-500/40`;
+        return `${baseClasses} bg-emerald-500/10 text-emerald-400 border-emerald-500/20`;
       case 'closed':
-        return `${baseClasses} bg-gray-500/20 text-gray-300 border-gray-500/40`;
+        return `${baseClasses} bg-slate-500/10 text-slate-400 border-slate-500/20`;
       default:
         return `${baseClasses} bg-white/10 text-white/60 border-white/20`;
     }

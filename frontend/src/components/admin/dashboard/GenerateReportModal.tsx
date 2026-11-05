@@ -146,7 +146,7 @@ export function GenerateReportModal({ isOpen, onClose, onGenerate }: GenerateRep
                           type="button"
                           onClick={() => setReportType(type)}
                           className={`relative flex-1 rounded-full px-3 py-2 text-xs font-medium transition-colors duration-500 ${
-                            reportType === type ? 'text-[#00153a]' : 'text-white/55 hover:text-white'
+                            reportType === type ? 'text-[#001D58]' : 'text-white/55 hover:text-white'
                           }`}
                         >
                           {reportType === type && (
@@ -283,7 +283,7 @@ export function GenerateReportModal({ isOpen, onClose, onGenerate }: GenerateRep
                     <button
                       type="submit"
                       disabled={isGenerating}
-                      className="flex flex-1 items-center justify-center gap-2 rounded-full bg-[#FFCA40] px-4 py-3 text-sm font-semibold text-[#00153a] transition-all duration-700 ease-[cubic-bezier(0.32,0.72,0,1)] hover:shadow-[0_8px_40px_-8px_rgba(255,202,64,0.5)] active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-60"
+                      className="flex flex-1 items-center justify-center gap-2 rounded-full bg-[#FFCA40] px-4 py-3 text-sm font-semibold text-[#001D58] transition-all duration-700 ease-[cubic-bezier(0.32,0.72,0,1)] hover:shadow-[0_8px_40px_-8px_rgba(255,202,64,0.5)] active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-60"
                     >
                       {isGenerating ? (
                         <>

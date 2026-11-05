@@ -119,8 +119,8 @@ export default function SurveyEditorPage() {
     router.push('/admin/surveys');
   };
 
-  if (loading) return <div className="text-gray-300">Loading…</div>;
-  if (!survey) return <div className="text-gray-300">Survey not found</div>;
+  if (loading) return <div className="text-white/70">Loading…</div>;
+  if (!survey) return <div className="text-white/70">Survey not found</div>;
 
   return (
     <div className="space-y-6">
@@ -135,10 +135,10 @@ export default function SurveyEditorPage() {
         <div className="p-6 space-y-4">
           <Input name="title" label="Title" value={survey.title} onChange={(e) => setSurvey({ ...survey, title: e.target.value })} className="w-full pl-3 pr-3 py-2 bg-white/8 border border-white/15 rounded-lg text-white" />
           <div className="space-y-1">
-            <label className="block text-sm font-medium text-gray-300">Description</label>
+            <label className="block text-sm font-medium text-white/70">Description</label>
             <Textarea value={survey.description || ''} onChange={(e) => setSurvey({ ...survey, description: e.target.value })} className="w-full min-h-[120px] p-3 bg-white/8 border border-white/15 rounded-xl text-white" />
           </div>
-          <label className="flex items-center gap-2 text-sm text-gray-300">
+          <label className="flex items-center gap-2 text-sm text-white/70">
             <input type="checkbox" checked={survey.is_active} onChange={(e) => setSurvey({ ...survey, is_active: e.target.checked })} /> Active
           </label>
         </div>
@@ -154,7 +154,7 @@ export default function SurveyEditorPage() {
           {survey.questions.map((q, i) => (
             <div key={q.id ?? `new-${i}`} className="p-4 border border-white/20 rounded-lg mb-4">
               <div className="flex justify-between items-center mb-2">
-                <label className="block text-sm font-medium text-gray-300">Question {i + 1}</label>
+                <label className="block text-sm font-medium text-white/70">Question {i + 1}</label>
                 <button onClick={() => removeQuestion(i)} className="text-red-400 hover:text-red-300" type="button" aria-label={`Remove question ${i + 1}`} title={`Remove question ${i + 1}`}><FiTrash2 /></button>
               </div>
               <Input name="question_text" label="Question text" value={q.question_text} onChange={(e) => updateQuestion(i, 'question_text', e.target.value)} className="w-full pl-3 pr-3 py-2 bg-white/8 border border-white/15 rounded-lg text-white mb-2" />
@@ -185,7 +185,7 @@ export default function SurveyEditorPage() {
                 <div className="mt-3 grid grid-cols-1 sm:grid-cols-2 gap-3">
                   <Input name="rating_min" label="Scale min" type="number" placeholder="1" onChange={() => {}} value={''} className="hidden" />
                   <Input name="rating_max" label="Scale max" type="number" placeholder="5" onChange={() => {}} value={''} className="hidden" />
-                  <div className="text-xs text-gray-300">Tip: Rating scale will be interpreted from answers; you can guide users in the question text (e.g., &quot;1 = Sangat Tidak Setuju, 5 = Sangat Setuju&quot;).</div>
+                  <div className="text-xs text-white/70">Tip: Rating scale will be interpreted from answers; you can guide users in the question text (e.g., &quot;1 = Sangat Tidak Setuju, 5 = Sangat Setuju&quot;).</div>
                 </div>
               )}
             </div>

@@ -311,7 +311,7 @@ export function CaseCreationForm({ onSubmit, loading }: CaseCreationFormProps) {
         <button
           type="submit"
           disabled={loading}
-          className="px-6 py-2.5 bg-[#FFCA40] hover:bg-[#FFCA40]/90 disabled:bg-[#FFCA40]/50 text-[#00153a] font-semibold rounded-xl transition-all duration-200 shadow-lg shadow-[#FFCA40]/10 flex items-center gap-2 disabled:cursor-not-allowed text-sm"
+          className="px-6 py-2.5 bg-[#FFCA40] hover:bg-[#FFCA40]/90 disabled:bg-[#FFCA40]/50 text-[#001D58] font-semibold rounded-xl transition-all duration-200 shadow-lg shadow-[#FFCA40]/10 flex items-center gap-2 disabled:cursor-not-allowed text-sm"
         >
           {loading ? (
             <>

@@ -23,7 +23,6 @@ import { apiCall } from "@/utils/adminApi";
 import type {
   ApiKeyStatusResponse,
   KeySnapshot,
-  AddKeyResponse,
   ActiveModelStatusResponse,
 } from "@/types/admin/apiKeys";
 
@@ -693,87 +692,6 @@ function FallbackChainViz({ chain }: { chain: string[] }) {
   );
 }
 
-function AddKeyForm({ onKeyAdded }: { onKeyAdded: () => void }) {
-  const [value, setValue] = useState("");
-  const [submitting, setSubmitting] = useState(false);
-  const [masked, setMasked] = useState(true);
-
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    const trimmed = value.trim();
-    if (!trimmed || trimmed.length < 10) {
-      toast.error("API key must be at least 10 characters.");
-      return;
-    }
-
-    try {
-      setSubmitting(true);
-      const res = await apiCall<AddKeyResponse>(
-        "/api/v1/admin/system/api-keys",
-        { method: "POST", body: JSON.stringify({ api_key: trimmed }) }
-      );
-      toast.success(res.message);
-      setValue("");
-      onKeyAdded();
-    } catch (err) {
-      const msg =
-        err instanceof Error ? err.message : "Failed to add key";
-      toast.error(msg);
-    } finally {
-      setSubmitting(false);
-    }
-  };
-
-  const displayValue = masked && value.length > 8
-    ? `${value.slice(0, 4)}${"*".repeat(value.length - 8)}${value.slice(-4)}`
-    : value;
-
-  return (
-    <div className="rounded-xl border border-white/10 bg-white/5 p-5 backdrop-blur">
-      <h3 className="mb-3 flex items-center gap-2 text-sm font-semibold text-white/70">
-        <FiPlus size={16} className="text-[#FFCA40]" />
-        Add API Key
-      </h3>
-      <p className="mb-4 text-xs text-white/40">
-        Adds a new Gemini API key to the runtime rotation pool. The key is not
-        persisted across restarts (set it via the GEMINI_API_KEY env vars for
-        persistence).
-      </p>
-      <form onSubmit={handleSubmit} className="flex gap-2">
-        <div className="relative flex-1">
-          <input
-            type={masked ? "password" : "text"}
-            value={value}
-            onChange={(e) => setValue(e.target.value)}
-            placeholder="AIzaSy..."
-            className="w-full rounded-lg border border-white/10 bg-white/5 px-4 py-2.5 text-sm text-white placeholder-white/30 outline-none transition focus:border-[#FFCA40]/40 focus:ring-1 focus:ring-[#FFCA40]/20"
-          />
-          <button
-            type="button"
-            onClick={() => setMasked((p) => !p)}
-            className="absolute top-1/2 right-3 -translate-y-1/2 text-white/30 hover:text-white/60 transition"
-            tabIndex={-1}
-          >
-            {masked ? <FiShield size={14} /> : <FiKey size={14} />}
-          </button>
-        </div>
-        <button
-          type="submit"
-          disabled={submitting || value.trim().length < 10}
-          className="flex items-center gap-2 rounded-lg bg-[#FFCA40] px-5 py-2.5 text-sm font-semibold text-[#000B1F] transition hover:bg-[#FFCA40]/90 disabled:opacity-40"
-        >
-          {submitting ? (
-            <FiRefreshCw size={14} className="animate-spin" />
-          ) : (
-            <FiPlus size={14} />
-          )}
-          Add
-        </button>
-      </form>
-    </div>
-  );
-}
-
 // ---------------------------------------------------------------------------
 // Page
 // ---------------------------------------------------------------------------
@@ -1011,8 +929,6 @@ export default function AdminApiKeysPage() {
             </div>
           </div>
 
-          {/* Add key form */}
-          <AddKeyForm onKeyAdded={() => fetchStatus()} />
         </>
       )}
     </div>

@@ -1,10 +1,13 @@
 /**
  * PrivacySafeguardsStatus Component
- * 
+ *
  * Displays real-time privacy compliance status:
- * - k-anonymity value and threshold
+ * - Configured k-anonymity (enforced on every IA query)
  * - Differential privacy budget consumption
- * - Consent validation stats
+ * - Consent basis (allow-listed aggregate-only queries)
+ *
+ * Every value comes from the backend privacy-audit endpoint; when the
+ * endpoint is unreachable the panel says so instead of showing numbers.
  */
 
 'use client';
@@ -13,15 +16,35 @@ import { FiCheck, FiX } from 'react-icons/fi';
 import { usePrivacyStatus } from '../hooks/usePrivacyStatus';
 
 export function PrivacySafeguardsStatus() {
-  const { status, loading } = usePrivacyStatus();
+  const { status, loading, error } = usePrivacyStatus();
+
+  const shellClass =
+    'bg-[#00153a]/40 backdrop-blur-md border border-white/10 rounded-2xl overflow-hidden shadow-xl';
+  const header = (
+    <div className="p-6 border-b border-white/5 bg-white/5">
+      <h2 className="text-xl font-bold text-white tracking-tight">Privacy Safeguards Status</h2>
+      <p className="text-xs text-white/50 mt-1 font-mono uppercase tracking-wider">Real-time privacy compliance monitoring</p>
+    </div>
+  );
+
+  if (error && !status) {
+    return (
+      <div className={shellClass}>
+        {header}
+        <div className="p-6">
+          <div className="bg-red-500/10 border border-red-500/30 rounded-xl p-4 text-sm text-red-300">
+            Privacy status unavailable: {error}. The numbers below are never guessed — check the
+            clinical-analytics service and refresh.
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   if (loading || !status) {
     return (
-      <div className="bg-[#00153a]/40 backdrop-blur-md border border-white/10 rounded-2xl overflow-hidden shadow-xl">
-        <div className="p-6 border-b border-white/5 bg-white/5">
-          <h2 className="text-xl font-bold text-white tracking-tight">Privacy Safeguards Status</h2>
-          <p className="text-xs text-white/50 mt-1 font-mono uppercase tracking-wider">Real-time privacy compliance monitoring</p>
-        </div>
+      <div className={shellClass}>
+        {header}
         <div className="p-6">
           <div className="animate-pulse grid grid-cols-1 md:grid-cols-3 gap-6">
             {[1, 2, 3].map((i) => (
@@ -37,9 +60,7 @@ export function PrivacySafeguardsStatus() {
     );
   }
 
-  const kAnonymityPercent = Math.min((status.k_value / (status.k_threshold * 2)) * 100, 100);
-  const epsilonPercent = (status.epsilon_used / status.epsilon_total) * 100;
-  const consentPercent = (status.consented_users / status.total_users) * 100;
+  const epsilonPercent = status.epsilon_total > 0 ? (status.epsilon_used / status.epsilon_total) * 100 : 0;
 
   const getStatusIcon = (compliant: boolean) =>
     compliant ? (
@@ -49,11 +70,8 @@ export function PrivacySafeguardsStatus() {
     );
 
   return (
-    <div className="bg-[#00153a]/40 backdrop-blur-md border border-white/10 rounded-2xl overflow-hidden shadow-xl">
-      <div className="p-6 border-b border-white/5 bg-white/5">
-        <h2 className="text-xl font-bold text-white tracking-tight">Privacy Safeguards Status</h2>
-        <p className="text-xs text-white/50 mt-1 font-mono uppercase tracking-wider">Real-time privacy compliance monitoring</p>
-      </div>
+    <div className={shellClass}>
+      {header}
 
       <div className="p-6">
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
@@ -66,19 +84,19 @@ export function PrivacySafeguardsStatus() {
             </div>
             <div className="flex items-center justify-between mb-3 relative z-10">
               <h3 className="text-xs font-bold text-white/50 uppercase tracking-wider">k-anonymity</h3>
-              {getStatusIcon(status.k_value >= status.k_threshold)}
+              {getStatusIcon(status.k_anonymity > 0)}
             </div>
-            <p className="text-3xl font-bold text-white relative z-10">k = {status.k_value}</p>
-            <p className="text-xs text-white/50 mt-1 font-mono relative z-10">Threshold: k ≥ {status.k_threshold}</p>
+            <p className="text-3xl font-bold text-white relative z-10">k ≥ {status.k_anonymity}</p>
+            <p className="text-xs text-white/50 mt-1 font-mono relative z-10">Enforced on every IA query</p>
             <div className="mt-4 h-1.5 bg-white/10 rounded-full overflow-hidden relative z-10">
               <div
-                className={`h-full transition-all duration-500 ease-out ${status.k_value >= status.k_threshold ? 'bg-emerald-500 shadow-[0_0_10px_rgba(16,185,129,0.5)]' : 'bg-red-500 shadow-[0_0_10px_rgba(239,68,68,0.5)]'
+                className={`h-full transition-all duration-500 ease-out ${status.k_anonymity > 0 ? 'bg-emerald-500 shadow-[0_0_10px_rgba(16,185,129,0.5)]' : 'bg-red-500 shadow-[0_0_10px_rgba(239,68,68,0.5)]'
                   }`}
-                style={{ width: `${Math.min(kAnonymityPercent, 100)}%` }}
+                style={{ width: status.k_anonymity > 0 ? '100%' : '0%' }}
               ></div>
             </div>
-            {status.k_value < status.k_threshold && (
-              <p className="text-xs text-red-400 mt-2 font-medium relative z-10">⚠️ Below threshold - queries blocked</p>
+            {status.k_anonymity === 0 && (
+              <p className="text-xs text-red-400 mt-2 font-medium relative z-10">⚠️ Not configured — queries blocked</p>
             )}
           </div>
 
@@ -91,19 +109,21 @@ export function PrivacySafeguardsStatus() {
             </div>
             <div className="flex items-center justify-between mb-3 relative z-10">
               <h3 className="text-xs font-bold text-white/50 uppercase tracking-wider">Differential Privacy</h3>
-              {getStatusIcon(status.epsilon_used < status.epsilon_total)}
+              {getStatusIcon(status.dp_enabled && status.budget_healthy)}
             </div>
             <p className="text-3xl font-bold text-white relative z-10">
               ε = {status.epsilon_used.toFixed(2)}<span className="text-lg text-white/40 font-normal">/{status.epsilon_total.toFixed(1)}</span>
             </p>
             <p className="text-xs text-white/50 mt-1 font-mono relative z-10">
-              {((1 - epsilonPercent / 100) * 100).toFixed(0)}% budget remaining
+              {status.dp_enabled ? 'Noise calibrated per query' : 'DP disabled'}
+              {' · '}
+              {status.epsilon_total > 0 ? `${Math.max(0, 100 - epsilonPercent).toFixed(0)}% budget remaining` : 'no budget set'}
             </p>
             <div className="mt-4 h-1.5 bg-white/10 rounded-full overflow-hidden relative z-10">
               <div
                 className={`h-full transition-all duration-500 ease-out ${epsilonPercent < 80 ? 'bg-blue-500 shadow-[0_0_10px_rgba(59,130,246,0.5)]' : epsilonPercent < 95 ? 'bg-yellow-500' : 'bg-red-500'
                   }`}
-                style={{ width: `${epsilonPercent}%` }}
+                style={{ width: `${Math.min(epsilonPercent, 100)}%` }}
               ></div>
             </div>
             {epsilonPercent >= 95 && (
@@ -111,7 +131,7 @@ export function PrivacySafeguardsStatus() {
             )}
           </div>
 
-          {/* Consent Validation */}
+          {/* Consent basis */}
           <div className="bg-white/5 border border-white/10 rounded-xl p-5 relative overflow-hidden group hover:bg-white/10 transition-all">
             <div className="absolute top-0 right-0 p-3 opacity-10 group-hover:opacity-20 transition-opacity">
               <svg className="w-16 h-16 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -119,21 +139,15 @@ export function PrivacySafeguardsStatus() {
               </svg>
             </div>
             <div className="flex items-center justify-between mb-3 relative z-10">
-              <h3 className="text-xs font-bold text-white/50 uppercase tracking-wider">Consent Validation</h3>
-              {getStatusIcon(status.consented_users > 0)}
+              <h3 className="text-xs font-bold text-white/50 uppercase tracking-wider">Consent Basis</h3>
+              {getStatusIcon(true)}
             </div>
-            <p className="text-3xl font-bold text-white relative z-10">
-              {status.consented_users} <span className="text-lg text-white/40 font-normal">/ {status.total_users}</span>
+            <p className="text-base font-bold text-white relative z-10 leading-snug">
+              Aggregate-only, allow-listed queries
             </p>
-            <p className="text-xs text-white/50 mt-1 font-mono relative z-10">Active users opted in</p>
-            <div className="mt-4 h-1.5 bg-white/10 rounded-full overflow-hidden relative z-10">
-              <div
-                className="h-full bg-[#FFCA40] shadow-[0_0_10px_rgba(255,202,64,0.5)] transition-all duration-500 ease-out"
-                style={{ width: `${consentPercent}%` }}
-              ></div>
-            </div>
-            <p className="text-xs text-white/60 mt-2 font-medium relative z-10">
-              {consentPercent.toFixed(1)}% consent rate
+            <p className="text-xs text-white/50 mt-1 relative z-10">
+              IA runs only questions from a reviewed registry — no individual records are ever
+              accessed, so per-user analytics consent is not required by design.
             </p>
           </div>
         </div>
@@ -141,8 +155,3 @@ export function PrivacySafeguardsStatus() {
     </div>
   );
 }
-
-
-
-
-

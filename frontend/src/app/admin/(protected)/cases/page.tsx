@@ -58,11 +58,22 @@ export default function CasesPage() {
   });
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [filters, setFilters] = useState<CaseFilters>({
-    page: 1,
-    page_size: 20,
-    sort_by: 'created_at',
-    sort_order: 'desc',
+  const [filters, setFilters] = useState<CaseFilters>(() => {
+    // Seed from URL so deep links land pre-filtered: AdminHeader search
+    // (?search=), AlertsFeed critical link (?severity=critical), and drawer
+    // user links (?search=<user_hash>).
+    const search = searchParams?.get('search');
+    const severity = searchParams?.get('severity');
+    const status = searchParams?.get('status');
+    return {
+      page: 1,
+      page_size: 20,
+      sort_by: 'created_at',
+      sort_order: 'desc',
+      ...(search ? { search } : {}),
+      ...(severity && severity !== 'all' ? { severity: severity as CaseFilters['severity'] } : {}),
+      ...(status && status !== 'all' ? { status: status as CaseFilters['status'] } : {}),
+    };
   });
   const [activeChip, setActiveChip] = useState<QuickFilter>('all');
 
@@ -177,7 +188,7 @@ export default function CasesPage() {
   const showAlert = pageSlaBreached > 0 || criticalUnassigned > 0;
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-6">
       {/* Compact Header */}
       <div className="bg-white/5 backdrop-blur-sm border border-white/10 rounded-lg p-5">
         <div className="flex items-center justify-between">

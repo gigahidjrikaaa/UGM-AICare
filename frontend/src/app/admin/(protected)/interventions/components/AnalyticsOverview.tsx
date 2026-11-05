@@ -123,7 +123,7 @@ export function AnalyticsOverview({ analytics, loading, timeframeDays }: Props) 
                             medium: 'bg-yellow-500/20 border-yellow-500/30 text-yellow-300',
                             high: 'bg-orange-500/20 border-orange-500/30 text-orange-300',
                             critical: 'bg-red-500/20 border-red-500/30 text-red-300',
-                            unknown: 'bg-gray-500/20 border-gray-500/30 text-gray-300',
+                            unknown: 'bg-slate-500/10 border-slate-500/20 text-white/70',
                         };
                         const colorClass = colors[level as keyof typeof colors] || colors.unknown;
 

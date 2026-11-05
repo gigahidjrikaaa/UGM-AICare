@@ -205,7 +205,7 @@ export function IAQueryResults({ result, loading }: IAQueryResultsProps) {
         {summary && (
           <div className="mb-6 grid grid-cols-1 lg:grid-cols-2 gap-6">
             {/* Executive Summary */}
-            <div className="bg-gradient-to-br from-blue-500/10 to-purple-500/10 border border-white/10 rounded-xl p-6">
+            <div className="bg-linear-to-br from-blue-500/10 to-purple-500/10 border border-white/10 rounded-xl p-6">
               <h3 className="text-lg font-bold text-white mb-3 flex items-center gap-2">
                 <span className="text-xl">📊</span> Executive Summary
               </h3>
@@ -215,7 +215,7 @@ export function IAQueryResults({ result, loading }: IAQueryResultsProps) {
             </div>
 
             {/* Actionable Recommendations */}
-            <div className="bg-gradient-to-br from-emerald-500/10 to-teal-500/10 border border-white/10 rounded-xl p-6">
+            <div className="bg-linear-to-br from-emerald-500/10 to-teal-500/10 border border-white/10 rounded-xl p-6">
               <h3 className="text-lg font-bold text-white mb-3 flex items-center gap-2">
                 <span className="text-xl">🚀</span> Actionable Recommendations
               </h3>

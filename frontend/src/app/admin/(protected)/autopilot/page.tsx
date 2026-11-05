@@ -38,12 +38,12 @@ const REVIEWABLE = new Set(["awaiting_approval"]);
 // Helper component for status badges
 const StatusBadge = ({ status }: { status: string }) => {
   const styles: Record<string, string> = {
-    awaiting_approval: "bg-amber-500/10 text-amber-500 border-amber-500/20",
-    approved: "bg-emerald-500/10 text-emerald-500 border-emerald-500/20",
-    rejected: "bg-red-500/10 text-red-500 border-red-500/20",
-    running: "bg-blue-500/10 text-blue-500 border-blue-500/20",
-    confirmed: "bg-purple-500/10 text-purple-500 border-purple-500/20",
-    failed: "bg-rose-500/10 text-rose-500 border-rose-500/20",
+    awaiting_approval: "bg-amber-500/10 text-amber-400 border-amber-500/20",
+    approved: "bg-emerald-500/10 text-emerald-400 border-emerald-500/20",
+    rejected: "bg-red-500/10 text-red-400 border-red-500/20",
+    running: "bg-blue-500/10 text-blue-400 border-blue-500/20",
+    confirmed: "bg-violet-500/10 text-violet-400 border-violet-500/20",
+    failed: "bg-red-500/10 text-red-400 border-red-500/20",
   };
   
   const defaultStyle = "bg-slate-500/10 text-slate-400 border-slate-500/20";
@@ -434,7 +434,7 @@ export default function AdminAutopilotPage() {
 
             <div className="relative">
               {/* Connecting Line */}
-              <div className="hidden md:block absolute top-1/2 left-0 w-full h-0.5 bg-gradient-to-r from-emerald-500/20 via-[#FFCA40]/20 to-purple-500/20 -translate-y-1/2 z-0"></div>
+              <div className="hidden md:block absolute top-1/2 left-0 w-full h-0.5 bg-linear-to-r from-emerald-500/20 via-[#FFCA40]/20 to-purple-500/20 -translate-y-1/2 z-0"></div>
 
               <div className="grid grid-cols-1 md:grid-cols-5 gap-4 relative z-10">
                 {[

@@ -126,7 +126,7 @@ export default function CampaignsPage() {
       case 'paused':
         return 'bg-amber-500/10 text-amber-400 border-amber-500/20';
       case 'completed':
-        return 'bg-blue-500/10 text-blue-400 border-blue-500/20';
+        return 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20';
       case 'cancelled':
         return 'bg-rose-500/10 text-rose-400 border-rose-500/20';
       default:
@@ -180,7 +180,7 @@ export default function CampaignsPage() {
           <p className="text-white/60">{error instanceof Error ? error.message : 'Unknown error'}</p>
           <button
             onClick={() => queryClient.invalidateQueries({ queryKey: ['campaigns'] })}
-            className="rounded-xl bg-[#FFCA40] px-6 py-3 font-semibold text-[#00153a] shadow-lg shadow-[#FFCA40]/20 transition-all hover:bg-[#FFCA40]/90"
+            className="rounded-xl bg-[#FFCA40] px-6 py-3 font-semibold text-[#001D58] shadow-lg shadow-[#FFCA40]/20 transition-all hover:bg-[#FFCA40]/90"
           >
             Try Again
           </button>
@@ -204,7 +204,7 @@ export default function CampaignsPage() {
               <SparklesIcon className="mr-3 text-[#FFCA40] w-8 h-8" />
               Outreach Campaigns
             </h1>
-            <p className="text-gray-400 mt-1 max-w-2xl">
+            <p className="text-white/50 mt-1 max-w-2xl">
               Manage proactive interventions and Therapeutic Coach Agent (TCA) campaigns.
             </p>
           </div>
@@ -221,7 +221,7 @@ export default function CampaignsPage() {
               className="relative group"
             >
               <div className="absolute inset-0 rounded-xl bg-[#FFCA40] blur opacity-40 group-hover:opacity-60 transition-opacity duration-300" />
-              <div className="relative flex items-center gap-2 rounded-xl bg-[#FFCA40] px-5 py-2.5 font-semibold text-[#00153a] shadow-sm transition-all hover:bg-[#FFCA40]/90">
+              <div className="relative flex items-center gap-2 rounded-xl bg-[#FFCA40] px-5 py-2.5 font-semibold text-[#001D58] shadow-sm transition-all hover:bg-[#FFCA40]/90">
                 <PlusIcon className="w-5 h-5" />
                 <span>Create Campaign</span>
               </div>

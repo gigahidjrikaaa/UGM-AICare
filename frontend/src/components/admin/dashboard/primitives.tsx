@@ -116,7 +116,7 @@ export function ZoneLabel({ children }: { children: ReactNode }) {
       <span className="shrink-0 text-[10px] font-semibold uppercase tracking-[0.25em] text-white/35">
         {children}
       </span>
-      <div className="h-px flex-1 bg-gradient-to-r from-white/10 via-white/5 to-transparent" />
+      <div className="h-px flex-1 bg-linear-to-r from-white/10 via-white/5 to-transparent" />
     </div>
   );
 }

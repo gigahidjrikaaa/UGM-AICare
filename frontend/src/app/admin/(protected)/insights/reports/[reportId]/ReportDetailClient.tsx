@@ -41,6 +41,66 @@ export function ReportDetailClient({ reportId }: ReportDetailClientProps) {
     fetchReport();
   }, [reportId]);
 
+  const handleExport = () => {
+    if (!report) return;
+
+    const lines: string[] = [
+      'UGM-AICare — IA Insights Report',
+      '='.repeat(40),
+      `Type: ${report.report_type}`,
+      `Period: ${report.period_start} → ${report.period_end}`,
+      `Generated: ${report.generated_at}`,
+      '',
+      `Assessments analyzed: ${report.assessment_count}`,
+      `High-risk count: ${report.high_risk_count}`,
+    ];
+
+    if (report.summary) {
+      lines.push('', 'SUMMARY', '-'.repeat(40), report.summary);
+    }
+
+    if (report.sentiment_data) {
+      const sd = report.sentiment_data;
+      if (sd.avg_sentiment != null) lines.push('', `Average sentiment: ${sd.avg_sentiment}`);
+      if (sd.avg_risk != null) lines.push(`Average risk: ${sd.avg_risk}`);
+      if (sd.severity_distribution) {
+        lines.push('', 'SEVERITY DISTRIBUTION', '-'.repeat(40));
+        Object.entries(sd.severity_distribution).forEach(([level, count]) =>
+          lines.push(`  ${level}: ${count}`),
+        );
+      }
+      if (sd.patterns?.length) {
+        lines.push('', 'PATTERNS', '-'.repeat(40));
+        sd.patterns.forEach((p) => lines.push(`  [${p.severity}/${p.trend}] ${p.title} — ${p.description}`));
+      }
+      if (sd.recommendations?.length) {
+        lines.push('', 'RECOMMENDATIONS', '-'.repeat(40));
+        sd.recommendations.forEach((r) => lines.push(`  [${r.priority}/${r.category}] ${r.title} — ${r.description}`));
+      }
+    }
+
+    if (report.trending_topics && Object.keys(report.trending_topics).length > 0) {
+      lines.push('', 'TRENDING TOPICS', '-'.repeat(40));
+      Object.entries(report.trending_topics).forEach(([topic, data]) => {
+        const count = typeof data === 'object' && data !== null && 'count' in data
+          ? String((data as { count?: unknown }).count)
+          : '';
+        lines.push(`  ${topic}${count ? ` (${count})` : ''}`);
+      });
+    }
+
+    lines.push('', `Exported from UGM-AICare admin console`);
+
+    const blob = new Blob([lines.join('\n')], { type: 'text/plain;charset=utf-8' });
+    const url = URL.createObjectURL(blob);
+    const anchor = document.createElement('a');
+    anchor.href = url;
+    anchor.download = `aicare-insights-${report.report_type}-${report.period_start}.txt`;
+    anchor.click();
+    URL.revokeObjectURL(url);
+    toast.success('Report downloaded');
+  };
+
   if (loading) {
     return (
       <div className="flex items-center justify-center space-y-6">
@@ -174,7 +234,7 @@ export function ReportDetailClient({ reportId }: ReportDetailClientProps) {
                 <div className="flex items-center gap-4">
                   <div className="flex-1 h-3 bg-white/10 rounded-full overflow-hidden">
                     <div
-                      className="h-full bg-gradient-to-r from-red-500 via-yellow-500 to-green-500 transition-all duration-500"
+                      className="h-full bg-linear-to-r from-red-500 via-yellow-500 to-green-500 transition-all duration-500"
                       style={{ width: `${sentimentData.avg_sentiment * 100}%` }}
                     />
                   </div>
@@ -359,7 +419,7 @@ export function ReportDetailClient({ reportId }: ReportDetailClientProps) {
             Back to Reports
           </Link>
           <button
-            onClick={() => toast.success('Report exported (mock)')}
+            onClick={handleExport}
             className="flex items-center gap-2 px-4 py-2 bg-[#FFCA40]/15 border border-[#FFCA40]/40 text-[#FFCA40] rounded-lg hover:bg-[#FFCA40]/25 transition-colors"
           >
             <Download size={16} />

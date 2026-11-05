@@ -463,14 +463,14 @@ export default function AdminTestingPage() {
 
   return (
     <div className="space-y-6">
-      <div className="rounded-xl border border-white/10 bg-white/5 p-6">
+      <div>
         <div className="flex flex-col gap-2 md:flex-row md:items-center md:justify-between">
           <div>
-            <h1 className="flex items-center gap-2 text-2xl font-semibold text-white">
+            <h1 className="flex items-center gap-3 text-3xl font-bold text-white">
               <FiTerminal className="text-[#FFCA40]" />
               Testing Console
             </h1>
-            <p className="mt-1 text-sm text-white/70">
+            <p className="mt-1 text-sm text-white/60">
               Admin-only testing page to run demonstration flows and capture logs for debugging/reporting.
             </p>
           </div>

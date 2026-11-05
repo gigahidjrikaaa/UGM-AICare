@@ -71,10 +71,10 @@ const CbtModuleForm: React.FC<CbtModuleFormProps> = ({ module, onSuccess }) => {
                 required
                 className="w-full pl-10 pr-3 py-3 bg-white/8 border border-white/15 rounded-xl text-white placeholder-white/40 focus:ring-2 focus:ring-[#FFCA40]/50 focus:border-[#FFCA40]/50 outline-none transition-all duration-300 backdrop-blur-sm hover:bg-white/10"
             />
-            <p className="text-xs text-gray-400 -mt-2">Use clear, student-facing language. This appears wherever the module is listed.</p>
+            <p className="text-xs text-white/50 -mt-2">Use clear, student-facing language. This appears wherever the module is listed.</p>
 
             <div className="space-y-1">
-                <label htmlFor="description" className="block text-sm font-medium text-gray-300">Short description</label>
+                <label htmlFor="description" className="block text-sm font-medium text-white/70">Short description</label>
                 <Textarea
                     id="description"
                     placeholder="What will students practice or learn in this module? Keep it short and friendly."
@@ -84,7 +84,7 @@ const CbtModuleForm: React.FC<CbtModuleFormProps> = ({ module, onSuccess }) => {
                     rows={4}
                     className="w-full min-h-[150px] p-3 bg-white/8 border border-white/15 rounded-xl text-white placeholder-white/40 focus:ring-2 focus:ring-[#FFCA40]/50 focus:border-[#FFCA40]/50 outline-none transition-all duration-300 backdrop-blur-sm hover:bg-white/10"
                 />
-                <p className="text-xs text-gray-400">Tip: Focus on outcomes (e.g., “Belajar mengenali pola pikir yang tidak membantu dan menggantinya dengan perspektif yang lebih seimbang”).</p>
+                <p className="text-xs text-white/50">Tip: Focus on outcomes (e.g., “Belajar mengenali pola pikir yang tidak membantu dan menggantinya dengan perspektif yang lebih seimbang”).</p>
             </div>
 
             <div className="pt-2">

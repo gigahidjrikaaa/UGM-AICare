@@ -5,44 +5,18 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { Search, Filter, Download, Mail, RefreshCw, BarChart2, ShieldAlert, AlertTriangle, Phone, Users } from 'lucide-react';
 import { apiCall } from '@/utils/adminApi';
 import { toast } from 'react-hot-toast';
-import Image from 'next/image';
+import UserAvatar from '@/components/ui/profile/UserAvatar';
 import { User, UsersResponse, UserStats } from '@/types/admin/users';
 import { getScreeningDashboard, listScreeningProfiles } from '@/services/adminScreeningApi';
-import { ScreeningDashboard, ScreeningProfile, RISK_CONFIG } from '@/types/admin/screening';
+import { getDashboardTrends } from '@/services/adminDashboardApi';
+import type { TrendsResponse } from '@/types/admin/dashboard';
+import { ScreeningDashboard, ScreeningProfile, RISK_CONFIG, RiskLevel } from '@/types/admin/screening';
 import PatientProfileDrawer from '@/components/admin/PatientProfileDrawer';
-import { AreaChart, Area, ResponsiveContainer, BarChart, Bar } from 'recharts';
+import { AreaChart, Area, ResponsiveContainer, BarChart, Bar, XAxis } from 'recharts';
 
 const ITEMS_PER_PAGE = 20;
 
-const mockActivityTrend = [
-  { value: 42 },
-  { value: 51 },
-  { value: 47 },
-  { value: 56 },
-  { value: 61 },
-  { value: 58 },
-  { value: 64 },
-];
-
-const mockIssuesTrend = [
-  { value: 9 },
-  { value: 7 },
-  { value: 8 },
-  { value: 6 },
-  { value: 5 },
-  { value: 4 },
-  { value: 3 },
-];
-
-const mockSentimentTrend = [
-  { value: 0.12 },
-  { value: 0.06 },
-  { value: 0.14 },
-  { value: 0.19 },
-  { value: 0.16 },
-  { value: 0.24 },
-  { value: 0.21 },
-];
+const RISK_LEVELS: RiskLevel[] = ['none', 'mild', 'moderate', 'severe', 'critical'];
 
 export default function PatientManagementPage() {
   const [users, setUsers] = useState<User[]>([]);
@@ -65,6 +39,7 @@ export default function PatientManagementPage() {
   const [drawerLoading, setDrawerLoading] = useState(false);
   const [screeningDashboard, setScreeningDashboard] = useState<ScreeningDashboard | null>(null);
   const [screeningProfilesMap, setScreeningProfilesMap] = useState<Record<number, ScreeningProfile>>({});
+  const [trends, setTrends] = useState<TrendsResponse | null>(null);
 
   const fetchUsers = useCallback(async () => {
     try {
@@ -76,13 +51,14 @@ export default function PatientManagementPage() {
         sort_order: sortOrder,
         ...(searchQuery && { search: searchQuery }),
         ...(roleFilter && { role: roleFilter }),
-        ...(activeOnly && { is_active: 'true' })
+        ...(activeOnly && { active_only: 'true' })
       }).toString();
 
-      const [usersData, sdData, spData] = await Promise.all([
+      const [usersData, sdData, spData, trendsData] = await Promise.all([
         apiCall(`/api/v1/admin/users?${queryParams}`) as Promise<UsersResponse>,
         getScreeningDashboard().catch(() => null),
-        listScreeningProfiles({ limit: 1000 }).catch(() => null)
+        listScreeningProfiles({ limit: 100 }).catch(() => null),
+        getDashboardTrends(30).catch(() => null)
       ]);
 
       setUsers(usersData.users);
@@ -90,6 +66,7 @@ export default function PatientManagementPage() {
       setTotalCount(usersData.total_count);
 
       if (sdData) setScreeningDashboard(sdData);
+      if (trendsData) setTrends(trendsData);
 
       if (spData) {
         const pMap: Record<number, ScreeningProfile> = {};
@@ -114,17 +91,6 @@ export default function PatientManagementPage() {
     e.preventDefault();
     setCurrentPage(1);
     fetchUsers();
-  };
-
-  const handleTableSort = (field: 'id' | 'last_activity_date' | 'current_streak' | 'sentiment_score') => {
-    if (sortBy === field) {
-      setSortOrder(sortOrder === 'asc' ? 'desc' : 'asc');
-    } else {
-      setSortBy(field);
-      setSortOrder('desc');
-    }
-    setCurrentPage(1);
-    // Let useCallback dependency trigger refetch
   };
 
   const handleExport = () => {
@@ -184,19 +150,19 @@ export default function PatientManagementPage() {
             <Users className="mr-3 text-[#FFCA40]" />
             Patient Clinical Command Center
           </h1>
-          <p className="text-gray-400 mt-1">Monitor screening progress and engagement of active patients</p>
+          <p className="text-white/50 mt-1">Monitor screening progress and engagement of active patients</p>
         </div>
         <div className="flex items-center gap-3">
           <button
             onClick={() => fetchUsers()}
-            className="p-2 bg-white/5 border border-white/10 rounded-lg text-gray-300 hover:text-white hover:bg-white/10 transition-colors"
+            className="p-2 bg-white/5 border border-white/10 rounded-lg text-white/70 hover:text-white hover:bg-white/10 transition-colors"
             title="Refresh"
           >
             <RefreshCw className={`h-5 w-5 ${loading ? 'animate-spin text-[#FFCA40]' : ''}`} />
           </button>
           <button
             onClick={handleExport}
-            className="flex items-center gap-2 px-4 py-2 bg-white/5 border border-white/10 rounded-lg text-gray-300 hover:text-white hover:bg-white/10 transition-colors"
+            className="flex items-center gap-2 px-4 py-2 bg-white/5 border border-white/10 rounded-lg text-white/70 hover:text-white hover:bg-white/10 transition-colors"
           >
             <Download className="h-4 w-4" /> Export CSV
           </button>
@@ -212,19 +178,22 @@ export default function PatientManagementPage() {
         >
           <div className="flex items-start justify-between">
             <div>
-              <p className="text-sm font-medium text-gray-400">Total Monitored Users</p>
+              <p className="text-sm font-medium text-white/50">Total Monitored Users</p>
               <h3 className="text-3xl font-bold text-white mt-1">{stats?.total_users || 0}</h3>
             </div>
             <div className="p-3 bg-blue-500/10 rounded-lg">
               <BarChart2 className="w-6 h-6 text-blue-400" />
             </div>
           </div>
-          <div className="mt-4 flex items-center h-10 w-full">
-            <ResponsiveContainer width="100%" height="100%">
-              <AreaChart data={mockActivityTrend}>
-                <Area type="monotone" dataKey="value" stroke="#3b82f6" fill="#3b82f6" fillOpacity={0.2} strokeWidth={2} />
-              </AreaChart>
-            </ResponsiveContainer>
+          <div className="mt-4">
+            <div className="flex items-center h-10 w-full">
+              <ResponsiveContainer width="100%" height="100%">
+                <AreaChart data={trends?.cases_opened_trend ?? []}>
+                  <Area type="monotone" dataKey="value" stroke="#3b82f6" fill="#3b82f6" fillOpacity={0.2} strokeWidth={2} />
+                </AreaChart>
+              </ResponsiveContainer>
+            </div>
+            <p className="mt-1 text-[10px] text-white/40">Cases opened · last 30 days</p>
           </div>
         </motion.div>
 
@@ -236,19 +205,28 @@ export default function PatientManagementPage() {
         >
           <div className="flex items-start justify-between">
             <div>
-              <p className="text-sm font-medium text-gray-400">Requires Attention</p>
+              <p className="text-sm font-medium text-white/50">Requires Attention</p>
               <h3 className="text-3xl font-bold text-red-500 mt-1">{screeningDashboard?.profiles_requiring_attention || 0}</h3>
             </div>
             <div className="p-3 bg-red-500/20 rounded-lg">
               <AlertTriangle className="w-6 h-6 text-red-400" />
             </div>
           </div>
-          <div className="mt-4 flex items-center h-10 w-full">
-            <ResponsiveContainer width="100%" height="100%">
-              <BarChart data={mockIssuesTrend}>
-                <Bar dataKey="value" fill="#ef4444" radius={[2, 2, 0, 0]} opacity={0.8} />
-              </BarChart>
-            </ResponsiveContainer>
+          <div className="mt-4">
+            <div className="flex items-center h-10 w-full">
+              <ResponsiveContainer width="100%" height="100%">
+                <BarChart
+                  data={RISK_LEVELS.map((level) => ({
+                    level,
+                    count: screeningDashboard?.risk_distribution[level] ?? 0,
+                  }))}
+                >
+                  <XAxis dataKey="level" hide />
+                  <Bar dataKey="count" fill="#ef4444" radius={[2, 2, 0, 0]} opacity={0.8} />
+                </BarChart>
+              </ResponsiveContainer>
+            </div>
+            <p className="mt-1 text-[10px] text-white/40">Current risk distribution</p>
           </div>
         </motion.div>
 
@@ -260,7 +238,7 @@ export default function PatientManagementPage() {
         >
           <div className="flex items-start justify-between">
             <div>
-              <p className="text-sm font-medium text-gray-400">High Risk Profiles</p>
+              <p className="text-sm font-medium text-white/50">High Risk Profiles</p>
               <h3 className="text-3xl font-bold text-orange-400 mt-1">
                 {(screeningDashboard?.risk_distribution['critical'] || 0) + (screeningDashboard?.risk_distribution['severe'] || 0)}
               </h3>
@@ -269,12 +247,15 @@ export default function PatientManagementPage() {
               <ShieldAlert className="w-6 h-6 text-orange-400" />
             </div>
           </div>
-          <div className="mt-4 flex items-center h-10 w-full">
-            <ResponsiveContainer width="100%" height="100%">
-              <AreaChart data={mockSentimentTrend}>
-                <Area type="monotone" dataKey="value" stroke="#f97316" fill="#f97316" fillOpacity={0.2} strokeWidth={2} />
-              </AreaChart>
-            </ResponsiveContainer>
+          <div className="mt-4">
+            <div className="flex items-center h-10 w-full">
+              <ResponsiveContainer width="100%" height="100%">
+                <AreaChart data={trends?.sentiment_trend ?? []}>
+                  <Area type="monotone" dataKey="value" stroke="#f97316" fill="#f97316" fillOpacity={0.2} strokeWidth={2} />
+                </AreaChart>
+              </ResponsiveContainer>
+            </div>
+            <p className="mt-1 text-[10px] text-white/40">Avg wellness score · last 30 days</p>
           </div>
         </motion.div>
 
@@ -286,19 +267,22 @@ export default function PatientManagementPage() {
         >
           <div className="flex items-start justify-between">
             <div>
-              <p className="text-sm font-medium text-gray-400">Engagement Health</p>
+              <p className="text-sm font-medium text-white/50">Engagement Health</p>
               <h3 className="text-3xl font-bold text-green-400 mt-1">{stats?.active_users_7d || 0}</h3>
             </div>
             <div className="p-3 bg-green-500/10 rounded-lg">
               <RefreshCw className="w-6 h-6 text-green-400" />
             </div>
           </div>
-          <div className="mt-4 flex items-center h-10 w-full">
-            <ResponsiveContainer width="100%" height="100%">
-              <BarChart data={mockActivityTrend}>
-                <Bar dataKey="value" fill="#4ade80" radius={[2, 2, 0, 0]} opacity={0.8} />
-              </BarChart>
-            </ResponsiveContainer>
+          <div className="mt-4">
+            <div className="flex items-center h-10 w-full">
+              <ResponsiveContainer width="100%" height="100%">
+                <BarChart data={trends?.cases_closed_trend ?? []}>
+                  <Bar dataKey="value" fill="#4ade80" radius={[2, 2, 0, 0]} opacity={0.8} />
+                </BarChart>
+              </ResponsiveContainer>
+            </div>
+            <p className="mt-1 text-[10px] text-white/40">Cases closed · last 30 days</p>
           </div>
         </motion.div>
       </div>
@@ -306,7 +290,7 @@ export default function PatientManagementPage() {
       {/* Toolbar */}
       <div className="flex flex-col sm:flex-row gap-4 items-center justify-between bg-white/5 p-4 rounded-xl border border-white/10">
         <form onSubmit={handleSearch} className="flex-1 w-full relative">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-gray-400" />
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-white/50" />
           <input
             type="text"
             placeholder="Search by name, email, or ID..."
@@ -320,7 +304,7 @@ export default function PatientManagementPage() {
             onClick={() => setShowFilters(!showFilters)}
             className={`flex-1 sm:flex-none flex items-center justify-center gap-2 px-4 py-2 rounded-lg border transition-colors ${showFilters || roleFilter || activeOnly
               ? 'bg-[#FFCA40]/20 border-[#FFCA40]/50 text-[#FFCA40]'
-              : 'bg-black/20 border-white/10 text-gray-300 hover:bg-white/10 hover:text-white'
+              : 'bg-black/20 border-white/10 text-white/70 hover:bg-white/10 hover:text-white'
               }`}
           >
             <Filter className="h-4 w-4" /> Filters
@@ -342,7 +326,7 @@ export default function PatientManagementPage() {
           >
             <div className="p-4 bg-white/5 border border-white/10 rounded-xl flex gap-6 items-center flex-wrap">
               <div>
-                <label className="block text-xs font-medium text-gray-400 mb-1">Role</label>
+                <label className="block text-xs font-medium text-white/50 mb-1">Role</label>
                 <select
                   value={roleFilter}
                   onChange={(e) => setRoleFilter(e.target.value)}
@@ -362,8 +346,8 @@ export default function PatientManagementPage() {
                   onChange={(e) => setActiveOnly(e.target.checked)}
                   className="h-4 w-4 text-[#FFCA40] focus:ring-[#FFCA40] bg-white/10 border-white/20 rounded"
                 />
-                <label htmlFor="activeOnly" className="ml-2 text-sm text-gray-300">
-                  Active users only
+                <label htmlFor="activeOnly" className="ml-2 text-sm text-white/70">
+                  Active in the last 30 days
                 </label>
               </div>
             </div>
@@ -377,11 +361,11 @@ export default function PatientManagementPage() {
           <table className="min-w-full divide-y divide-white/20">
             <thead className="bg-white/5">
               <tr>
-                <th className="px-6 py-4 text-left text-xs font-semibold text-gray-300 uppercase tracking-wider">User Profile</th>
-                <th className="px-6 py-4 text-left text-xs font-semibold text-gray-300 uppercase tracking-wider">Access & Role</th>
-                <th className="px-6 py-4 text-left text-xs font-semibold text-gray-300 uppercase tracking-wider">Screening Risk</th>
-                <th className="px-6 py-4 text-left text-xs font-semibold text-gray-300 uppercase tracking-wider">Engagement</th>
-                <th className="px-6 py-4 text-right text-xs font-semibold text-gray-300 uppercase tracking-wider">CRM Actions</th>
+                <th className="px-6 py-4 text-left text-xs font-semibold text-white/70 uppercase tracking-wider">User Profile</th>
+                <th className="px-6 py-4 text-left text-xs font-semibold text-white/70 uppercase tracking-wider">Access & Role</th>
+                <th className="px-6 py-4 text-left text-xs font-semibold text-white/70 uppercase tracking-wider">Screening Risk</th>
+                <th className="px-6 py-4 text-left text-xs font-semibold text-white/70 uppercase tracking-wider">Engagement</th>
+                <th className="px-6 py-4 text-right text-xs font-semibold text-white/70 uppercase tracking-wider">CRM Actions</th>
               </tr>
             </thead>
             <tbody className="bg-transparent divide-y divide-white/10">
@@ -406,13 +390,7 @@ export default function PatientManagementPage() {
                     <td className="px-6 py-4 whitespace-nowrap">
                       <div className="flex items-center">
                         <div className="relative h-10 w-10 text-white rounded-full border border-white/20 bg-white/10 shrink-0 overflow-hidden">
-                          {user.avatar_url ? (
-                            <Image src={user.avatar_url} alt="Avatar" fill className="object-cover" />
-                          ) : (
-                            <div className="flex h-full w-full items-center justify-center text-[#FFCA40] font-bold">
-                              {(user.name || user.email || 'U').charAt(0).toUpperCase()}
-                            </div>
-                          )}
+                          <UserAvatar src={user.avatar_url} name={user.name} email={user.email} initialsClassName="text-sm" />
                         </div>
                         <div className="ml-4">
                           <div className="text-sm font-bold text-white">{user.name || `User ${user.id}`}</div>
@@ -461,14 +439,6 @@ export default function PatientManagementPage() {
                             S: {(user.sentiment_score * 100).toFixed(0)}%
                           </div>
                         </div>
-                        {/* Sparkline for Activity */}
-                        <div className="h-6 w-32 mt-1">
-                          <ResponsiveContainer width="100%" height="100%">
-                            <AreaChart data={mockActivityTrend}>
-                              <Area type="monotone" dataKey="value" stroke="#3b82f6" fill="#3b82f6" fillOpacity={0.2} strokeWidth={1.5} />
-                            </AreaChart>
-                          </ResponsiveContainer>
-                        </div>
                       </div>
                     </td>
 
@@ -499,7 +469,7 @@ export default function PatientManagementPage() {
         {/* Pagination Header (Optional padding bottom) */}
         {totalPages > 1 && (
           <div className="bg-white/5 px-4 py-3 border-t border-white/20 flex flex-col sm:flex-row justify-between items-center gap-4">
-            <div className="text-sm text-gray-400">
+            <div className="text-sm text-white/50">
               Showing {(currentPage - 1) * ITEMS_PER_PAGE + 1} to {Math.min(currentPage * ITEMS_PER_PAGE, totalCount)} of {totalCount} users
             </div>
             <div className="flex items-center gap-2">
@@ -517,7 +487,7 @@ export default function PatientManagementPage() {
                   <button
                     key={page}
                     onClick={() => setCurrentPage(page)}
-                    className={`px-3 py-1 rounded-md text-sm transition-colors ${page === currentPage ? 'bg-[#FFCA40] text-black font-bold' : 'bg-white/5 text-white hover:bg-white/10'
+                    className={`px-3 py-1 rounded-md text-sm transition-colors ${page === currentPage ? 'bg-[#FFCA40] text-[#001D58] font-bold' : 'bg-white/5 text-white hover:bg-white/10'
                       }`}
                   >
                     {page}

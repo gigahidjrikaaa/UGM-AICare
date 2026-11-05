@@ -186,7 +186,7 @@ export function ArchitectureGuide() {
                             onClick={() => setActiveTab(tab.id as 'agents' | 'bdi' | 'cases' | 'theory')}
                             className={`px-5 py-2 text-sm font-bold rounded-lg transition-all ${
                                 activeTab === tab.id
-                                    ? 'bg-[#FFCA40] text-[#00153a] shadow-lg scale-105'
+                                    ? 'bg-[#FFCA40] text-[#001D58] shadow-lg scale-105'
                                     : 'text-white/40 hover:text-white'
                             }`}
                         >

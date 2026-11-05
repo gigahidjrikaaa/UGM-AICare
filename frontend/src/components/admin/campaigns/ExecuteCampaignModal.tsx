@@ -68,7 +68,7 @@ export function ExecuteCampaignModal({ campaign, onClose, onSuccess }: ExecuteCa
           initial={{ opacity: 0, scale: 0.95 }}
           animate={{ opacity: 1, scale: 1 }}
           exit={{ opacity: 0, scale: 0.95 }}
-          className="bg-gradient-to-br from-[#001a47] to-[#00153a] rounded-2xl shadow-2xl border border-white/10 max-w-2xl w-full"
+          className="bg-linear-to-br from-[#001a47] to-[#00153a] rounded-2xl shadow-2xl border border-white/10 max-w-2xl w-full"
         >
           {/* Header */}
           <div className="bg-[#001a47]/95 backdrop-blur-sm border-b border-white/10 px-6 py-4 flex items-center justify-between">
@@ -239,7 +239,7 @@ export function ExecuteCampaignModal({ campaign, onClose, onSuccess }: ExecuteCa
               <button
                 onClick={handleExecute}
                 disabled={isExecuting}
-                className="px-6 py-3 bg-[#FFCA40] hover:bg-[#FFCA40]/90 disabled:opacity-50 disabled:cursor-not-allowed text-[#00153a] font-semibold rounded-xl transition-all shadow-lg shadow-[#FFCA40]/20 flex items-center gap-2"
+                className="px-6 py-3 bg-[#FFCA40] hover:bg-[#FFCA40]/90 disabled:opacity-50 disabled:cursor-not-allowed text-[#001D58] font-semibold rounded-xl transition-all shadow-lg shadow-[#FFCA40]/20 flex items-center gap-2"
               >
                 {isExecuting ? (
                   <>

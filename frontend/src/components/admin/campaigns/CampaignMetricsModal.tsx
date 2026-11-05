@@ -66,7 +66,7 @@ export function CampaignMetricsModal({ campaignId, campaignName, onClose }: Camp
           initial={{ opacity: 0, scale: 0.95 }}
           animate={{ opacity: 1, scale: 1 }}
           exit={{ opacity: 0, scale: 0.95 }}
-          className="bg-gradient-to-br from-[#001a47] to-[#00153a] rounded-2xl shadow-2xl border border-white/10 max-w-4xl w-full max-h-[90vh] overflow-y-auto"
+          className="bg-linear-to-br from-[#001a47] to-[#00153a] rounded-2xl shadow-2xl border border-white/10 max-w-4xl w-full max-h-[90vh] overflow-y-auto"
         >
           {/* Header */}
           <div className="sticky top-0 bg-[#001a47]/95 backdrop-blur-sm border-b border-white/10 px-6 py-4 flex items-center justify-between z-10">
@@ -102,7 +102,7 @@ export function CampaignMetricsModal({ campaignId, campaignName, onClose }: Camp
                 {/* Summary Cards */}
                 <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
                   {/* Total Messages */}
-                  <div className="p-4 bg-gradient-to-br from-blue-500/20 to-blue-600/20 border border-blue-500/30 rounded-xl">
+                  <div className="p-4 bg-linear-to-br from-blue-500/20 to-blue-600/20 border border-blue-500/30 rounded-xl">
                     <div className="flex items-center gap-3">
                       <ChartBarIcon className="w-8 h-8 text-blue-400" />
                       <div>
@@ -113,7 +113,7 @@ export function CampaignMetricsModal({ campaignId, campaignName, onClose }: Camp
                   </div>
 
                   {/* Success Rate */}
-                  <div className="p-4 bg-gradient-to-br from-green-500/20 to-green-600/20 border border-green-500/30 rounded-xl">
+                  <div className="p-4 bg-linear-to-br from-green-500/20 to-green-600/20 border border-green-500/30 rounded-xl">
                     <div className="flex items-center gap-3">
                       <CheckCircleIcon className="w-8 h-8 text-green-400" />
                       <div>
@@ -124,7 +124,7 @@ export function CampaignMetricsModal({ campaignId, campaignName, onClose }: Camp
                   </div>
 
                   {/* Users Targeted */}
-                  <div className="p-4 bg-gradient-to-br from-[#FFCA40]/20 to-[#FFCA40]/10 border border-[#FFCA40]/30 rounded-xl">
+                  <div className="p-4 bg-linear-to-br from-[#FFCA40]/20 to-[#FFCA40]/10 border border-[#FFCA40]/30 rounded-xl">
                     <div className="flex items-center gap-3">
                       <CheckCircleIcon className="w-8 h-8 text-[#FFCA40]" />
                       <div>
@@ -135,7 +135,7 @@ export function CampaignMetricsModal({ campaignId, campaignName, onClose }: Camp
                   </div>
 
                   {/* Users Engaged */}
-                  <div className="p-4 bg-gradient-to-br from-purple-500/20 to-purple-600/20 border border-purple-500/30 rounded-xl">
+                  <div className="p-4 bg-linear-to-br from-purple-500/20 to-purple-600/20 border border-purple-500/30 rounded-xl">
                     <div className="flex items-center gap-3">
                       <XCircleIcon className="w-8 h-8 text-purple-400" />
                       <div>

@@ -23,13 +23,13 @@ export default function LangGraphMonitoringPage() {
   return (
     <div className="space-y-6 font-mono text-white selection:bg-white/30">
       
-      <div className="max-w-7xl mx-auto space-y-6">
-        
+      <div className="space-y-6">
+
         {/* Page Header */}
-        <div className="flex flex-col md:flex-row justify-between items-start md:items-end gap-4 border-b border-white/20 pb-4">
+        <div className="flex flex-col md:flex-row justify-between items-start md:items-end gap-4 border-b border-white/10 pb-4">
           <div>
-            <h1 className="text-2xl font-bold uppercase tracking-widest mb-1">LangGraph Observability</h1>
-            <p className="text-white/50 text-xs uppercase tracking-widest">
+            <h1 className="text-3xl font-bold text-white">LangGraph Observability</h1>
+            <p className="mt-1 text-sm text-white/60 font-mono uppercase tracking-widest">
               Financial & Technical Telemetry
             </p>
           </div>
@@ -42,7 +42,7 @@ export default function LangGraphMonitoringPage() {
                   onClick={() => setAnalyticsDays(days)}
                   className={`px-3 py-1 transition-colors uppercase ${
                     analyticsDays === days
-                      ? 'bg-white text-black font-bold'
+                      ? 'bg-white text-[#001D58] font-bold'
                       : 'bg-black text-white/50 hover:bg-white/10 hover:text-white'
                   }`}
                 >
@@ -74,7 +74,7 @@ export default function LangGraphMonitoringPage() {
 
         {/* Error State */}
         {error && (
-          <div className="border border-red-500 bg-red-500/10 p-3 text-red-500 text-xs flex justify-between items-center uppercase tracking-widest">
+          <div className="rounded-xl border border-red-500/40 bg-red-500/10 p-3 text-red-300 text-xs flex justify-between items-center uppercase tracking-widest">
             <p>ERR_CONNECTION: Failed to sync telemetry ({error})</p>
             <button
               onClick={() => refetch()}

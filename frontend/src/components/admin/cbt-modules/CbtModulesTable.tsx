@@ -78,12 +78,12 @@ const CbtModulesTable = () => {
                     <div className="p-6 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                         <div>
                             <h2 className="text-xl font-semibold text-white">CBT Modules</h2>
-                            <p className="text-sm text-gray-300 mt-1">
+                            <p className="text-sm text-white/70 mt-1">
                                 Create guided, step-by-step experiences to help students practice skills like
                                 cognitive restructuring, problem solving, and mindfulness.
                             </p>
                         </div>
-                        <Button onClick={handleAddNew} className="inline-flex items-center px-4 py-2 bg-[#FFCA40] hover:bg-[#ffda63] text-black rounded-lg text-sm font-medium transition-colors">
+                        <Button onClick={handleAddNew} className="inline-flex items-center gap-2 rounded-xl bg-[#FFCA40] px-5 py-2.5 text-sm font-semibold text-[#001D58] shadow-lg shadow-[#FFCA40]/20 transition-all hover:bg-[#FFCA40]/90 disabled:cursor-not-allowed disabled:opacity-50">
                             <FiPlus className="mr-2" />
                             Add Module
                         </Button>
@@ -91,7 +91,7 @@ const CbtModulesTable = () => {
 
                     {modules.length === 0 ? (
                         <div className="px-6 pb-6">
-                            <div className="border border-dashed border-white/20 rounded-lg p-6 text-center text-gray-300">
+                            <div className="border border-dashed border-white/20 rounded-lg p-6 text-center text-white/70">
                                 <p className="mb-2">No modules yet.</p>
                                 <p className="mb-4 text-sm">Start by creating your first CBT module. You can add steps afterwards.</p>
                                 <Button onClick={handleAddNew} className="inline-flex items-center px-4 py-2 bg-white/10 hover:bg-white/20 text-white rounded-lg text-sm font-medium transition-colors">
@@ -105,16 +105,16 @@ const CbtModulesTable = () => {
                             <table className="min-w-full divide-y divide-white/20">
                                 <thead className="bg-white/5">
                                     <tr>
-                                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider">Title</th>
-                                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider">Description</th>
-                                        <th className="px-6 py-3 text-right text-xs font-medium text-gray-300 uppercase tracking-wider">Actions</th>
+                                        <th className="px-6 py-3 text-left text-xs font-medium text-white/70 uppercase tracking-wider">Title</th>
+                                        <th className="px-6 py-3 text-left text-xs font-medium text-white/70 uppercase tracking-wider">Description</th>
+                                        <th className="px-6 py-3 text-right text-xs font-medium text-white/70 uppercase tracking-wider">Actions</th>
                                     </tr>
                                 </thead>
                                 <tbody className="bg-transparent divide-y divide-white/20">
                                     {modules.map((module) => (
                                         <tr key={module.id} className="hover:bg-white/5 transition-colors">
                                             <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-white">{module.title}</td>
-                                            <td className="px-6 py-4 whitespace-normal text-sm text-gray-300">{module.description}</td>
+                                            <td className="px-6 py-4 whitespace-normal text-sm text-white/70">{module.description}</td>
                                             <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
                                                 <Tooltip title="Manage steps">
                                                     <Link href={`/admin/cbt-modules/${module.id}/steps`} className="inline-flex items-center text-green-400 hover:text-green-300 mr-4" aria-label={`Manage steps for ${module.title}`}>
@@ -146,7 +146,7 @@ const CbtModulesTable = () => {
                     <h2 className="text-xl font-semibold text-white mb-2">
                         {selectedModule ? 'Edit Module' : 'Create a New Module'}
                     </h2>
-                    <p className="text-sm text-gray-300 mb-4">Give your module a clear, student-friendly title and a short description of what they’ll practice.</p>
+                    <p className="text-sm text-white/70 mb-4">Give your module a clear, student-friendly title and a short description of what they’ll practice.</p>
                     <CbtModuleForm module={selectedModule} onSuccess={handleFormSuccess} />
                     <Button onClick={() => setIsFormVisible(false)} className="mt-4 bg-white/10 hover:bg-white/20 text-white">Cancel</Button>
                 </div>

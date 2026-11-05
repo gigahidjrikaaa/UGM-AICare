@@ -248,7 +248,7 @@ export default function AdminDashboardPage() {
               <button
                 type="button"
                 onClick={() => loadDashboard()}
-                className="group mx-auto flex items-center gap-2 rounded-full bg-[#FFCA40] py-2 pl-6 pr-2 text-sm font-semibold text-[#00153a] transition-all duration-700 ease-[cubic-bezier(0.32,0.72,0,1)] hover:shadow-[0_8px_40px_-8px_rgba(255,202,64,0.45)] active:scale-[0.98]"
+                className="group mx-auto flex items-center gap-2 rounded-full bg-[#FFCA40] py-2 pl-6 pr-2 text-sm font-semibold text-[#001D58] transition-all duration-700 ease-[cubic-bezier(0.32,0.72,0,1)] hover:shadow-[0_8px_40px_-8px_rgba(255,202,64,0.45)] active:scale-[0.98]"
               >
                 Retry connection
                 <span className="flex h-8 w-8 items-center justify-center rounded-full bg-black/10 transition-transform duration-700 ease-[cubic-bezier(0.32,0.72,0,1)] group-hover:translate-x-0.5 group-hover:-translate-y-[1px]">
@@ -296,7 +296,7 @@ export default function AdminDashboardPage() {
             <button
               type="button"
               onClick={() => setShowGenerateModal(true)}
-              className="group flex items-center gap-2.5 rounded-full bg-[#FFCA40] py-2 pl-5 pr-2 text-sm font-semibold text-[#00153a] transition-all duration-700 ease-[cubic-bezier(0.32,0.72,0,1)] hover:shadow-[0_8px_40px_-8px_rgba(255,202,64,0.5)] active:scale-[0.98]"
+              className="group flex items-center gap-2.5 rounded-full bg-[#FFCA40] py-2 pl-5 pr-2 text-sm font-semibold text-[#001D58] transition-all duration-700 ease-[cubic-bezier(0.32,0.72,0,1)] hover:shadow-[0_8px_40px_-8px_rgba(255,202,64,0.5)] active:scale-[0.98]"
             >
               Generate IA Report
               <span className="flex h-8 w-8 items-center justify-center rounded-full bg-black/10 transition-transform duration-700 ease-[cubic-bezier(0.32,0.72,0,1)] group-hover:translate-x-0.5 group-hover:-translate-y-[1px] group-hover:scale-105">
@@ -325,7 +325,7 @@ export default function AdminDashboardPage() {
                   type="button"
                   onClick={() => setTimeRange(range)}
                   className={`relative rounded-full px-4 py-1.5 text-sm font-medium transition-colors duration-500 ${
-                    timeRange === range ? 'text-[#00153a]' : 'text-white/55 hover:text-white'
+                    timeRange === range ? 'text-[#001D58]' : 'text-white/55 hover:text-white'
                   }`}
                 >
                   {timeRange === range && (
