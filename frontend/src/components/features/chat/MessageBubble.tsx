@@ -1,6 +1,7 @@
 // src/components/features/chat/MessageBubble.tsx
 import React from 'react';
 import ReactMarkdown from 'react-markdown';
+import remarkGfm from 'remark-gfm';
 import { format } from 'date-fns';
 import { id } from 'date-fns/locale';
 import { Message } from '@/types/chat';
@@ -44,7 +45,7 @@ if (typeof window !== 'undefined') {
   audioCache.aika.load();
 }
 
-export function MessageBubble({
+export const MessageBubble = React.memo(function MessageBubble({
   message,
   isLastInGroup = true,
   onCancelAppointment,
@@ -201,13 +202,16 @@ export function MessageBubble({
     }
     return (
       <div className="shrink-0 w-8 h-8 rounded-full overflow-hidden border border-white/20 bg-black/20 shadow-sm backdrop-blur-sm">
-        <Image src="/aika-human.jpeg" alt="Aika" width={28} height={28} className="object-cover w-full h-full" />
+        <Image src="/aika-human.webp" alt="Aika" width={28} height={28} className="object-cover w-full h-full" />
       </div>
     );
   };
 
   const renderBubbleContent = () => {
-    if (message.isLoading) {
+    // Loading dots only until the first streamed token arrives; once
+    // `isStreaming` flips on, the partial markdown text renders progressively
+    // (ChatGPT/Gemini-style), with a blinking cursor at the end.
+    if (message.isLoading && !message.isStreaming) {
       return (
         <div className="flex flex-col gap-2">
           {message.toolIndicator ? (
@@ -220,33 +224,18 @@ export function MessageBubble({
         </div>
       );
     }
+    const streaming = Boolean(message.isStreaming);
+    const displayContent = streaming ? `${message.content} ▍` : message.content;
     return (
       <>
         <div className={cn(
-          // Enhanced prose styling for better readability
-          'prose prose-sm max-w-none',
-          // Paragraph spacing
-          'prose-p:my-1.5 prose-p:leading-relaxed',
-          // List styling - better spacing and bullets
-          'prose-ul:my-2 prose-ul:pl-4 prose-ul:space-y-1',
-          'prose-ol:my-2 prose-ol:pl-4 prose-ol:space-y-1',
-          'prose-li:my-0.5 prose-li:leading-relaxed',
-          // Headers styling
-          'prose-headings:font-semibold prose-headings:text-ugm-gold prose-headings:mt-3 prose-headings:mb-1.5',
-          'prose-h1:text-base prose-h2:text-sm prose-h3:text-sm',
-          // Strong/Bold styling
-          'prose-strong:text-ugm-gold prose-strong:font-semibold',
-          // Code/Pre styling
-          'prose-code:text-ugm-gold/90 prose-code:bg-white/5 prose-code:px-1 prose-code:rounded prose-code:text-xs',
-          // Blockquote styling
-          'prose-blockquote:border-l-2 prose-blockquote:border-ugm-gold/50 prose-blockquote:pl-3 prose-blockquote:italic prose-blockquote:text-white/70',
-          // Text colors
-          isUser ? 'prose-invert' : isError ? 'text-red-200' : 'text-white/90',
-          // Link styling
-          'prose-a:font-medium prose-a:transition-colors prose-a:underline prose-a:underline-offset-2',
-          isUser ? 'prose-a:text-ugm-gold hover:prose-a:text-ugm-gold/80' : 'prose-a:text-ugm-gold hover:prose-a:text-ugm-gold/80'
+          // NOTE: prose-* utilities are dead (no typography plugin) — all
+          // markdown styling lives in the component overrides below.
+          'max-w-none text-sm',
+          isUser ? 'text-white' : isError ? 'text-red-200' : 'text-white/90'
         )}>
           <ReactMarkdown
+            remarkPlugins={[remarkGfm]}
             components={{
               a: ({ ...props }) => <a {...props} target="_blank" rel="noopener noreferrer" className="break-all" />,
               // Enhanced heading rendering
@@ -262,11 +251,35 @@ export function MessageBubble({
               // Better strong/emphasis
               strong: ({ children, ...props }) => <strong {...props} className="font-semibold text-ugm-gold">{children}</strong>,
               em: ({ children, ...props }) => <em {...props} className="italic text-white/80">{children}</em>,
+              del: ({ children, ...props }) => <del {...props} className="line-through text-white/50">{children}</del>,
+              // Inline code: gold-on-dark chip.
+              code: ({ children, ...props }) => (
+                <code {...props} className="rounded bg-white/10 px-1 py-0.5 text-[12px] text-ugm-gold/90">{children}</code>
+              ),
+              // Blockquote: gold left border on glass.
+              blockquote: ({ children, ...props }) => (
+                <blockquote {...props} className="my-2 border-l-2 border-ugm-gold/50 pl-3 italic text-white/70">{children}</blockquote>
+              ),
+              // Code blocks: horizontally scrollable, no highlighting (rare
+              // in this domain) but never overflowing the bubble.
+              pre: ({ children, ...props }) => (
+                <pre {...props} className="my-2 overflow-x-auto rounded-lg bg-black/30 border border-white/10 p-2 text-[11px] leading-relaxed [&_code]:bg-transparent [&_code]:p-0 [&_code]:text-white/90">
+                  {children}
+                </pre>
+              ),
+              // Tables via GFM: compact, scroll-safe inside the bubble.
+              table: ({ children, ...props }) => (
+                <div className="my-2 overflow-x-auto">
+                  <table {...props} className="w-full border-collapse">{children}</table>
+                </div>
+              ),
+              th: ({ children, ...props }) => <th {...props} className="border-b border-white/20 px-2 py-1 text-left font-semibold text-ugm-gold/90">{children}</th>,
+              td: ({ children, ...props }) => <td {...props} className="border-b border-white/5 px-2 py-1 align-top">{children}</td>,
               // Horizontal rule as section divider
               hr: ({ ...props }) => <hr {...props} className="my-3 border-white/10" />,
             }}
           >
-            {message.content}
+            {displayContent}
           </ReactMarkdown>
         </div>
         {/* Countdown hint — only visible while the retry cooldown is active. */}
@@ -434,3 +447,4 @@ export function MessageBubble({
     </motion.div>
   );
 }
+);

@@ -65,6 +65,14 @@ export function useAikaChat({
   // Retry cooldown after a rate-limit fallback (ms remaining until the user can resend).
   const [retryCooldownMs, setRetryCooldownMs] = useState(0);
 
+  // Streaming render throttle state (see onPartialResponse below).
+  const STREAM_RENDER_MIN_INTERVAL_MS = 60;
+  const lastStreamRenderRef = useRef(0);
+  const streamFlushTimerRef = useRef<number | null>(null);
+  // Char offset into partialResponseBufferRef where the CURRENT streaming
+  // bubble begins — advanced whenever a bubble boundary splits the response.
+  const bubbleStartOffsetRef = useRef(0);
+
   // Count down the retry cooldown every second.
   useEffect(() => {
     if (retryCooldownMs <= 0) return;
@@ -247,52 +255,29 @@ export function useAikaChat({
     return next.trim();
   };
 
+  // Live bubble-split boundary detector: returns the index (in `text`) where
+  // a NEW bubble should start, or -1. Only STRONG boundaries count — a blank
+  // line followed by a bold header, markdown heading, or numbered-bold item —
+  // so ordinary paragraphs never split mid-thought.
   const findChunkBoundary = (text: string): number => {
-    const paragraphBreak = text.lastIndexOf('\n\n');
-    if (paragraphBreak >= 0) {
-      return paragraphBreak + 2;
+    const MIN_BUBBLE_CHARS = 120;
+    if (text.length < MIN_BUBBLE_CHARS) {
+      return -1;
     }
 
-    const sentenceMarkers = ['. ', '! ', '? ', '。'];
-    let sentenceBoundary = -1;
-    for (const marker of sentenceMarkers) {
-      const index = text.lastIndexOf(marker);
-      if (index > sentenceBoundary) {
-        sentenceBoundary = index + marker.length;
+    const strongStart = /\n\n(?=\*\*|##?#?\s|\d+\.\s\*\*)/g;
+    let last = -1;
+    let match: RegExpExecArray | null;
+    while ((match = strongStart.exec(text)) !== null) {
+      if (match.index >= MIN_BUBBLE_CHARS) {
+        last = match.index + 2;
       }
     }
-
-    if (sentenceBoundary >= 0 && sentenceBoundary >= 120) {
-      return sentenceBoundary;
+    // Don't create a tiny trailing bubble.
+    if (last !== -1 && text.length - last < 40) {
+      return -1;
     }
-
-    if (text.length >= 240) {
-      const forcedBoundary = text.lastIndexOf(' ', 220);
-      return forcedBoundary >= 0 ? forcedBoundary + 1 : 220;
-    }
-
-    return -1;
-  };
-
-  const consumePartialChunks = (text: string): { chunks: string[]; remainder: string } => {
-    const chunks: string[] = [];
-    let remainder = text;
-
-    while (true) {
-      const boundary = findChunkBoundary(remainder);
-      if (boundary <= 0) {
-        break;
-      }
-
-      const chunk = remainder.slice(0, boundary).trim();
-      remainder = remainder.slice(boundary).trimStart();
-
-      if (chunk) {
-        chunks.push(chunk);
-      }
-    }
-
-    return { chunks, remainder };
+    return last;
   };
 
   /**
@@ -453,37 +438,99 @@ export function useAikaChat({
         bubbleCountRef.current = 1;
       }
 
-      const bubbleId = currentBubbleIdRef.current;
-      const accumulatedText = partialResponseBufferRef.current;
-
-      setMessages((prev) => {
-        const index = prev.findIndex((m) => m.id === bubbleId);
-
-        if (index === -1) {
-          const message: Message = {
-            id: bubbleId,
-            role: 'assistant',
-            content: accumulatedText,
-            timestamp: new Date(),
-            session_id: sessionId,
-            conversation_id: conversationId,
-            created_at: new Date().toISOString(),
-            updated_at: new Date().toISOString(),
-            isLoading: true,
-          };
-          return [...prev, message];
+      // Render coalescing: replay chunks arrive every few ms; applying each
+      // one re-renders the whole ChatWindow. Throttle DOM-state updates to
+      // ~60ms; a trailing flush guarantees the final text always lands (the
+      // definitive sanitize pass at stream end re-reads the buffer anyway).
+      const now = Date.now();
+      const sinceLastRender = now - lastStreamRenderRef.current;
+      if (sinceLastRender < STREAM_RENDER_MIN_INTERVAL_MS) {
+        if (!streamFlushTimerRef.current) {
+          streamFlushTimerRef.current = window.setTimeout(() => {
+            streamFlushTimerRef.current = null;
+            lastStreamRenderRef.current = Date.now();
+            applyPartialResponseToBubble();
+          }, STREAM_RENDER_MIN_INTERVAL_MS - sinceLastRender);
         }
+        return;
+      }
+      lastStreamRenderRef.current = now;
+      applyPartialResponseToBubble();
+    },
+  });
 
-        const updated = [...prev];
-        updated[index] = {
-          ...updated[index],
-          content: accumulatedText,
+  const applyPartialResponseToBubble = useCallback(() => {
+    const fullBuffer = partialResponseBufferRef.current;
+    const bubbleId = currentBubbleIdRef.current;
+    const startOffset = bubbleStartOffsetRef.current;
+    const bubbleText = fullBuffer.slice(startOffset);
+    const conversationId = lastConversationIdRef.current || uuidv4();
+
+    // Multi-bubble: when the accumulated buffer crosses a strong boundary
+    // (blank line + bold header / heading), finalize the current bubble and
+    // start a fresh streaming bubble for the remainder. ChatGPT-style single
+    // streaming bubble mid-thought; Aika's designed multi-bubble look at
+    // section breaks.
+    const splitIndex = bubbleId ? findChunkBoundary(bubbleText) : -1;
+
+    setMessages((prev) => {
+      let working = prev;
+
+      // --- Finalize the current bubble at the split point ---
+      if (splitIndex !== -1 && bubbleId) {
+        const index = working.findIndex((m) => m.id === bubbleId);
+        if (index !== -1) {
+          const closed = [...working];
+          closed[index] = {
+            ...closed[index],
+            content: bubbleText.slice(0, splitIndex).trimEnd(),
+            isStreaming: false,
+            updated_at: new Date().toISOString(),
+          };
+          working = closed;
+        }
+        bubbleStartOffsetRef.current = startOffset + splitIndex;
+        currentBubbleIdRef.current = uuidv4();
+      }
+
+      // --- Create the active streaming bubble if missing ---
+      const activeId = currentBubbleIdRef.current;
+      const activeIndex = working.findIndex((m) => m.id === activeId);
+      if (activeIndex !== -1) {
+        const updated = [...working];
+        updated[activeIndex] = {
+          ...updated[activeIndex],
+          content: fullBuffer.slice(bubbleStartOffsetRef.current),
           updated_at: new Date().toISOString(),
         };
         return updated;
-      });
-    },
-  });
+      }
+
+      const message: Message = {
+        id: activeId || uuidv4(),
+        role: 'assistant',
+        content: fullBuffer.slice(bubbleStartOffsetRef.current),
+        timestamp: new Date(),
+        session_id: sessionId,
+        conversation_id: conversationId,
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString(),
+        isLoading: false,
+        isStreaming: true,
+      };
+      return [...working, message];
+    });
+  }, [sessionId, findChunkBoundary]);
+
+  // Flush any pending throttled render on unmount.
+  useEffect(() => {
+    return () => {
+      if (streamFlushTimerRef.current) {
+        clearTimeout(streamFlushTimerRef.current);
+        streamFlushTimerRef.current = null;
+      }
+    };
+  }, []);
 
   /**
    * Initialize with greeting message
@@ -638,6 +685,7 @@ export function useAikaChat({
       partialResponseBufferRef.current = '';
       hasPartialResponseRef.current = false;
       bubbleCountRef.current = 0;
+        bubbleStartOffsetRef.current = 0;
       currentBubbleIdRef.current = null;
       latestInterventionPlanRef.current = null;
       latestAppointmentRef.current = null;
@@ -707,7 +755,7 @@ export function useAikaChat({
             if (bubbleIndex === -1) {
               for (let index = prev.length - 1; index >= 0; index -= 1) {
                 const item = prev[index];
-                if (item.role === 'assistant' && item.conversation_id === activeConversationId && item.isLoading) {
+                if (item.role === 'assistant' && item.conversation_id === activeConversationId && (item.isLoading || item.isStreaming)) {
                   bubbleIndex = index;
                   break;
                 }
@@ -720,6 +768,7 @@ export function useAikaChat({
                 ...next[bubbleIndex],
                 content: sanitizedContent || 'Aku sudah menyiapkan detail dukungan untukmu.',
                 isLoading: false,
+                isStreaming: false,
                 updated_at: new Date().toISOString(),
                 aikaMetadata: aikaResponse.metadata,
                 interventionPlan: interventionPlan || undefined,
@@ -785,6 +834,7 @@ export function useAikaChat({
         });
 
         partialResponseBufferRef.current = '';
+        bubbleStartOffsetRef.current = 0;
         hasPartialResponseRef.current = false;
         bubbleCountRef.current = 0;
         currentBubbleIdRef.current = null;
@@ -810,7 +860,7 @@ export function useAikaChat({
           if (bubbleIndex === -1) {
             for (let index = prev.length - 1; index >= 0; index -= 1) {
               const item = prev[index];
-              if (item.role === 'assistant' && item.conversation_id === activeConversationId && item.isLoading) {
+              if (item.role === 'assistant' && item.conversation_id === activeConversationId && (item.isLoading || item.isStreaming)) {
                 bubbleIndex = index;
                 break;
               }
@@ -828,6 +878,7 @@ export function useAikaChat({
               ...next[bubbleIndex],
               content: sanitizedContent || 'Maaf, terjadi kesalahan. Silakan coba lagi.',
               isLoading: false,
+              isStreaming: false, // otherwise the ▍ cursor sticks forever
               isError: true,
               updated_at: new Date().toISOString(),
               interventionPlan: interventionPlan || next[bubbleIndex].interventionPlan,
@@ -856,6 +907,7 @@ export function useAikaChat({
         setActiveAgents([]); // Clear active agents when done
         setCurrentThinking(null);
         partialResponseBufferRef.current = '';
+        bubbleStartOffsetRef.current = 0;
         hasPartialResponseRef.current = false;
         bubbleCountRef.current = 0;
         currentBubbleIdRef.current = null;

@@ -31,7 +31,7 @@ export interface AikaRiskAssessment {
 
 export interface AikaMetadata {
   session_id: string;
-  user_role: 'user' | 'admin' | 'counselor';
+  user_role: 'user' | 'admin' | 'counselor' | 'peer_supporter';
   intent: string;
   agents_invoked: string[];  // e.g., ["STA", "TCA"]
   actions_taken: string[];   // e.g., ["assess_risk", "provide_cbt_support"]
@@ -65,7 +65,7 @@ export interface AikaResponse {
 
 export interface AikaRequest {
   user_id: number;
-  role: 'user' | 'admin' | 'counselor';
+  role: 'user' | 'admin' | 'counselor' | 'peer_supporter';
   message: string;
   conversation_history: AikaMessage[];
   preferred_model?: string;
@@ -187,7 +187,7 @@ function buildAikaMetadataFromComplete(
 
   return {
     session_id: typeof metadata.session_id === 'string' ? metadata.session_id : '',
-    user_role: (metadata.user_role as 'user' | 'admin' | 'counselor') || 'user',
+    user_role: (metadata.user_role as 'user' | 'admin' | 'counselor' | 'peer_supporter') || 'user',
     intent: typeof metadata.intent === 'string' ? metadata.intent : 'unknown',
     agents_invoked: (metadata.agents_invoked as string[]) || Array.from(invokedAgents),
     actions_taken: (metadata.actions_taken as string[]) || [],
@@ -235,7 +235,7 @@ export function useAika(options: UseAikaOptions = {}) {
   const sendMessage = useCallback(async (
     message: string,
     conversationHistory: AikaMessage[] = [],
-    role: 'user' | 'admin' | 'counselor' = 'user',
+    role: 'user' | 'admin' | 'counselor' | 'peer_supporter' = 'user',
     preferredModel?: string,
     sessionId?: string,
   ): Promise<AikaResponse | null> => {

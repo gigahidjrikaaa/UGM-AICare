@@ -113,7 +113,7 @@ export function AikaLoadingBubble({ activeAgents = [], currentThinking = null, c
       {/* Aika Avatar */}
       <div className="shrink-0 w-8 h-8 rounded-full overflow-hidden shadow-sm border border-white/20 bg-black/20 backdrop-blur-sm">
         <Image
-          src="/aika-human.jpeg"
+          src="/aika-human.webp"
           alt="Aika"
           width={32}
           height={32}

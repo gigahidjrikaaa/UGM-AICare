@@ -27,6 +27,7 @@ import { useProactiveMessages } from "@/contexts/ProactiveMessagesContext";
 import { useProfilePicture } from '@/hooks/useProfilePicture';
 import { ChatWindow } from '@/components/features/chat/ChatWindow';
 import { ChatInput } from '@/components/features/chat/ChatInput';
+import { CrisisHelpButton } from '@/components/features/chat/CrisisHelpButton';
 import { AIKA_MEMORY_NOTE } from '@/constants/chat';
 import { useInterventionPlans } from '@/hooks/useInterventionPlans';
 import { AikaLoadingBubble } from '@/components/features/aika/AikaLoadingBubble';
@@ -549,6 +550,9 @@ export default function AikaEnhancedPage() {
               {/* Chat Input - using original component */}
               <div className="px-4 pb-3 pt-2">
                 <div className="mx-auto w-full max-w-3xl">
+                  <div className="mb-2 flex items-center">
+                    <CrisisHelpButton />
+                  </div>
                   <ChatInput
                     inputValue={inputValue}
                     onInputChange={handleInputChange}

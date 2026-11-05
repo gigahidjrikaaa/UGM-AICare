@@ -21,7 +21,7 @@ export default function TimeSlotCard({ slot, onSelect }: TimeSlotCardProps) {
     return (
         <div className="bg-white/5 border border-white/10 rounded-xl p-3 w-56 flex-shrink-0 hover:bg-white/10 transition-colors cursor-pointer group" onClick={() => onSelect(slot)}>
             <div className="flex items-center gap-3 mb-2">
-                <div className="w-10 h-10 rounded-lg bg-blue-500/20 flex flex-col items-center justify-center text-blue-300 border border-blue-500/30">
+                <div className="w-10 h-10 rounded-lg bg-ugm-gold/20 flex flex-col items-center justify-center text-ugm-gold border border-ugm-gold/30">
                     <span className="text-[10px] uppercase font-bold">{slot.day_name.substring(0, 3)}</span>
                     <span className="text-sm font-bold">{dateObj.getDate()}</span>
                 </div>
@@ -37,9 +37,9 @@ export default function TimeSlotCard({ slot, onSelect }: TimeSlotCardProps) {
 
             <button
                 onClick={(e) => { e.stopPropagation(); onSelect(slot); }}
-                className="w-full py-1.5 bg-white/10 hover:bg-green-500/20 hover:text-green-300 hover:border-green-500/30 border border-white/10 rounded-lg text-xs font-medium transition-all flex items-center justify-center gap-2"
+                className="w-full py-1.5 bg-white/10 hover:bg-ugm-gold/20 hover:text-ugm-gold hover:border-ugm-gold/30 border border-white/10 rounded-lg text-xs font-medium transition-all flex items-center justify-center gap-2"
             >
-                Confirm Time
+                Pilih Waktu
             </button>
         </div>
     );

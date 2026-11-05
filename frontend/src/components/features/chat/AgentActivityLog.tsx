@@ -21,7 +21,7 @@ interface AgentActivityLogProps {
 const AGENT_LABELS: Record<string, string> = {
   STA: '🧠 Suicide & Threat Assessment',
   TCA: '🤝 Support & Care Agent',
-  CMA: '🚨 Scheduling & Documentation Agent',
+  CMA: '🚨 Case Management Agent',
 };
 
 const INTENT_LABELS: Record<string, { label: string; icon: React.ReactNode; color: string }> = {
@@ -69,9 +69,9 @@ export function AgentActivityLog({ agentActivity }: AgentActivityLogProps) {
   const processingSeconds = (agentActivity.processing_time_ms / 1000).toFixed(2);
   
   // Calculate width class for risk score bar
-  const getRiskWidthClass = (score: number): string => {
-    const percent = Math.round(score * 10) * 10; // Round to nearest 10
-    return `w-[${percent}%]`;
+  const getRiskWidthStyle = (score: number): React.CSSProperties => {
+    const clamped = Math.max(0, Math.min(100, Math.round(score * 100)));
+    return { width: `${clamped}%` };
   };
 
   return (
@@ -191,7 +191,8 @@ export function AgentActivityLog({ agentActivity }: AgentActivityLogProps) {
                 </div>
                 <div className="relative h-2 w-full overflow-hidden rounded-full bg-white/10">
                   <div
-                    className={`h-full transition-all ${getRiskWidthClass(agentActivity.risk_score)} ${
+                    style={getRiskWidthStyle(agentActivity.risk_score)}
+                    className={`h-full transition-all ${
                       agentActivity.risk_level === 'critical' || agentActivity.risk_level === 'high'
                         ? 'bg-red-500'
                         : agentActivity.risk_level === 'medium'

@@ -119,7 +119,7 @@ export function InterventionPlan({ plan }: InterventionPlanProps) {
             animate={{ height: 'auto', opacity: 1 }}
             exit={{ height: 0, opacity: 0 }}
             transition={{ duration: 0.3 }}
-            className="bg-linear-to-b from-gray-50/50 to-white"
+            className="bg-linear-to-b from-white/5 to-white/[0.02] border-t border-white/10"
           >
             {/* Plan Steps */}
             {plan.plan_steps.length > 0 && (
@@ -245,7 +245,7 @@ export function InterventionPlan({ plan }: InterventionPlanProps) {
                       className={cn(
                         'block p-4 rounded-xl border-2 transition-all',
                         card.url
-                          ? 'bg-white border-purple-200/80 hover:border-ugm-gold/60 hover:shadow-lg cursor-pointer group'
+                          ? 'bg-white/5 border-white/10 hover:border-ugm-gold/60 hover:shadow-lg cursor-pointer group'
                           : 'bg-gray-50 border-gray-200 cursor-default'
                       )}
                     >

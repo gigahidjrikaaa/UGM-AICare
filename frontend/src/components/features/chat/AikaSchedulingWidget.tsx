@@ -190,7 +190,7 @@ export function AikaSchedulingWidget({ onScheduled, onAikaFollowup }: AikaSchedu
                 className="w-full rounded-xl border border-white/15 bg-black/20 px-3 py-2 text-sm text-white outline-none focus:border-ugm-gold"
               >
                 {counselors.map((item) => (
-                  <option key={item.id} value={item.id} className="bg-[#0d1d35]">
+                  <option key={item.id} value={item.id} className="bg-ugm-blue-dark">
                     {item.name}{item.specialization ? ` • ${item.specialization}` : ''}
                   </option>
                 ))}
@@ -215,7 +215,7 @@ export function AikaSchedulingWidget({ onScheduled, onAikaFollowup }: AikaSchedu
                 className="w-full rounded-xl border border-white/15 bg-black/20 px-3 py-2 text-sm text-white outline-none focus:border-ugm-gold"
               >
                 {types.map((item) => (
-                  <option key={item.id} value={item.id} className="bg-[#0d1d35]">
+                  <option key={item.id} value={item.id} className="bg-ugm-blue-dark">
                     {item.name} ({item.duration_minutes} menit)
                   </option>
                 ))}
@@ -279,7 +279,7 @@ export function AikaSchedulingWidget({ onScheduled, onAikaFollowup }: AikaSchedu
                   type="button"
                   onClick={handleBookAppointment}
                   disabled={!canSubmit || isSubmitting}
-                  className="rounded-xl bg-green-500 px-3 py-2 text-xs font-semibold text-white disabled:opacity-50"
+                  className="rounded-xl bg-ugm-gold px-3 py-2 text-xs font-semibold text-ugm-blue-dark disabled:opacity-50"
                 >
                   {isSubmitting ? 'Membuat...' : 'Buat Appointment'}
                 </button>

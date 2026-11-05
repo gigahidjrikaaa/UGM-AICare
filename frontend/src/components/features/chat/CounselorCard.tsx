@@ -33,7 +33,7 @@ export default function CounselorCard({ counselor, onSelect }: CounselorCardProp
                 )}
             </div>
 
-            <h4 className="text-white font-semibold text-sm mb-1 line-clamp-1">{counselor.name}</h4>
+            <h4 className="text-white font-semibold text-sm mb-1 line-clamp-1 title={counselor.name}">{counselor.name}</h4>
             <p className="text-white/60 text-xs mb-2 line-clamp-1">{counselor.specialization}</p>
 
             <div className="flex items-center gap-3 text-xs text-white/50 mb-3">
@@ -49,7 +49,7 @@ export default function CounselorCard({ counselor, onSelect }: CounselorCardProp
 
             <button
                 onClick={() => onSelect(counselor)}
-                className="w-full py-2 bg-[#FFCA40] hover:bg-[#ffc107] text-[#001D58] rounded-lg text-xs font-bold flex items-center justify-center gap-2 transition-colors opacity-90 hover:opacity-100"
+                className="w-full py-2 bg-ugm-gold hover:bg-ugm-gold-dark text-ugm-blue-dark rounded-lg text-xs font-bold flex items-center justify-center gap-2 transition-colors opacity-90 hover:opacity-100"
             >
                 Select Counselor <FiCheck className="w-3 h-3" />
             </button>
