@@ -89,6 +89,11 @@ class User(Base):
     # selector only runs when this is True (consent_type='personalization').
     # Default OFF: no randomization without explicit consent.
     consent_personalization: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
+    # Opt-in for the peer-support program — required before a student can be
+    # paired with a peer supporter or join a peer circle, and before any
+    # peer-message send (consent_type='peer_support' in the ledger).
+    # Default OFF.
+    consent_peer_support: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
 
     # Relationships - use string references to avoid circular imports
     conversations: Mapped[List["Conversation"]] = relationship("Conversation", back_populates="user")

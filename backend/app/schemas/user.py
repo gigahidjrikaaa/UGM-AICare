@@ -75,6 +75,8 @@ class ConsentAndPrivacySettings(BaseModel):
     consent_ai_memory: bool = False
     # Opt-in for Aika-initiated proactive chat (plan follow-ups etc.).
     consent_proactive_chat: bool = False
+    # Opt-in for the peer-support program (pairings + circles).
+    consent_peer_support: bool = False
 
 
 class LocalizationAndAccessibility(BaseModel):
@@ -128,6 +130,10 @@ class UserProfileOverviewResponse(BaseModel):
 
 
 class UserProfileOverviewUpdate(BaseModel):
+    # NOTE: deliberately NO risk_level / clinical_summary / primary_concerns —
+    # those are clinical-record fields owned by the care team. Students see
+    # them read-only in the overview response; accepting student writes here
+    # would let a student overwrite counselor-visible clinical data.
     preferred_name: Optional[str] = None
     pronouns: Optional[str] = None
     profile_photo_url: Optional[str] = None
@@ -137,9 +143,6 @@ class UserProfileOverviewUpdate(BaseModel):
     emergency_contact_relationship: Optional[str] = None
     emergency_contact_phone: Optional[str] = None
     emergency_contact_email: Optional[str] = None
-    risk_level: Optional[str] = None
-    clinical_summary: Optional[str] = None
-    primary_concerns: Optional[str] = None
     safety_plan_notes: Optional[str] = None
     current_therapist_name: Optional[str] = None
     current_therapist_contact: Optional[str] = None
@@ -152,6 +155,7 @@ class UserProfileOverviewUpdate(BaseModel):
     consent_emergency_contact: Optional[bool] = None
     consent_marketing: Optional[bool] = None
     consent_ai_memory: Optional[bool] = None
+    consent_peer_support: Optional[bool] = None
     preferred_language: Optional[str] = None
     preferred_timezone: Optional[str] = None
     accessibility_needs: Optional[str] = None

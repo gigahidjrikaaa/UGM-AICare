@@ -27,6 +27,8 @@ class AutopilotActionType(str, enum.Enum):
     # risk level — the gate is the user's proactive-chat consent, checked at
     # creation AND at delivery (see plan_followup_service).
     plan_followup = "plan_followup"
+    # RAG knowledge-base embedding for admin-uploaded content resources.
+    content_embedding = "content_embedding"
 
 
 class AutopilotPolicyDecision(str, enum.Enum):

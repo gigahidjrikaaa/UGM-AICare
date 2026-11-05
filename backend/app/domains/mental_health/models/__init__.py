@@ -47,6 +47,7 @@ from .assessments import (
     ConversationRiskAssessment,
     UserScreeningProfile,
     ScreeningDimensionSample,
+    FormalScreeningSubmission,
 )
 
 # Agents subdomain
@@ -57,6 +58,19 @@ from .feedback import Feedback, Survey, SurveyQuestion, SurveyResponse, SurveyAn
 
 # Content subdomain
 from .content import ContentResource, CbtModule, CbtModuleStep
+
+# Counselor email audit
+from .counselor_email_log import CounselorEmailLog
+from .email_templates import EmailTemplate
+
+# Peer-support subdomain
+from .peer_support import (
+    PeerSupportPairing,
+    PeerCircle,
+    PeerCircleMember,
+    PeerMessage,
+    CounselorThread,
+)
 
 # Events subdomain
 from .events import Event, AgentNameEnum
@@ -108,6 +122,14 @@ __all__ = [
     "ConversationRiskAssessment",
     "UserScreeningProfile",
     "ScreeningDimensionSample",
+    "FormalScreeningSubmission",
+    "PeerSupportPairing",
+    "PeerCircle",
+    "PeerCircleMember",
+    "PeerMessage",
+    "CounselorThread",
+    "CounselorEmailLog",
+    "EmailTemplate",
     # Agents
     "AgentRun",
     "AgentMessage",

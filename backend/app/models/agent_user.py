@@ -11,6 +11,7 @@ from app.database import Base
 class AgentRoleEnum(str, enum.Enum):
     admin = "admin"
     counselor = "counselor"
+    peer_supporter = "peer_supporter"
     operator = "operator"
     student = "student"
 

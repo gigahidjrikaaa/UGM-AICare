@@ -59,6 +59,13 @@ class Case(Base):
     # of this breach — dedupes the scan so it never spams.
     sla_breach_notified_at = Column(DateTime(timezone=True), nullable=True)
     closure_reason = Column(Text, nullable=True)
+    # Set when a counselor resolves the case (in_progress -> resolved).
+    resolution_notes = Column(Text, nullable=True)
+    resolved_at = Column(DateTime(timezone=True), nullable=True)
+    # Assignment pool hint set at case creation: 'peer' routes the case to the
+    # peer-supporter pool (mild/moderate distress), 'counselor' to the
+    # professional pool (high/critical). NULL = legacy case, counselor pool.
+    routed_pool = Column(String(20), nullable=True)
 
     # Relationships
     notes: Mapped[List["CaseNote"]] = relationship(

@@ -1,11 +1,13 @@
 """Shared role normalization utilities.
 
-The system has four canonical roles:
+The system has five canonical roles:
 
-    admin        full administrative access (read + write on all admin routes)
-    counselor    elevated access for counselors (case management, clinical views)
-    user         any authenticated app user (students, lecturers, staff)
-    admin_viewer read-only admin access for demo and auditors
+    admin           full administrative access (read + write on all admin routes)
+    counselor       elevated access for counselors (case management, clinical views)
+    user            any authenticated app user (students, lecturers, staff)
+    admin_viewer    read-only admin access for demo and auditors
+    peer_supporter  trained student volunteer; counselor portal scoped to their
+                    own caseload, mild/moderate case assignments, supervised
 
 Legacy aliases that may still exist in the database or arrive from older
 frontend builds are silently resolved to their canonical equivalents:
@@ -30,22 +32,31 @@ ROLE_ADMIN = "admin"
 ROLE_COUNSELOR = "counselor"
 ROLE_USER = "user"  # Any authenticated app user — students, lecturers, staff
 ROLE_ADMIN_VIEWER = "admin_viewer"
+# Trained student volunteer providing supervised peer support. Sits between
+# user and counselor: gets the counselor portal scoped to their own caseload,
+# case-read AI tools, and mild/moderate case assignments — never high/critical.
+ROLE_PEER_SUPPORTER = "peer_supporter"
 
 # Backward-compat alias — code that imported ROLE_STUDENT still works.
 ROLE_STUDENT = ROLE_USER
 
 # Full set of canonical roles (guest is legacy-OAuth only, kept for compat).
 CANONICAL_ROLES: frozenset[str] = frozenset(
-    {ROLE_ADMIN, ROLE_COUNSELOR, ROLE_USER, ROLE_ADMIN_VIEWER}
+    {ROLE_ADMIN, ROLE_COUNSELOR, ROLE_USER, ROLE_ADMIN_VIEWER, ROLE_PEER_SUPPORTER}
 )
 
 # Roles permitted to access admin-protected routes.
+# NOTE: peer_supporter deliberately absent — the admin console exposes
+# cross-user data (PII browser, campaigns) that supporters must not reach.
 ALLOWED_ADMIN_ROLES: frozenset[str] = frozenset(
     {ROLE_ADMIN, ROLE_COUNSELOR, ROLE_ADMIN_VIEWER}
 )
 
 # Roles that receive privileged tool access (without full admin panel access).
-ALLOWED_PRIVILEGED_ROLES: frozenset[str] = frozenset({ROLE_ADMIN, ROLE_COUNSELOR})
+# peer_supporter included: their Aika gets case-read tools for their caseload.
+ALLOWED_PRIVILEGED_ROLES: frozenset[str] = frozenset(
+    {ROLE_ADMIN, ROLE_COUNSELOR, ROLE_PEER_SUPPORTER}
+)
 
 # ── Internal alias map (module-private) ───────────────────────────────────────
 _ALIAS_MAP: dict[str, str] = {

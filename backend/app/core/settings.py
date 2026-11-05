@@ -26,13 +26,17 @@ class Settings(BaseSettings):
     rag_enabled: bool = Field(True, alias="RAG_ENABLED")
     rag_top_k: int = Field(5, alias="RAG_TOP_K")
     rag_min_score: float = Field(0.25, alias="RAG_MIN_SCORE")
-    rag_embedding_model: str = Field("text-embedding-004", alias="RAG_EMBEDDING_MODEL")
+    rag_embedding_model: str = Field("gemini-embedding-001", alias="RAG_EMBEDDING_MODEL")  # text-embedding-004 retired by Google (404 as of Oct 2026)
     rag_embedding_dim: int = Field(768, alias="RAG_EMBEDDING_DIM")
 
     # JITAI — outcome-adaptive intervention loop.
     # Phase 1 (screening time series + self-report) is gated by this flag so the
     # deploy is a no-op until it is explicitly enabled.
     jitai_enabled: bool = Field(False, alias="JITAI_ENABLED")
+    # Formal instrument administration (PHQ-9 / GAD-7) — a core, opt-in
+    # screening surface; separate from the JITAI experiment gates so it is
+    # available without enabling the adaptive loop.
+    formal_screening_enabled: bool = Field(True, alias="FORMAL_SCREENING_ENABLED")
     # Phase 4: adaptive activity selection experiment (Thompson sampling + A/B).
     jitai_experiment_enabled: bool = Field(False, alias="JITAI_EXPERIMENT_ENABLED")
     jitai_exploration_rate: float = Field(0.1, alias="JITAI_EXPLORATION_RATE")
@@ -101,6 +105,21 @@ class Settings(BaseSettings):
     
     # Application Settings
     app_env: str = Field("development", alias="APP_ENV")
+    # Inbound email (two-way replies). The webhook accepts provider payloads
+    # (SendGrid/Mailgun-style JSON) authenticated by this shared secret; the
+    # reply address carries a per-thread HMAC token that is verified before
+    # any message is stored.
+    inbound_email_webhook_secret: str = Field("", alias="INBOUND_EMAIL_WEBHOOK_SECRET")
+    inbound_email_reply_domain: str = Field(
+        "replies.ugm-aicare.com", alias="INBOUND_EMAIL_REPLY_DOMAIN"
+    )
+    # Admin testing/demo endpoints (DB seeding, chat simulation, subprocess
+    # replay, test-user minting). Mounted only outside production unless this
+    # is explicitly enabled — the endpoints can create real records and run
+    # repo scripts, so production keeps them off by default.
+    enable_admin_testing_endpoints: bool = Field(
+        False, alias="ENABLE_ADMIN_TESTING_ENDPOINTS"
+    )
     port: int = Field(22001, alias="PORT")
     frontend_url: str = Field("http://localhost:4000", alias="FRONTEND_URL")
     backend_url: str = Field("http://localhost:22001", alias="BACKEND_URL")

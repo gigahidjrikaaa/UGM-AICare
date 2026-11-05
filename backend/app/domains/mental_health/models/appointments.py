@@ -36,6 +36,12 @@ class Counselor(Base):
     availability_schedule: Mapped[Optional[dict]] = mapped_column(JSON, nullable=True)  # Weekly schedule
     rating: Mapped[float] = mapped_column(Float, default=0.0, nullable=True)
     total_reviews: Mapped[int] = mapped_column(Integer, default=0, nullable=True)
+
+    # Peer-support fields — only meaningful when the linked user's role is
+    # "peer_supporter". accepts_peer_cases gates the CMA peer pool; peer_bio
+    # is the student-facing "hi, I'm a trained peer supporter" blurb.
+    accepts_peer_cases: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
+    peer_bio: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
     
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.now)
     updated_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.now, onupdate=datetime.now)

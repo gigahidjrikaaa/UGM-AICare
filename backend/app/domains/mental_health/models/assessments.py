@@ -182,3 +182,47 @@ class ScreeningDimensionSample(Base):
     )
 
     user: Mapped["User"] = relationship("User")
+
+
+class FormalScreeningSubmission(Base):
+    """One administered formal instrument (PHQ-9 / GAD-7) with item responses.
+
+    Unlike ``ScreeningDimensionSample`` (which stores only the derived score),
+    this keeps the full response vector so results can be re-scored, audited,
+    and shown to the user as history. ``crisis_flag`` marks a non-zero answer
+    on a gateway crisis item (PHQ-9 item 9) and independently of the total
+    score drives the safety response.
+    """
+
+    __tablename__ = "formal_screening_submissions"
+    __table_args__ = (
+        Index(
+            "ix_formal_screening_user_instrument_time",
+            "user_id",
+            "instrument",
+            "created_at",
+        ),
+    )
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)
+    user_id: Mapped[int] = mapped_column(
+        Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True
+    )
+
+    instrument: Mapped[str] = mapped_column(String(32), nullable=False)
+    responses: Mapped[list] = mapped_column(JSON, nullable=False)
+
+    total_score: Mapped[int] = mapped_column(Integer, nullable=False)
+    max_score: Mapped[int] = mapped_column(Integer, nullable=False)
+    normalized_score: Mapped[float] = mapped_column(Float, nullable=False)
+    severity_band: Mapped[str] = mapped_column(String(32), nullable=False)
+    severity_label: Mapped[str] = mapped_column(String(64), nullable=False)
+
+    crisis_flag: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
+    crisis_item_indices: Mapped[Optional[list]] = mapped_column(JSON, nullable=True)
+
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False, index=True
+    )
+
+    user: Mapped["User"] = relationship("User")
