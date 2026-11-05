@@ -16,6 +16,7 @@ UserRole = Literal[
     "counselor",
     "user",
     "admin_viewer",
+    "peer_supporter",
     # Legacy aliases — resolved to canonical by normalize_role() before persistence
     "student",     # → user  (any authenticated app user, incl. lecturers)
     "therapist",   # → counselor
@@ -39,6 +40,8 @@ class UserListItem(BaseModel):
     created_at: Optional[datetime] = None
     avatar_url: Optional[str] = None
     check_in_code: Optional[str] = None
+    # Hashed identifier used for cross-page deep links (cases search covers it).
+    user_hash: Optional[str] = None
 
     # Aggregated counts
     total_journal_entries: int

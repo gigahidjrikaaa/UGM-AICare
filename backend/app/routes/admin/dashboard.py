@@ -17,6 +17,7 @@ from app.domains.mental_health.models import (
     Case,
     CaseSeverityEnum,
     CaseStatusEnum,
+    InterventionCampaign,
     TriageAssessment,
 )
 from app.schemas.admin.dashboard import (
@@ -121,8 +122,17 @@ async def get_overview(
     sla_breach_count = int((await db.execute(sla_breach_stmt)).scalar() or 0)
 
     # ===== KPI 7: Active campaigns count =====
-    # TODO: Implement when campaigns table exists (Phase 5)
-    active_campaigns_count = 0
+    active_campaigns_count = int(
+        (
+            await db.execute(
+                select(func.count()).select_from(InterventionCampaign).where(
+                    InterventionCampaign.is_active == True,  # noqa: E712
+                    InterventionCampaign.status == "active",
+                )
+            )
+        ).scalar()
+        or 0
+    )
 
     # ===== Sentiment calculation (proxy from triage risk) =====
     avg_risk_stmt = (

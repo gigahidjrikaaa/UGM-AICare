@@ -116,19 +116,6 @@ class UpdateActiveModelRequest(BaseModel):
     model: str = Field(..., min_length=3, description="gemini:auto, gemini-*, glm-* or z-ai/* model ID")
 
 
-class AddKeyRequest(BaseModel):
-    """Placeholder schema for adding a new API key."""
-
-    api_key: str = Field(..., min_length=10, description="Google Gemini API key")
-
-
-class AddKeyResponse(BaseModel):
-    """Response after (placeholder) key addition."""
-
-    message: str
-    total_keys: int
-
-
 # ---------- Endpoints ----------
 
 
@@ -224,32 +211,4 @@ async def update_active_chat_model(
         active_chat_model=normalized_model,
         active_chat_provider=get_active_chat_provider(),
         supported_chat_models=get_supported_chat_models(),
-    )
-
-
-@router.post("", response_model=AddKeyResponse)
-async def add_api_key(
-    body: AddKeyRequest,
-    admin_user: Any = Depends(get_admin_user),
-) -> AddKeyResponse:
-    """Placeholder: accept a new Gemini API key.
-
-    In a production build this would persist the key to a secrets vault.
-    For now it appends to the in-memory list so the rotation pool grows
-    immediately without a restart.
-    """
-    from app.core.llm import GEMINI_API_KEYS
-
-    # Duplicate check
-    if body.api_key in GEMINI_API_KEYS:
-        return AddKeyResponse(
-            message="Key already registered.",
-            total_keys=len(GEMINI_API_KEYS),
-        )
-
-    GEMINI_API_KEYS.append(body.api_key)
-
-    return AddKeyResponse(
-        message="Key added to rotation pool (runtime only, not persisted).",
-        total_keys=len(GEMINI_API_KEYS),
     )

@@ -2,9 +2,12 @@
 
 from fastapi import APIRouter, Depends
 
+from app.core.settings import settings
 from app.dependencies import get_admin_readonly_user
 
 from .appointments import router as appointments_router
+from .cbt_modules import router as cbt_modules_router
+from .email_templates_admin import router as email_templates_router
 from .content_resources import router as content_resources_router
 from .conversations import router as conversations_router
 from .flags import router as flags_router
@@ -12,21 +15,15 @@ from .profile import router as profile_router
 from .dashboard import router as dashboard_router
 from .interventions import router as interventions_router
 from .cases import router as cases_router
-from .counselors import router as counselors_router
 from .system import router as system_router
 from .users import router as users_router
 # Testing/demo endpoints (DB seeding, chat simulation, subprocess replays):
-# env-gated OFF by default in production — enable explicitly with
-# ENABLE_ADMIN_TESTING_ENDPOINTS=true.
-import os as _os
-
-if (
-    _os.getenv("APP_ENV", "").lower() not in {"production", "prod"}
-    or _os.getenv("ENABLE_ADMIN_TESTING_ENDPOINTS", "").lower() in {"1", "true", "yes", "on"}
-):
-    from .testing import router as testing_router
-else:
+# gated OFF by default in production — enable explicitly with
+# ENABLE_ADMIN_TESTING_ENDPOINTS=true (or run outside production).
+if settings.app_env.lower() in {"production", "prod"} and not settings.enable_admin_testing_endpoints:
     testing_router = None
+else:
+    from .testing import router as testing_router
 from .insights import router as insights_router
 from .alerts import router as alerts_router
 from .sse import router as sse_router
@@ -43,14 +40,18 @@ from .agent_decisions import router as agent_decisions_router
 from .scheduler import router as scheduler_router
 
 # Router-level dependency: runs on every admin route before the route handler.
-# - admin / counselor: unrestricted (read + write).
-# - admin_viewer: read-only (GET/HEAD/OPTIONS only); any other method → 403.
+# - admin: full read + write access.
+# - admin_viewer / counselor: read-only (GET/HEAD/OPTIONS only); any other
+#   method → 403. Counselors have their own portal (/api/v1/counselor/*) and
+#   must not write to admin surfaces (campaign blasts, flags, testing, ...).
 router = APIRouter(
     prefix="/api/v1/admin",
     tags=["Admin"],
     dependencies=[Depends(get_admin_readonly_user)],
 )
 router.include_router(appointments_router)
+router.include_router(cbt_modules_router)
+router.include_router(email_templates_router)
 router.include_router(content_resources_router)
 router.include_router(conversations_router)
 router.include_router(flags_router)
@@ -60,7 +61,9 @@ router.include_router(users_router)
 router.include_router(dashboard_router)
 router.include_router(interventions_router)
 router.include_router(cases_router)
-router.include_router(counselors_router)
+# NOTE: counselors_router is intentionally NOT included here — it carries its
+# own /admin/counselors prefix and is mounted at /api/v1 in main.py; including
+# it here also duplicated everything under /api/v1/admin/admin/counselors/*.
 if testing_router is not None:
     router.include_router(testing_router)
 router.include_router(insights_router)

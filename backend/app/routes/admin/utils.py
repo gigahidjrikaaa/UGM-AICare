@@ -31,8 +31,17 @@ def hash_user_id(user_id: int) -> str:
     return hashlib.md5(f"user_{user_id}_salt".encode()).hexdigest()[:8]
 
 
-def build_avatar_url(email: Optional[str], user_id: int, size: int = 128) -> str:
-    """Construct a deterministic avatar URL for a user."""
+def build_avatar_url(
+    email: Optional[str],
+    user_id: int,
+    size: int = 128,
+    profile_photo_url: Optional[str] = None,
+) -> str:
+    """Construct the avatar URL for a user: uploaded photo first, then
+    Gravatar/DiceBear so admin surfaces match what the student app shows."""
+    if profile_photo_url and profile_photo_url.strip():
+        return profile_photo_url.strip()
+
     if email:
         normalized = email.strip().lower()
         if normalized:

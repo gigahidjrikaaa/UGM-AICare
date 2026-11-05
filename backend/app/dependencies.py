@@ -318,10 +318,15 @@ async def get_admin_readonly_user(
             detail="Account is deactivated",
         )
 
-    if effective_role == "admin_viewer" and request.method.upper() not in {"GET", "HEAD", "OPTIONS"}:
+    # Counselors are read-only here: they have their own complete portal
+    # (/api/v1/counselor/*), and the admin console exposes cross-user data
+    # (PII database browser, campaign email blasts, testing endpoints when
+    # mounted) that must not be writable — or browsable-by-default — by a
+    # counselor-role account. Writes and non-GET exports → 403.
+    if effective_role in {"admin_viewer", "counselor"} and request.method.upper() not in {"GET", "HEAD", "OPTIONS"}:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
-            detail="Read-only admin access. This action requires full admin or counselor privileges.",
+            detail="Read-only admin access. This action requires full admin privileges.",
         )
 
     return current_user

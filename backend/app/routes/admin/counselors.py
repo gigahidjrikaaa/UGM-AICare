@@ -53,10 +53,17 @@ def _prepare_counselor_display(profile: CounselorProfile) -> CounselorProfile:
 # ========================================
 
 async def _ensure_counselor_profiles(db: AsyncSession) -> None:
-    """Ensure counselor users have matching profile records."""
+    """Ensure counselor AND peer-supporter users have matching profile records.
+
+    peer_supporter users reuse the Counselor profile table (with
+    accepts_peer_cases=True) so the whole assignment/scope/alert stack works
+    for them unchanged.
+    """
     try:
         counselor_rows = await db.execute(
-            select(User.id, User.name, User.email).where(User.role == "counselor")
+            select(User.id, User.name, User.email, User.role).where(
+                User.role.in_(["counselor", "peer_supporter"])
+            )
         )
         counselor_users = counselor_rows.all()
         if not counselor_users:
@@ -76,22 +83,24 @@ async def _ensure_counselor_profiles(db: AsyncSession) -> None:
             row = user_map[user_id]
             email = getattr(row, "email", None)
             display_name_encrypted = getattr(row, "name", None)
-            
+
             # Try to get name from user profile first
             display_name = decrypt_user_field(display_name_encrypted)
-            
+
             # If no name, try to get from email
             if not display_name and email:
                 display_name = decrypt_user_email(email)
-                
+
             # If still no name (decryption failed or empty), use raw email or ID fallback
             if not display_name:
                 display_name = email or f"Counselor {user_id}"
 
+            is_peer = getattr(row, "role", None) == "peer_supporter"
             profile = CounselorProfile(
                 user_id=user_id,
                 name=display_name,
                 is_available=True,
+                accepts_peer_cases=is_peer,
             )
             db.add(profile)
 
@@ -108,6 +117,15 @@ async def _ensure_counselor_profiles(db: AsyncSession) -> None:
                 select(CounselorProfile).where(CounselorProfile.user_id.is_not(None))
             )
         ).scalars().all()
+        # Role map so peer supporters get peer_supporter shadow rows.
+        profile_user_ids = {p.user_id for p in linked_profiles if p.user_id is not None}
+        role_by_user: dict[int, str] = {}
+        if profile_user_ids:
+            role_rows = await db.execute(
+                select(User.id, User.role).where(User.id.in_(profile_user_ids))
+            ).all()
+            role_by_user = {row.id: row.role for row in role_rows}
+
         for profile in linked_profiles:
             agent_id = str(profile.id)
             existing_agent = (
@@ -116,8 +134,13 @@ async def _ensure_counselor_profiles(db: AsyncSession) -> None:
                 )
             ).scalar_one_or_none()
             if existing_agent is None:
+                shadow_role = (
+                    AgentRoleEnum.peer_supporter
+                    if role_by_user.get(profile.user_id) == "peer_supporter"
+                    else AgentRoleEnum.counselor
+                )
                 db.add(
-                    AgentUser(id=agent_id, role=AgentRoleEnum.counselor)
+                    AgentUser(id=agent_id, role=shadow_role)
                 )
 
         await db.commit()

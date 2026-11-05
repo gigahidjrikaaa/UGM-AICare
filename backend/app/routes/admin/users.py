@@ -29,7 +29,7 @@ from app.schemas.admin import (
     UserListItem,
     UsersResponse,
 )
-from .utils import decrypt_user_email, get_user_stats, build_avatar_url, decrypt_user_field
+from .utils import decrypt_user_email, get_user_stats, build_avatar_url, decrypt_user_field, hash_user_id
 from app.services.user_normalization import allow_email_checkins as allow_email_checkins_for_user
 from app.services.user_normalization import check_in_code as check_in_code_for_user
 from app.services.user_normalization import clinical_snapshot
@@ -92,10 +92,10 @@ async def create_user(
     _ensure_admin_only(admin_user)
 
     requested_role = _normalize_role(payload.role)
-    if requested_role not in {"user", "counselor", "admin"}:
+    if requested_role not in {"user", "counselor", "admin", "peer_supporter"}:
         raise HTTPException(
             status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
-            detail="Invalid role. Allowed: user, counselor, admin",
+            detail="Invalid role. Allowed: user, counselor, peer_supporter, admin",
         )
 
     email_normalized = payload.email.strip().lower()
@@ -153,9 +153,10 @@ async def get_users(
     page: int = Query(1, ge=1, description="Page number"),
     limit: int = Query(20, ge=1, le=100, description="Items per page"),
     search: Optional[str] = Query(None, description="Search by email or google_sub"),
+    role: Optional[str] = Query(None, description="Filter by role (user, counselor, admin, guest)"),
     sort_by: str = Query("id", description="Sort field"),
     sort_order: str = Query("desc", description="Sort order (asc/desc)"),
-    active_only: bool = Query(False, description="Show only active users"),
+    active_only: bool = Query(False, description="Show only users active in the last 30 days"),
     db: AsyncSession = Depends(get_async_db),
     admin_user: User = Depends(get_admin_user),
 ):
@@ -194,6 +195,10 @@ async def get_users(
             or_(User.email.ilike(pattern), User.google_sub.ilike(pattern))
         )
 
+    if role:
+        normalized_role = role.strip().lower()
+        base_query = base_query.filter(func.lower(User.role) == normalized_role)
+
     if active_only:
         thirty_days_ago = datetime.now().date() - timedelta(days=30)
         base_query = base_query.filter(func.coalesce(UserProfile.last_activity_date, User.last_activity_date) >= thirty_days_ago)
@@ -212,7 +217,11 @@ async def get_users(
     users: List[UserListItem] = []
     for user_obj, journal_count, conversation_count, badge_count, appointment_count in rows:
         email_plain = decrypt_user_email(user_obj.email)
-        avatar_url = build_avatar_url(email_plain, user_obj.id)
+        avatar_url = build_avatar_url(
+            email_plain,
+            user_obj.id,
+            profile_photo_url=user_obj.profile.profile_photo_url if user_obj.profile else None,
+        )
         # Ensure last_activity_date is a Python date or None
         lad = (user_obj.profile.last_activity_date if user_obj.profile else None) or user_obj.last_activity_date
         import datetime as dt
@@ -240,6 +249,7 @@ async def get_users(
                 created_at=user_obj.created_at,
                 avatar_url=avatar_url,
                 check_in_code=check_in_code_for_user(user_obj) or user_obj.check_in_code,
+                user_hash=hash_user_id(user_obj.id),
                 total_journal_entries=journal_count or 0,
                 total_conversations=conversation_count or 0,
                 total_badges=badge_count or 0,
@@ -278,7 +288,12 @@ async def get_user_detail(
     await ensure_user_normalized_tables(db, user)
 
     email_plain = decrypt_user_email(user.email)
-    avatar_url = build_avatar_url(email_plain, user.id, size=192)
+    avatar_url = build_avatar_url(
+        email_plain,
+        user.id,
+        size=192,
+        profile_photo_url=user.profile.profile_photo_url if user.profile else None,
+    )
 
     journals = (
         await db.execute(
@@ -602,7 +617,13 @@ async def reset_user_password(
     db: AsyncSession = Depends(get_async_db),
     admin_user: User = Depends(get_admin_user),
 ):
-    """Generate a password reset token for a user."""
+    """Email a password-reset link to the user.
+
+    Delegates to the standard password-reset service: only a HASH of the
+    token is stored, and the raw token goes to the user's email — it is never
+    returned in the API response (returning it would let any admin take over
+    any account and leak tokens into logs/proxies).
+    """
     logger.info("Admin %s requesting password reset for user %s", admin_user.id, user_id)
     if getattr(admin_user, "role", None) != "admin":
         raise HTTPException(
@@ -621,27 +642,18 @@ async def reset_user_password(
             detail="User does not have an email address",
         )
 
-    reset_token = secrets.token_urlsafe(32)
-    # Persist token + expiry so the normal reset flow can validate it.
-    user.password_reset_token = reset_token
-    user.password_reset_expires = datetime.utcnow() + timedelta(hours=1)
-    db.add(user)
-    try:
-        await db.commit()
-        await db.refresh(user)
-    except Exception as exc:
-        await db.rollback()
-        logger.exception("Failed to persist reset token for user %s", user_id)
+    from app.utils.password_reset import create_password_reset_token
+
+    sent = await create_password_reset_token(db, user_email)
+    if not sent:
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Failed to generate reset token",
-        ) from exc
+            detail="Failed to send the password reset email. Check SMTP configuration.",
+        )
 
-    logger.info("Password reset token generated for user %s", user_id)
+    logger.info("Password reset email sent for user %s (admin-initiated)", user_id)
     return {
-        "message": f"Password reset token generated for user {user_id}",
+        "message": "Password reset email sent to the user",
         "user_id": user_id,
         "email": user_email,
-        "reset_token": reset_token,
-        "note": "In production, this token would be sent via email",
     }

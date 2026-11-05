@@ -186,10 +186,11 @@ def _map_counselor(counselor: Counselor) -> CounselorResponse:
 
 def _map_user(user: User) -> AppointmentUser:
     email_plain = decrypt_user_email(user.email)
+    profile_photo = user.profile.profile_photo_url if user.profile else None
     return AppointmentUser(
         id=user.id,
         email=email_plain,
-        avatar_url=build_avatar_url(email_plain, user.id, size=96),
+        avatar_url=build_avatar_url(email_plain, user.id, size=96, profile_photo_url=profile_photo),
     )
 
 
@@ -205,7 +206,7 @@ async def get_appointments(
     result = await db.execute(
         select(Appointment)
         .options(
-            selectinload(Appointment.user),
+            selectinload(Appointment.user).selectinload(User.profile),
             selectinload(Appointment.counselor),
             selectinload(Appointment.appointment_type),
         )
@@ -249,7 +250,7 @@ async def get_appointment(
     result = await db.execute(
         select(Appointment)
         .options(
-            selectinload(Appointment.user),
+            selectinload(Appointment.user).selectinload(User.profile),
             selectinload(Appointment.counselor),
             selectinload(Appointment.appointment_type),
         )
@@ -290,7 +291,7 @@ async def update_appointment(
     result = await db.execute(
         select(Appointment)
         .options(
-            selectinload(Appointment.user),
+            selectinload(Appointment.user).selectinload(User.profile),
             selectinload(Appointment.counselor),
             selectinload(Appointment.appointment_type),
         )
