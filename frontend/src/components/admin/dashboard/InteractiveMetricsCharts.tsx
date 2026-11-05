@@ -46,7 +46,6 @@ interface InteractiveMetricsChartsProps {
 }
 
 export function InteractiveMetricsCharts({ overview, trends }: InteractiveMetricsChartsProps) {
-  const [activeSeverity, setActiveSeverity] = useState<number>(0);
   const [caseMode, setCaseMode] = useState<'opened' | 'closed'>('opened');
 
   const severityData = useMemo(() => {
@@ -151,8 +150,6 @@ export function InteractiveMetricsCharts({ overview, trends }: InteractiveMetric
                   nameKey="name"
                   innerRadius={48}
                   outerRadius={76}
-                  activeIndex={activeSeverity}
-                  onMouseEnter={(_, index) => setActiveSeverity(index)}
                   paddingAngle={3}
                   stroke="none"
                   cornerRadius={6}

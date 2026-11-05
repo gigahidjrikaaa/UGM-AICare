@@ -13,6 +13,10 @@ updates:
         update-types:
           - minor
           - patch
+    ignore:
+      - dependency-name: bcrypt
+        update-types:
+          - version-update:semver-major
 
   - package-ecosystem: npm
     directory: /frontend
@@ -27,6 +31,10 @@ updates:
         update-types:
           - minor
           - patch
+    ignore:
+      - dependency-name: typescript
+        update-types:
+          - version-update:semver-major
 
   - package-ecosystem: github-actions
     directory: /
