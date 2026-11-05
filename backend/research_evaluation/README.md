@@ -1,6 +1,19 @@
-# Research Evaluation Suite
+# Research evaluations: historical thesis and follow-on studies
 
-This directory contains all evaluation datasets, scripts, and test suites for the bachelor's thesis research questions. These materials are **isolated from CI/CD pipelines** and designed exclusively for academic thesis evaluation.
+## Status and scope
+
+The bachelor's thesis is completed and submitted, and the degree has been awarded. Its authoritative manuscript and final PDF live in the separate [thesis repository](https://github.com/gigahidjrikaaa/bachelors_thesis_DEIE_giga).
+
+This directory contains two distinct bodies of work:
+
+- **Historical thesis materials:** the original scenario directories, evaluation notebooks, runners and saved results. Existing paths are preserved; outputs describe historical experiments and must not be overwritten by new runs.
+- **Follow-on research:** [`ccse/`](ccse/README.md), which contains draft change-control safety experiments and is independent of the completed degree.
+
+The historical materials below are retained as originally documented and may include older titles, RQ numbering, paths and API assumptions. The submitted manuscript takes precedence. The exact evaluated application commit is unverified. Do not claim these results describe current `main` or the local working tree.
+
+New studies must record their own protocol and reproducibility metadata. See [research boundaries](../../docs/research/RESEARCH_BOUNDARIES.md).
+
+## Historical evaluation documentation
 
 ## Project Context
 

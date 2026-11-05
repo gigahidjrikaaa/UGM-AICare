@@ -2,6 +2,17 @@
 
 **Agentic Mental Health Support System** — a multi-agent AI system for proactive, privacy-preserving mental health support in university settings.
 
+## Project status and research origins
+
+UGM-AICare is an ongoing mental-health support platform and research project. It originated in a bachelor's thesis that is **completed and submitted; the degree has been awarded**. Further platform development and research proceed independently of that completed academic submission.
+
+- [Completed thesis and submitted record](https://github.com/gigahidjrikaaa/bachelors_thesis_DEIE_giga)
+- [Development and research boundaries](docs/research/RESEARCH_BOUNDARIES.md)
+- [Historical thesis evaluation materials](backend/research_evaluation/README.md)
+- [CCSE follow-on research](backend/research_evaluation/ccse/README.md)
+
+Historical thesis metrics describe the evaluated implementation and corpus, not the current platform. Current capabilities require evaluation against a pinned application version.
+
 ![UGM-AICare](frontend/public/aicare_logo.png)
 
 **Live Demo:** [aicare.sumbu.xyz](https://aicare.sumbu.xyz) | **API:** [api.aicare.sumbu.xyz](https://api.aicare.sumbu.xyz)

@@ -4,6 +4,8 @@ sidebar_position: 2
 
 # Evaluation Framework &amp; Ethics
 
+> Historical bachelor's thesis context: the thesis is completed and submitted, and the degree has been awarded. This page preserves the earlier research framing; it is not evidence of current platform performance. See the [completed thesis](https://github.com/gigahidjrikaaa/bachelors_thesis_DEIE_giga) and the application repository's `docs/research/RESEARCH_BOUNDARIES.md` for the boundary with ongoing development and follow-on research.
+
 ## Research Questions to System Mapping
 
 ```mermaid
