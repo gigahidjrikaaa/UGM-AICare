@@ -278,107 +278,25 @@ async def send_proactive_checkins() -> None:
 # =============================================================================
 
 async def detect_screening_trends() -> None:
-    """Scheduled job to detect deteriorating mental health trends.
-    
-    Analyzes screening profile changes over time to identify:
-    - Users whose scores are worsening
-    - New entries into moderate/severe categories
-    - Patterns requiring proactive intervention
-    
-    Creates alerts for admin dashboard and triggers early outreach.
+    """Scheduled job: cross-conversation risk-trajectory early warning.
+
+    Delegates to ``screening_trajectory_service.detect_risk_trajectory_declines``
+    which compares each user's recent ConversationRiskAssessment rows and
+    formal-instrument submissions across time, and for genuine deterioration:
+    persists the trajectory on the screening profile, raises a counselor
+    alert, and (consent-gated) delivers an in-app proactive check-in — deduped
+    to at most one cycle per user per 7 days.
     """
     logger.info("Scheduler: Running screening trend detection job...")
     async with AsyncSessionLocal() as db:
         try:
-            # Get all screening profiles with significant indicators
-            stmt = (
-                select(UserScreeningProfile, User)
-                .join(User, UserScreeningProfile.user_id == User.id)
-                .where(
-                    User.is_active == True,
-                    or_(
-                        UserScreeningProfile.overall_risk.in_(["moderate", "severe", "critical"]),
-                        UserScreeningProfile.requires_attention == True,
-                    )
-                )
+            from app.services.screening_trajectory_service import (
+                detect_risk_trajectory_declines,
             )
-            result = await db.execute(stmt)
-            profiles_to_check = result.all()
-            
-            deterioration_count = 0
-            alerts_created = 0
-            
-            for profile, user in profiles_to_check:
-                if not profile.profile_data:
-                    continue
-                
-                dimension_scores = profile.profile_data.get("dimension_scores", {})
-                
-                # Check for deterioration patterns
-                deteriorating_dimensions: List[Dict[str, Any]] = []
-                for dim_key, score_data in dimension_scores.items():
-                    if isinstance(score_data, dict):
-                        trend = score_data.get("trend", "stable")
-                        current_score = score_data.get("current_score", 0)
-                        severity = score_data.get("severity_label", "none")
-                        
-                        # Flag if worsening and above mild threshold
-                        if trend == "worsening" and current_score > 0.3:
-                            deteriorating_dimensions.append({
-                                "dimension": dim_key,
-                                "score": current_score,
-                                "severity": severity,
-                            })
-                
-                if deteriorating_dimensions:
-                    deterioration_count += 1
-                    
-                    # Check if user needs immediate attention
-                    if profile.overall_risk in ("severe", "critical"):
-                        # Create alert for admin
-                        try:
-                            from app.services.alert_service import get_alert_service
-                            from app.models.alerts import AlertType, AlertSeverity
-                            
-                            alert_service = get_alert_service(db)
-                            await alert_service.create_alert(
-                                alert_type=AlertType.SYSTEM_NOTIFICATION,
-                                severity=AlertSeverity.HIGH if profile.overall_risk == "severe" else AlertSeverity.CRITICAL,
-                                title="Deteriorating Mental Health Trend Detected",
-                                message=(
-                                    f"User {user.id} showing worsening trend in "
-                                    f"{len(deteriorating_dimensions)} dimension(s): "
-                                    f"{', '.join([d['dimension'] for d in deteriorating_dimensions[:3]])}. "
-                                    f"Overall risk: {profile.overall_risk}."
-                                ),
-                                alert_metadata={
-                                    "user_id": user.id,
-                                    "risk_level": profile.overall_risk,
-                                    "deteriorating_dimensions": deteriorating_dimensions,
-                                    "detection_type": "trend_analysis",
-                                },
-                            )
-                            alerts_created += 1
-                            logger.warning(
-                                f"Scheduler: Created alert for user {user.id} with deteriorating trend"
-                            )
-                        except Exception as e:
-                            logger.error(f"Scheduler: Failed to create alert for user {user.id}: {e}")
-                    
-                    # Mark profile as requiring attention if not already
-                    if not profile.requires_attention:
-                        profile.requires_attention = True
-                        logger.info(f"Scheduler: Marked user {user.id} profile as requiring attention")
-            
+
+            summary = await detect_risk_trajectory_declines(db)
             await db.commit()
-            
-            logger.info(
-                f"Scheduler: Trend detection complete. "
-                f"Profiles checked: {len(profiles_to_check)}, "
-                f"Deteriorating: {deterioration_count}, "
-                f"Alerts created: {alerts_created}"
-            )
-            
+            logger.info("Scheduler: Trend detection complete: %s", summary)
         except Exception as e:
             logger.error(f"Scheduler: Error during trend detection: {e}", exc_info=True)
             await db.rollback()
@@ -481,7 +399,7 @@ async def send_counselor_reminders() -> None:
                             f"(severity: <strong>{case.severity.value}</strong>) assigned to you "
                             f"has not been updated in <strong>{days_stale} day(s)</strong>.</p>"
                             f"<p>Please log in to review and follow up with the student:</p>"
-                            f"<p><a href='{app_url}/admin/cases'>View Cases &rarr;</a></p>"
+                            f"<p><a href='{app_url}/counselor/cases?highlight={case.id}'>View Case &rarr;</a></p>"
                             f"<p>Thank you,<br/>UGM AICare System</p>"
                         )
                         await asyncio.to_thread(

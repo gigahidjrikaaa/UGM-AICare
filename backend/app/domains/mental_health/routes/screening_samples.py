@@ -231,3 +231,162 @@ async def set_personalization_consent(
     )
     await db.commit()
     return PersonalizationConsentResponse(consent_personalization=payload.granted)
+
+
+# =============================================================================
+# Formal instruments (PHQ-9 / GAD-7)
+# =============================================================================
+
+class InstrumentOptionOut(BaseModel):
+    value: int
+    label: str
+
+
+class InstrumentItemOut(BaseModel):
+    text: str
+    is_crisis_item: bool
+
+
+class InstrumentOut(BaseModel):
+    code: str
+    name: str
+    dimension: str
+    timeframe: str
+    options: List[InstrumentOptionOut]
+    items: List[InstrumentItemOut]
+    disclaimer: str
+    reference: str
+
+
+class InstrumentListResponse(BaseModel):
+    instruments: List[InstrumentOut]
+
+
+class InstrumentSubmissionOut(BaseModel):
+    id: int
+    instrument: str
+    total_score: int
+    max_score: int
+    normalized_score: float
+    severity_band: str
+    severity_label: str
+    crisis_flag: bool
+    created_at: datetime
+
+
+class InstrumentHistoryResponse(BaseModel):
+    submissions: List[InstrumentSubmissionOut]
+
+
+class InstrumentSubmitRequest(BaseModel):
+    responses: List[int] = Field(description="One 0-3 answer per instrument item")
+
+
+class InstrumentSubmitResponse(BaseModel):
+    recorded: bool
+    result: dict
+
+
+@router.get("/instruments", response_model=InstrumentListResponse)
+async def list_formal_instruments(
+    current_user: User = Depends(get_current_active_user),
+) -> InstrumentListResponse:
+    """Available formal instruments with their full item banks (self-screening)."""
+    if not settings.formal_screening_enabled:
+        raise HTTPException(status_code=404, detail="Formal screening is not enabled")
+
+    from app.domains.mental_health.screening.formal_instruments import list_instruments
+
+    return InstrumentListResponse(
+        instruments=[
+            InstrumentOut(
+                code=instrument.code,
+                name=instrument.name,
+                dimension=instrument.dimension,
+                timeframe=instrument.timeframe,
+                options=[
+                    InstrumentOptionOut(value=value, label=label)
+                    for value, label in instrument.options
+                ],
+                items=[
+                    InstrumentItemOut(text=item.text, is_crisis_item=item.is_crisis_item)
+                    for item in instrument.items
+                ],
+                disclaimer=instrument.disclaimer,
+                reference=instrument.reference,
+            )
+            for instrument in list_instruments()
+        ]
+    )
+
+
+@router.get("/instruments/history", response_model=InstrumentHistoryResponse)
+async def get_my_instrument_history(
+    current_user: User = Depends(get_current_active_user),
+    db: AsyncSession = Depends(get_async_db),
+) -> InstrumentHistoryResponse:
+    """The user's own past formal screening submissions (newest first)."""
+    from app.domains.mental_health.models import FormalScreeningSubmission
+
+    rows = (
+        await db.execute(
+            select(FormalScreeningSubmission)
+            .where(FormalScreeningSubmission.user_id == current_user.id)
+            .order_by(FormalScreeningSubmission.created_at.desc())
+            .limit(20)
+        )
+    ).scalars().all()
+
+    return InstrumentHistoryResponse(
+        submissions=[
+            InstrumentSubmissionOut(
+                id=row.id,
+                instrument=row.instrument,
+                total_score=row.total_score,
+                max_score=row.max_score,
+                normalized_score=row.normalized_score,
+                severity_band=row.severity_band,
+                severity_label=row.severity_label,
+                crisis_flag=row.crisis_flag,
+                created_at=row.created_at,
+            )
+            for row in rows
+        ]
+    )
+
+
+@router.post(
+    "/instruments/{instrument_code}/submit", response_model=InstrumentSubmitResponse
+)
+async def submit_formal_instrument(
+    instrument_code: str,
+    payload: InstrumentSubmitRequest,
+    current_user: User = Depends(get_current_active_user),
+    db: AsyncSession = Depends(get_async_db),
+) -> InstrumentSubmitResponse:
+    """Score and record a formal instrument submission (self-administered)."""
+    if not settings.formal_screening_enabled:
+        raise HTTPException(status_code=404, detail="Formal screening is not enabled")
+
+    from app.services.formal_instrument_service import record_formal_instrument
+
+    try:
+        result = await record_formal_instrument(
+            db,
+            user_id=current_user.id,
+            instrument_code=instrument_code,
+            responses=payload.responses,
+        )
+    except ValueError as exc:
+        raise HTTPException(status_code=422, detail=str(exc))
+    except KeyError as exc:
+        raise HTTPException(status_code=404, detail=str(exc))
+    except RuntimeError as exc:
+        raise HTTPException(
+            status_code=429,
+            detail=str(exc),
+            headers={"Retry-After": str(24 * 3600)},
+        )
+
+    await db.commit()
+    return InstrumentSubmitResponse(recorded=True, result=result)
