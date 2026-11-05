@@ -27,6 +27,9 @@ class ProactiveMessageSource(str, enum.Enum):
     plan_followup = "plan_followup"
     # Weekly opt-in self-report (PHQ-2/GAD-2) prompt — JITAI Phase 1b.
     self_report_checkin = "self_report_checkin"
+    # Early-warning outreach after a deteriorating cross-conversation risk
+    # trajectory is detected by the scheduler job.
+    trajectory_checkin = "trajectory_checkin"
 
 
 class ProactiveMessageStatus(str, enum.Enum):

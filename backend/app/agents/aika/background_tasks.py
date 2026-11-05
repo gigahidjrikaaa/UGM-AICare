@@ -274,6 +274,8 @@ async def _escalate_conversation_if_needed(
         "moderate": CaseSeverityEnum.med,
     }
     severity = severity_map.get(risk, CaseSeverityEnum.high)
+    # Pool routing: moderate distress goes to the peer-supporter pool.
+    routed_pool = 'peer' if severity in (CaseSeverityEnum.low, CaseSeverityEnum.med) else 'counselor'
 
     case: Case | None = None
     try:
@@ -295,37 +297,78 @@ async def _escalate_conversation_if_needed(
             summary_source = (
                 getattr(assessment, "conversation_summary", None) or last_message or ""
             )
+            # SLA deadline: this creation path never had one (cases slipped
+            # through with no escalation deadline). Critical = 15 min, else 1h.
+            from datetime import datetime as _datetime, timedelta as _timedelta
+
+            sla_minutes = (
+                15 if severity == CaseSeverityEnum.critical else 60
+            )
             case = Case(
                 status=CaseStatusEnum.new,
                 severity=severity,
+                routed_pool=routed_pool,
                 assigned_to=None,
                 user_hash=user_hash,
                 session_id=session_id,
                 summary_redacted=prelog_redact(summary_source),
+                sla_breach_at=_datetime.utcnow() + _timedelta(minutes=sla_minutes),
             )
             db.add(case)
             await db.flush()
 
             # Auto-assign: without this, directly-created review cases stayed
             # unassigned forever — invisible to counselors, whose case list
-            # filters assigned_to == me. Reuses CMA's deterministic counselor
-            # selection; status stays "new" so it still shows in the
-            # escalations intake queue. Assignment publishes CASE_ASSIGNED,
+            # filters assigned_to == me. Peer-routed cases go through the CMA
+            # peer pool; counselor-pool cases reuse CMA's deterministic
+            # counselor selection; status stays "new" so it still shows in
+            # the escalations intake queue. Assignment publishes CASE_ASSIGNED,
             # which the event bridge turns into a counselor-scoped alert.
             try:
-                from app.agents.cma.cma_graph import _select_optimal_counselor
-
-                counselor_id = await _select_optimal_counselor(
-                    db, severity.value, preferences={}
-                )
-                if counselor_id is not None:
-                    case.assigned_to = str(counselor_id)
-                    db.add(case)
-                    logger.info(
-                        "[BACKGROUND] Review case auto-assigned: case=%s → counselor=%s",
-                        case.id,
-                        counselor_id,
+                if routed_pool == 'peer':
+                    from app.domains.mental_health.services.peer_support_service import (
+                        select_supporter_for_assignment,
                     )
+
+                    supporter_id = await select_supporter_for_assignment(db)
+                    if supporter_id is not None:
+                        case.assigned_to = str(supporter_id)
+                        db.add(case)
+                        logger.info(
+                            "[BACKGROUND] Review case routed to peer pool: case=%s → supporter=%s",
+                            case.id,
+                            supporter_id,
+                        )
+                    else:
+                        # Peer pool empty — safety fallback to counselors.
+                        from app.agents.cma.cma_graph import _select_optimal_counselor
+
+                        counselor_id = await _select_optimal_counselor(
+                            db, severity.value, preferences={}
+                        )
+                        if counselor_id is not None:
+                            case.routed_pool = 'counselor'
+                            case.assigned_to = str(counselor_id)
+                            db.add(case)
+                            logger.info(
+                                "[BACKGROUND] Peer pool empty, review case fell back to counselor: case=%s → counselor=%s",
+                                case.id,
+                                counselor_id,
+                            )
+                else:
+                    from app.agents.cma.cma_graph import _select_optimal_counselor
+
+                    counselor_id = await _select_optimal_counselor(
+                        db, severity.value, preferences={}
+                    )
+                    if counselor_id is not None:
+                        case.assigned_to = str(counselor_id)
+                        db.add(case)
+                        logger.info(
+                            "[BACKGROUND] Review case auto-assigned: case=%s → counselor=%s",
+                            case.id,
+                            counselor_id,
+                        )
             except Exception as assign_exc:
                 logger.warning(
                     "[BACKGROUND] Auto-assignment failed (case stays unassigned for admin triage): %s",

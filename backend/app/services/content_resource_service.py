@@ -159,12 +159,29 @@ async def ingest_pdf_resource(file: UploadFile) -> ResourceIngestionResult:
 
 
 async def enqueue_embedding_job(resource_id: int) -> None:
-    """Run the embedding pipeline for a resource.
+    """Queue the embedding pipeline as a durable autopilot action.
 
-    Scheduled as a FastAPI BackgroundTask by the content-resource routes, so it
-    executes in-process after the response is sent (no Celery worker required).
+    Runs via the in-process autopilot worker (retry/backoff/dead-letter) —
+    durably via the autopilot queue (retry/dead-letter). Re-enqueueing the same resource resets its
+    action to queued, so admin re-uploads re-embed (the pipeline itself is
+    idempotent: delete-then-insert chunks).
     """
-    logger.info("Running embedding job for resource %s", resource_id)
+    import hashlib
+    from datetime import datetime, timezone
+
+    from app.domains.mental_health.models.autopilot_actions import AutopilotActionType
+    from app.domains.mental_health.models.autopilot_actions import (
+        AutopilotAction,
+        AutopilotActionStatus,
+    )
+    from app.domains.mental_health.services.autopilot_action_service import (
+        build_idempotency_key,
+        enqueue_action,
+    )
+
+    logger.info("Queueing embedding job for resource %s", resource_id)
+
+    idempotency_key = build_idempotency_key(f"embed:{resource_id}")
 
     async with AsyncSessionLocal() as db:
         resource = await db.get(ContentResource, resource_id)
@@ -174,12 +191,37 @@ async def enqueue_embedding_job(resource_id: int) -> None:
         resource.embedding_status = "queued"
         await db.commit()
 
-    from app.services.embedding_service import process_embedding
+        # Re-trigger semantics: reuse the existing action row if present.
+        existing = (
+            await db.execute(
+                select(AutopilotAction).where(
+                    AutopilotAction.idempotency_key == idempotency_key
+                )
+            )
+        ).scalar_one_or_none()
 
-    try:
-        await process_embedding(resource_id)
-    except Exception as exc:
-        logger.error("Embedding job failed for %s: %s", resource_id, exc, exc_info=True)
+        now = datetime.now(timezone.utc)
+        if existing is not None:
+            existing.status = AutopilotActionStatus.queued
+            existing.retry_count = 0
+            existing.next_retry_at = now
+            existing.error_message = None
+            db.add(existing)
+        else:
+            await enqueue_action(
+                db,
+                action_type=AutopilotActionType.content_embedding,
+                risk_level="low",
+                idempotency_key=idempotency_key,
+                payload_json={"resource_id": resource_id},
+                commit=False,
+            )
+        await db.commit()
+
+    logger.info("Embedding job queued for resource %s", resource_id)
+
+
+
 
 
 async def ensure_resource_exists(db: AsyncSession, resource_id: int) -> ContentResource:

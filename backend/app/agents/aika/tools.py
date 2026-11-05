@@ -71,6 +71,21 @@ _AIKA_ROLE_TOOL_ALLOWLISTS: Dict[str, Set[str]] = {
         "get_crisis_resources",
         "trigger_conversation_analysis",  # Manual STA analysis on demand
     },
+    # Trained student volunteer: case-read tools scoped to their own caseload
+    # (counselor_scope enforces assignment scope server-side) + their own
+    # student self-tools. No status changes, no analytics via AI.
+    "peer_supporter": {
+        "get_user_profile",
+        "get_user_preferences",
+        "get_journal_entries",
+        "get_activity_streak",
+        "get_crisis_resources",
+        "get_mental_health_resources",
+        "get_my_assigned_cases",
+        "get_case_details",
+        "get_user_cases",
+        "get_conversation_summary",
+    },
 }
 
 

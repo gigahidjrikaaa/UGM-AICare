@@ -116,9 +116,25 @@ async def enqueue_action(
     if existing:
         return existing
 
+    # Record the policy verdict on the row. Without this, the non-null
+    # policy_decision column made every direct enqueue fail with an
+    # IntegrityError on a real database (tests with MagicMock sessions
+    # masked it).
+    from app.core.policy import PolicyViolation
+    from app.domains.mental_health.services.autopilot_policy_engine import (
+        evaluate_action_policy,
+    )
+
+    verdict = evaluate_action_policy(action_type=action_type, risk_level=risk_level)
+    if verdict.decision == AutopilotPolicyDecision.deny:
+        raise PolicyViolation(
+            f"Action '{action_type.value}' denied by policy: {verdict.rationale}"
+        )
+
     action = AutopilotAction(
         action_type=action_type,
         risk_level=risk_level,
+        policy_decision=verdict.decision,
         status=AutopilotActionStatus.queued,
         idempotency_key=idempotency_key,
         payload_hash=hash_payload(payload_json),

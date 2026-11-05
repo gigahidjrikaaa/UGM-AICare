@@ -42,7 +42,7 @@ _RETRIEVE_SQL = text(
             c.chunk_metadata,
             r.title AS resource_title,
             r.source AS resource_source,
-            1 - (c.embedding <=> :query_vector::vector) AS dense_score,
+            1 - (c.embedding <=> CAST(:query_vector AS vector)) AS dense_score,
             CASE
                 WHEN c.tsv @@ websearch_to_tsquery('indonesian', :query_text)
                 THEN ts_rank_cd(c.tsv, websearch_to_tsquery('indonesian', :query_text))

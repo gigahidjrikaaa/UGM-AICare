@@ -91,6 +91,7 @@ AIKA_GREETINGS = {
     "user": "Hai! Aku Aika. Aku di sini untuk mendengarkan dan mendukungmu. Ada yang ingin kamu ceritakan?",
     "admin": "Hello! I'm Aika, your administrative assistant. How can I help you manage the platform today?",
     "counselor": "Hi! I'm Aika, your clinical assistant. What can I help you with regarding your cases?",
+    "peer_supporter": "Hi! I'm Aika, your peer-support assistant. I can pull up your assigned cases and conversation context — what do you need?",
 }
 
 # Role-specific capabilities summary
@@ -118,5 +119,11 @@ AIKA_CAPABILITIES = {
         "⚠️ High-risk case alerts",
         "📊 Patient progress tracking",
         "📝 Clinical documentation support",
+    ],
+    "peer_supporter": [
+        "📋 Melihat kasus yang ditugaskan padamu",
+        "💡 Konteks percakapan untuk sesi peer support",
+        "🚨 Panduan escalation ke counselor profesional",
+        "📚 Rekomendasi resources untuk peer sessions",
     ],
 }

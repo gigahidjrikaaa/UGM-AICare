@@ -1,13 +1,13 @@
 """Embedding pipeline for the RAG knowledge base (content_resource_chunks).
 
-Runs in-process (FastAPI BackgroundTasks) — previously a Celery task.
+Runs via the autopilot worker queue (durable, retried, dead-lettered).
 
 Pipeline per resource:
     1. Load resource content (DB row; MinIO-backed content is already
        extracted into ``content`` at ingestion time).
     2. Chunk via :mod:`app.services.knowledge_chunking` (section-aware,
        ~1200 chars, 15% overlap).
-    3. Embed chunks with ``text-embedding-004`` @ 768 dims
+    3. Embed chunks with ``gemini-embedding-001`` @ 768 dims
        (task type RETRIEVAL_DOCUMENT) through ``llm.embed_texts``.
     4. DELETE-then-INSERT all chunks for the resource inside one
        transaction (keeps re-ingestion idempotent).
@@ -32,6 +32,15 @@ from app.domains.mental_health.models import ContentResource
 from app.services.knowledge_chunking import chunk_text
 
 logger = logging.getLogger(__name__)
+def _now_naive() -> datetime:
+    """Naive UTC now.
+
+    ``ContentResource.embedding_last_processed_at`` and ``updated_at`` are
+    naive TIMESTAMP columns; writing timezone-aware datetimes (as this
+    module previously did with ``datetime.now(timezone.utc)``) fails on
+    asyncpg with "can't subtract offset-naive and offset-aware datetimes".
+    """
+    return datetime.now(timezone.utc).replace(tzinfo=None)
 
 
 def _vector_literal(vector: list[float]) -> str:
@@ -48,7 +57,7 @@ async def process_embedding(resource_id: int) -> None:
             return
 
         resource.embedding_status = "processing"
-        resource.embedding_last_processed_at = datetime.now(timezone.utc)
+        resource.embedding_last_processed_at = _now_naive()
         await db.commit()
 
         try:
@@ -80,7 +89,8 @@ async def process_embedding(resource_id: int) -> None:
                     text(
                         "INSERT INTO content_resource_chunks "
                         "(resource_id, chunk_index, section, content, chunk_metadata, embedding) "
-                        "VALUES (:rid, :idx, :section, :content, :meta::jsonb, :embedding::vector)"
+                        "VALUES (:rid, :idx, :section, :content, "
+                        "CAST(:meta AS jsonb), CAST(:embedding AS vector))"
                     ),
                     {
                         "rid": resource_id,
@@ -98,7 +108,7 @@ async def process_embedding(resource_id: int) -> None:
             metadata.pop("embedding_error", None)
             metadata["embedding_model"] = settings.rag_embedding_model
             resource.resource_metadata = metadata
-            resource.embedding_last_processed_at = datetime.now(timezone.utc)
+            resource.embedding_last_processed_at = _now_naive()
             await db.commit()
             logger.info(
                 "Resource %s embedded: %d chunks (model=%s)",
@@ -118,5 +128,5 @@ async def process_embedding(resource_id: int) -> None:
                 metadata = dict(fresh.resource_metadata or {})
                 metadata["embedding_error"] = str(exc)[:500]
                 fresh.resource_metadata = metadata
-                fresh.embedding_last_processed_at = datetime.now(timezone.utc)
+                fresh.embedding_last_processed_at = _now_naive()
                 await db.commit()

@@ -360,6 +360,25 @@ async def _handle_sta_conversation_analysis(action: AutopilotAction) -> dict[str
 
     async with AsyncSessionLocal() as db:
         await trigger_sta_conversation_analysis_background(state, db)
+
+        # Cross-session memory: generate the conversation summary for this
+        # session. Previously this only ran on the frontend-invoked
+        # end-session route — which the frontend never calls — so
+        # user_summaries stayed empty and the welcome-back greeting never had
+        # summary context. summarize_and_save opens its own session and
+        # swallows internal failures, so it can never fail the action.
+        if state.get("user_id") and state.get("session_id"):
+            try:
+                from app.domains.mental_health.services.summarization_service import summarize_and_save
+
+                await summarize_and_save(
+                    int(state["user_id"]), str(state["session_id"])
+                )
+            except Exception as summary_exc:
+                logger.warning(
+                    "Conversation summary failed (non-blocking): %s", summary_exc
+                )
+
         await db.commit()
 
     assessment = state.get("conversation_assessment") or {}
@@ -423,7 +442,26 @@ async def execute_autopilot_action(action: AutopilotAction) -> dict[str, Any]:
         return await _handle_sta_conversation_analysis(action)
     if action.action_type == AutopilotActionType.plan_followup:
         return await _handle_plan_followup(action)
+    if action.action_type == AutopilotActionType.content_embedding:
+        return await _handle_content_embedding(action)
     raise ValueError(f"Unsupported action type: {action.action_type.value}")
+
+
+async def _handle_content_embedding(action: AutopilotAction) -> dict[str, Any]:
+    """Run the RAG embedding pipeline for one content resource (durable).
+
+    ``embedding_service.process_embedding`` opens its own session and marks
+    the resource failed/errored internally, so failures here mean infra-level
+    problems only (queue/DB down) and are worth a retry.
+    """
+    from app.services.embedding_service import process_embedding
+
+    resource_id = int((action.payload_json or {}).get("resource_id", 0))
+    if not resource_id:
+        return {"skipped": "no resource_id"}
+
+    await process_embedding(resource_id)
+    return {"embedded": True, "resource_id": resource_id}
 
 
 async def _handle_plan_followup(action: AutopilotAction) -> dict[str, Any]:

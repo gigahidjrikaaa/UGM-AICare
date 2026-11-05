@@ -375,7 +375,7 @@ def _compute_routing(
     # The parse-failure path already escalates on any crisis keyword; this
     # extends the SAME guarantee to the success path so a misclassification
     # can never silently skip escalation for a real self-harm signal.
-    if normalized_role == "user" and updates.get("immediate_risk_level") not in (
+    if normalized_role in ("user", "peer_supporter") and updates.get("immediate_risk_level") not in (
         "high",
         "critical",
     ):
@@ -722,10 +722,9 @@ async def _evaluate_autopilot_policy(
     Side effects: may write an ``AutopilotAction`` row and a compliance audit
     entry when a candidate action is found.
     """
-    is_enabled = (
-        os.getenv("AUTOPILOT_ENABLED", "true").strip().lower()
-        in {"1", "true", "yes", "on"}
-    )
+    from app.services.autopilot_policy import get_bool as get_policy_bool
+
+    is_enabled = await get_policy_bool("AUTOPILOT_ENABLED", True)
     if not is_enabled:
         return {}
 

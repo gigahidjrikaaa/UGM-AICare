@@ -65,7 +65,8 @@ async def _create_counselor_alert(
     if not recipient_user_ids:
         return
 
-    link = f"/counselor/cases?case_id={case_id}" if case_id else "/counselor/cases"
+    # The counselor cases page honors ?highlight=<case_id> (not ?case_id=).
+    link = f"/counselor/cases?highlight={case_id}" if case_id else "/counselor/cases"
     metadata = {
         "audience": "counselor",
         "recipient_user_ids": recipient_user_ids,
@@ -108,6 +109,108 @@ async def _create_counselor_alert(
             "counselor_alert SSE broadcast failed (alert row persisted): %s",
             broadcast_exc,
         )
+
+
+async def resolve_counselors_for_user(user_id: int) -> list[int]:
+    """Resolve counselor user_ids who should hear about a user's risk signal.
+
+    Priority: assignees (counselors AND peer supporters) of the user's active
+    (new/in_progress/waiting) cases. Case → user linkage goes through the
+    session hash — Case stores a pseudonymous ``user_hash``, not a user_id,
+    so we match the same sha256("user_{id}")[:16] scheme the chat pipeline
+    writes. When the user has no active case, fall back to every active
+    counselor so a first crisis signal is never silently dropped.
+    """
+    import hashlib
+    from datetime import datetime, timedelta, timezone
+
+    from app.models.user import User as UserModel
+
+    user_hash = hashlib.sha256(f"user_{user_id}".encode()).hexdigest()[:16]
+
+    recipient_ids: set[int] = set()
+    async with AsyncSessionLocal() as db:
+        active_statuses = ("new", "in_progress", "waiting")
+        cases = (
+            await db.execute(
+                select(Case)
+                .where(
+                    Case.user_hash == user_hash,
+                    Case.status.in_(active_statuses),
+                    Case.assigned_to.is_not(None),
+                )
+                .limit(10)
+            )
+        ).scalars().all()
+        for case in cases:
+            try:
+                counselor_id = int(str(case.assigned_to))
+            except ValueError:
+                continue
+            profile = (
+                await db.execute(select(Counselor).where(Counselor.id == counselor_id))
+            ).scalar_one_or_none()
+            if profile and profile.user_id is not None:
+                recipient_ids.add(int(profile.user_id))
+
+        if not recipient_ids:
+            cutoff = (datetime.now(timezone.utc) - timedelta(days=90)).date()
+            counselor_rows = (
+                await db.execute(
+                    select(UserModel.id)
+                    .join(Counselor, Counselor.user_id == UserModel.id)
+                    .where(
+                        UserModel.is_active == True,  # noqa: E712
+                        UserModel.last_activity_date >= cutoff,
+                    )
+                    .limit(50)
+                )
+            ).scalars().all()
+            recipient_ids.update(int(uid) for uid in counselor_rows)
+
+    return sorted(recipient_ids)
+
+
+async def create_user_risk_counselor_alert(
+    *,
+    user_id: int,
+    title: str,
+    message: str,
+    severity: AlertSeverity,
+    detail: dict | None = None,
+    link: str = "/counselor/patients",
+) -> bool:
+    """Create a counselor-scoped alert about a user-level risk signal.
+
+    Used by the formal-instrument crisis path and the trajectory
+    early-warning job. Returns True when at least one counselor was reached.
+    """
+    try:
+        recipient_user_ids = await resolve_counselors_for_user(user_id)
+    except Exception as exc:
+        logger.warning("counselor resolution failed for user %s: %s", user_id, exc)
+        recipient_user_ids = []
+
+    if not recipient_user_ids:
+        return False
+
+    await _create_counselor_alert(
+        title=title,
+        message=message,
+        severity=severity,
+        case_id=None,
+        recipient_user_ids=recipient_user_ids,
+        alert_type=AlertType.SYSTEM_NOTIFICATION,
+    )
+    if detail:
+        logger.warning(
+            "user risk alert: user=%s severity=%s detail=%s recipients=%s",
+            user_id,
+            severity.value,
+            detail,
+            recipient_user_ids,
+        )
+    return True
 
 
 async def handle_case_assigned_event(event: Event) -> None:

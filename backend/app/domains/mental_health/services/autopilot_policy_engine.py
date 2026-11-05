@@ -65,6 +65,15 @@ def evaluate_action_policy(
             rationale="Badge minting is allowed for all risk levels",
         )
 
+    if action_type == AutopilotActionType.sta_conversation_analysis:
+        return PolicyEvaluationResult(
+            decision=AutopilotPolicyDecision.allow,
+            rationale=(
+                "Internal safety analysis bypasses the policy engine "
+                "(recorded as allow for queue consistency)"
+            ),
+        )
+
     if action_type == AutopilotActionType.plan_followup:
         return PolicyEvaluationResult(
             decision=AutopilotPolicyDecision.allow,
@@ -72,6 +81,12 @@ def evaluate_action_policy(
                 "Plan follow-ups are allowed at every risk level: the gate is "
                 "the user's proactive-chat consent, enforced again at delivery"
             ),
+        )
+
+    if action_type == AutopilotActionType.content_embedding:
+        return PolicyEvaluationResult(
+            decision=AutopilotPolicyDecision.allow,
+            rationale="Content embedding is an internal RAG pipeline step",
         )
 
     return PolicyEvaluationResult(
