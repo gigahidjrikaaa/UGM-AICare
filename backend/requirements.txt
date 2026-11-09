@@ -35,7 +35,7 @@ PyPDF2==3.0.1
 # Authentication
 python-jose[cryptography]>=3.5.0  # Updated to fix CVE-2024-33663
 passlib[bcrypt]==1.7.4
-bcrypt==4.0.1
+bcrypt==4.3.0
 python-dotenv
 hkdf
 
@@ -50,10 +50,10 @@ google-genai>=1.33.0
 google-api-core>=2.19.0,<3.0.0  # Constrain to avoid excessive backtracking
 googleapis-common-protos>=1.70.0,<2.0.0  # Explicit pin prevents resolver backtracking
 protobuf>=5.0.0,<6.0.0  # Compatible with google-genai and Langfuse
-opentelemetry-sdk==1.45.1  # Align OpenTelemetry stack for Langfuse
-opentelemetry-proto==1.45.1
-opentelemetry-exporter-otlp-proto-http==1.45.1
-opentelemetry-exporter-otlp-proto-common==1.45.1
+opentelemetry-sdk==1.45.2  # Align OpenTelemetry stack for Langfuse
+opentelemetry-proto==1.45.2
+opentelemetry-exporter-otlp-proto-http==1.45.2
+opentelemetry-exporter-otlp-proto-common==1.45.2
 
 # LangGraph
 langgraph>=1.2.15,<1.3.0
@@ -87,7 +87,7 @@ apscheduler==3.11.3
 
 # Utils
 python-slugify==8.0.1
-pydantic-settings==2.15.0
+pydantic-settings==2.16.2
 typing-extensions
 
 # Monitoring
